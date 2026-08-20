@@ -2319,6 +2319,15 @@ class $MessagesTable extends Messages with TableInfo<$MessagesTable, Message> {
     type: DriftSqlType.int,
     requiredDuringInsert: true,
   );
+  static const VerificationMeta _macMeta = const VerificationMeta('mac');
+  @override
+  late final GeneratedColumn<Uint8List> mac = GeneratedColumn<Uint8List>(
+    'mac',
+    aliasedName,
+    false,
+    type: DriftSqlType.blob,
+    requiredDuringInsert: true,
+  );
   static const VerificationMeta _replyToMeta = const VerificationMeta(
     'replyTo',
   );
@@ -2387,6 +2396,7 @@ class $MessagesTable extends Messages with TableInfo<$MessagesTable, Message> {
     nonce,
     messageType,
     status,
+    mac,
     replyTo,
     edited,
     protocolVersion,
@@ -2516,6 +2526,14 @@ class $MessagesTable extends Messages with TableInfo<$MessagesTable, Message> {
     } else if (isInserting) {
       context.missing(_statusMeta);
     }
+    if (data.containsKey('mac')) {
+      context.handle(
+        _macMeta,
+        mac.isAcceptableOrUnknown(data['mac']!, _macMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_macMeta);
+    }
     if (data.containsKey('reply_to')) {
       context.handle(
         _replyToMeta,
@@ -2606,6 +2624,10 @@ class $MessagesTable extends Messages with TableInfo<$MessagesTable, Message> {
         DriftSqlType.int,
         data['${effectivePrefix}_status'],
       )!,
+      mac: attachedDatabase.typeMapping.read(
+        DriftSqlType.blob,
+        data['${effectivePrefix}mac'],
+      )!,
       replyTo: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}reply_to'],
@@ -2648,6 +2670,7 @@ class Message extends DataClass implements Insertable<Message> {
   final Uint8List nonce;
   final int messageType;
   final int status;
+  final Uint8List mac;
   final String? replyTo;
   final int edited;
   final int protocolVersion;
@@ -2666,6 +2689,7 @@ class Message extends DataClass implements Insertable<Message> {
     required this.nonce,
     required this.messageType,
     required this.status,
+    required this.mac,
     this.replyTo,
     required this.edited,
     required this.protocolVersion,
@@ -2687,6 +2711,7 @@ class Message extends DataClass implements Insertable<Message> {
     map['nonce'] = Variable<Uint8List>(nonce);
     map['message_type'] = Variable<int>(messageType);
     map['_status'] = Variable<int>(status);
+    map['mac'] = Variable<Uint8List>(mac);
     if (!nullToAbsent || replyTo != null) {
       map['reply_to'] = Variable<String>(replyTo);
     }
@@ -2715,6 +2740,7 @@ class Message extends DataClass implements Insertable<Message> {
       nonce: Value(nonce),
       messageType: Value(messageType),
       status: Value(status),
+      mac: Value(mac),
       replyTo: replyTo == null && nullToAbsent
           ? const Value.absent()
           : Value(replyTo),
@@ -2747,6 +2773,7 @@ class Message extends DataClass implements Insertable<Message> {
       nonce: serializer.fromJson<Uint8List>(json['nonce']),
       messageType: serializer.fromJson<int>(json['messageType']),
       status: serializer.fromJson<int>(json['status']),
+      mac: serializer.fromJson<Uint8List>(json['mac']),
       replyTo: serializer.fromJson<String?>(json['replyTo']),
       edited: serializer.fromJson<int>(json['edited']),
       protocolVersion: serializer.fromJson<int>(json['protocolVersion']),
@@ -2770,6 +2797,7 @@ class Message extends DataClass implements Insertable<Message> {
       'nonce': serializer.toJson<Uint8List>(nonce),
       'messageType': serializer.toJson<int>(messageType),
       'status': serializer.toJson<int>(status),
+      'mac': serializer.toJson<Uint8List>(mac),
       'replyTo': serializer.toJson<String?>(replyTo),
       'edited': serializer.toJson<int>(edited),
       'protocolVersion': serializer.toJson<int>(protocolVersion),
@@ -2791,6 +2819,7 @@ class Message extends DataClass implements Insertable<Message> {
     Uint8List? nonce,
     int? messageType,
     int? status,
+    Uint8List? mac,
     Value<String?> replyTo = const Value.absent(),
     int? edited,
     int? protocolVersion,
@@ -2809,6 +2838,7 @@ class Message extends DataClass implements Insertable<Message> {
     nonce: nonce ?? this.nonce,
     messageType: messageType ?? this.messageType,
     status: status ?? this.status,
+    mac: mac ?? this.mac,
     replyTo: replyTo.present ? replyTo.value : this.replyTo,
     edited: edited ?? this.edited,
     protocolVersion: protocolVersion ?? this.protocolVersion,
@@ -2843,6 +2873,7 @@ class Message extends DataClass implements Insertable<Message> {
           ? data.messageType.value
           : this.messageType,
       status: data.status.present ? data.status.value : this.status,
+      mac: data.mac.present ? data.mac.value : this.mac,
       replyTo: data.replyTo.present ? data.replyTo.value : this.replyTo,
       edited: data.edited.present ? data.edited.value : this.edited,
       protocolVersion: data.protocolVersion.present
@@ -2870,6 +2901,7 @@ class Message extends DataClass implements Insertable<Message> {
           ..write('nonce: $nonce, ')
           ..write('messageType: $messageType, ')
           ..write('status: $status, ')
+          ..write('mac: $mac, ')
           ..write('replyTo: $replyTo, ')
           ..write('edited: $edited, ')
           ..write('protocolVersion: $protocolVersion, ')
@@ -2893,6 +2925,7 @@ class Message extends DataClass implements Insertable<Message> {
     $driftBlobEquality.hash(nonce),
     messageType,
     status,
+    $driftBlobEquality.hash(mac),
     replyTo,
     edited,
     protocolVersion,
@@ -2915,6 +2948,7 @@ class Message extends DataClass implements Insertable<Message> {
           $driftBlobEquality.equals(other.nonce, this.nonce) &&
           other.messageType == this.messageType &&
           other.status == this.status &&
+          $driftBlobEquality.equals(other.mac, this.mac) &&
           other.replyTo == this.replyTo &&
           other.edited == this.edited &&
           other.protocolVersion == this.protocolVersion &&
@@ -2935,6 +2969,7 @@ class MessagesCompanion extends UpdateCompanion<Message> {
   final Value<Uint8List> nonce;
   final Value<int> messageType;
   final Value<int> status;
+  final Value<Uint8List> mac;
   final Value<String?> replyTo;
   final Value<int> edited;
   final Value<int> protocolVersion;
@@ -2954,6 +2989,7 @@ class MessagesCompanion extends UpdateCompanion<Message> {
     this.nonce = const Value.absent(),
     this.messageType = const Value.absent(),
     this.status = const Value.absent(),
+    this.mac = const Value.absent(),
     this.replyTo = const Value.absent(),
     this.edited = const Value.absent(),
     this.protocolVersion = const Value.absent(),
@@ -2974,6 +3010,7 @@ class MessagesCompanion extends UpdateCompanion<Message> {
     required Uint8List nonce,
     required int messageType,
     required int status,
+    required Uint8List mac,
     this.replyTo = const Value.absent(),
     this.edited = const Value.absent(),
     this.protocolVersion = const Value.absent(),
@@ -2991,7 +3028,8 @@ class MessagesCompanion extends UpdateCompanion<Message> {
        ciphertext = Value(ciphertext),
        nonce = Value(nonce),
        messageType = Value(messageType),
-       status = Value(status);
+       status = Value(status),
+       mac = Value(mac);
   static Insertable<Message> custom({
     Expression<String>? messageId,
     Expression<String>? logicalMessageId,
@@ -3005,6 +3043,7 @@ class MessagesCompanion extends UpdateCompanion<Message> {
     Expression<Uint8List>? nonce,
     Expression<int>? messageType,
     Expression<int>? status,
+    Expression<Uint8List>? mac,
     Expression<String>? replyTo,
     Expression<int>? edited,
     Expression<int>? protocolVersion,
@@ -3025,6 +3064,7 @@ class MessagesCompanion extends UpdateCompanion<Message> {
       if (nonce != null) 'nonce': nonce,
       if (messageType != null) 'message_type': messageType,
       if (status != null) '_status': status,
+      if (mac != null) 'mac': mac,
       if (replyTo != null) 'reply_to': replyTo,
       if (edited != null) 'edited': edited,
       if (protocolVersion != null) 'protocol_version': protocolVersion,
@@ -3047,6 +3087,7 @@ class MessagesCompanion extends UpdateCompanion<Message> {
     Value<Uint8List>? nonce,
     Value<int>? messageType,
     Value<int>? status,
+    Value<Uint8List>? mac,
     Value<String?>? replyTo,
     Value<int>? edited,
     Value<int>? protocolVersion,
@@ -3067,6 +3108,7 @@ class MessagesCompanion extends UpdateCompanion<Message> {
       nonce: nonce ?? this.nonce,
       messageType: messageType ?? this.messageType,
       status: status ?? this.status,
+      mac: mac ?? this.mac,
       replyTo: replyTo ?? this.replyTo,
       edited: edited ?? this.edited,
       protocolVersion: protocolVersion ?? this.protocolVersion,
@@ -3115,6 +3157,9 @@ class MessagesCompanion extends UpdateCompanion<Message> {
     if (status.present) {
       map['_status'] = Variable<int>(status.value);
     }
+    if (mac.present) {
+      map['mac'] = Variable<Uint8List>(mac.value);
+    }
     if (replyTo.present) {
       map['reply_to'] = Variable<String>(replyTo.value);
     }
@@ -3151,6 +3196,7 @@ class MessagesCompanion extends UpdateCompanion<Message> {
           ..write('nonce: $nonce, ')
           ..write('messageType: $messageType, ')
           ..write('status: $status, ')
+          ..write('mac: $mac, ')
           ..write('replyTo: $replyTo, ')
           ..write('edited: $edited, ')
           ..write('protocolVersion: $protocolVersion, ')
@@ -10744,6 +10790,7 @@ typedef $$MessagesTableCreateCompanionBuilder = MessagesCompanion Function({
   required Uint8List nonce,
   required int messageType,
   required int status,
+  required Uint8List mac,
   Value<String?> replyTo,
   Value<int> edited,
   Value<int> protocolVersion,
@@ -10764,6 +10811,7 @@ typedef $$MessagesTableUpdateCompanionBuilder = MessagesCompanion Function({
   Value<Uint8List> nonce,
   Value<int> messageType,
   Value<int> status,
+  Value<Uint8List> mac,
   Value<String?> replyTo,
   Value<int> edited,
   Value<int> protocolVersion,
@@ -10856,6 +10904,11 @@ class $$MessagesTableFilterComposer
 
   ColumnFilters<int> get status => $composableBuilder(
     column: $table.status,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<Uint8List> get mac => $composableBuilder(
+    column: $table.mac,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -10972,6 +11025,11 @@ class $$MessagesTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<Uint8List> get mac => $composableBuilder(
+    column: $table.mac,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<String> get replyTo => $composableBuilder(
     column: $table.replyTo,
     builder: (column) => ColumnOrderings(column),
@@ -11075,6 +11133,9 @@ class $$MessagesTableAnnotationComposer
   GeneratedColumn<int> get status =>
       $composableBuilder(column: $table.status, builder: (column) => column);
 
+  GeneratedColumn<Uint8List> get mac =>
+      $composableBuilder(column: $table.mac, builder: (column) => column);
+
   GeneratedColumn<String> get replyTo =>
       $composableBuilder(column: $table.replyTo, builder: (column) => column);
 
@@ -11158,6 +11219,7 @@ class $$MessagesTableTableManager
                 Value<Uint8List> nonce = const Value.absent(),
                 Value<int> messageType = const Value.absent(),
                 Value<int> status = const Value.absent(),
+                Value<Uint8List> mac = const Value.absent(),
                 Value<String?> replyTo = const Value.absent(),
                 Value<int> edited = const Value.absent(),
                 Value<int> protocolVersion = const Value.absent(),
@@ -11177,6 +11239,7 @@ class $$MessagesTableTableManager
                 nonce: nonce,
                 messageType: messageType,
                 status: status,
+                mac: mac,
                 replyTo: replyTo,
                 edited: edited,
                 protocolVersion: protocolVersion,
@@ -11198,6 +11261,7 @@ class $$MessagesTableTableManager
                 required Uint8List nonce,
                 required int messageType,
                 required int status,
+                required Uint8List mac,
                 Value<String?> replyTo = const Value.absent(),
                 Value<int> edited = const Value.absent(),
                 Value<int> protocolVersion = const Value.absent(),
@@ -11217,6 +11281,7 @@ class $$MessagesTableTableManager
                 nonce: nonce,
                 messageType: messageType,
                 status: status,
+                mac: mac,
                 replyTo: replyTo,
                 edited: edited,
                 protocolVersion: protocolVersion,

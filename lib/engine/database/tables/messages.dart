@@ -32,6 +32,8 @@ class Messages extends Table {
   IntColumn get status => integer().named('_status')();
   BlobColumn get mac => blob()();
 
+  IntColumn get keyVersion => integer()();
+
   TextColumn get replyTo => text().nullable()();
 
   IntColumn get edited =>
