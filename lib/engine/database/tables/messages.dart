@@ -30,6 +30,7 @@ class Messages extends Table {
 
   // Column name `_status`.
   IntColumn get status => integer().named('_status')();
+  BlobColumn get mac => blob()();
 
   TextColumn get replyTo => text().nullable()();
 

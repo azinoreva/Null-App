@@ -1,7 +1,6 @@
 import 'package:drift/drift.dart';
 
 /// Drift table definition for the `Servers` table.
-///
 /// Stores information about messaging servers that the user can connect to.
 class Servers extends Table {
   TextColumn get serverId => text()();
