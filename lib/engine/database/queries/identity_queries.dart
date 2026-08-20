@@ -7,7 +7,7 @@ part 'identity_queries.g.dart';
 // Minimal database setup – adjust executor and schema as needed.
 @DriftDatabase(tables: [Identity], daos: [IdentityDao])
 class AppDatabase extends _$AppDatabase {
-  AppDatabase(QueryExecutor e) : super(e);
+  AppDatabase(super.e);
 
   @override
   int get schemaVersion => 1;
@@ -27,7 +27,7 @@ class AppDatabase extends _$AppDatabase {
 @DriftAccessor(tables: [Identity])
 class IdentityDao extends DatabaseAccessor<AppDatabase>
     with _$IdentityDaoMixin {
-  IdentityDao(AppDatabase db) : super(db);
+  IdentityDao(super.db);
 
   /// Returns the current (single) identity row.
   ///

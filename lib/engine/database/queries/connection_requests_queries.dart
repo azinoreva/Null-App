@@ -8,7 +8,7 @@ part 'connection_requests_queries.g.dart';
 @DriftAccessor(tables: [ConnectionRequests])
 class ConnectionRequestsDao extends DatabaseAccessor<AppDatabase>
     with _$ConnectionRequestsDaoMixin {
-  ConnectionRequestsDao(AppDatabase db) : super(db);
+  ConnectionRequestsDao(super.db);
 
   // Get a single request by ID.
   Future<ConnectionRequests?> getRequestById(String id) => (select(

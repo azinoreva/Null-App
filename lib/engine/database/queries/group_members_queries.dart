@@ -8,7 +8,7 @@ part 'group_members_queries.g.dart';
 @DriftAccessor(tables: [GroupMembers])
 class GroupMembersDao extends DatabaseAccessor<AppDatabase>
     with _$GroupMembersDaoMixin {
-  GroupMembersDao(AppDatabase db) : super(db);
+  GroupMembersDao(super.db);
 
   // Add a new member to a group.
   Future<int> addMember(Insertable<GroupMembers> member) =>

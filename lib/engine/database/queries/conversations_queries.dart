@@ -7,7 +7,7 @@ part 'conversations_queries.g.dart';
 @DriftAccessor(tables: [Conversations])
 class ConversationsDao extends DatabaseAccessor<AppDatabase>
     with _$ConversationsDaoMixin {
-  ConversationsDao(AppDatabase db) : super(db);
+  ConversationsDao(super.db);
 
   // Get a single conversation by ID.
   Future<Conversations?> getConversationById(String id) =>

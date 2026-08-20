@@ -9,7 +9,7 @@ part 'network_queries.g.dart';
 @DriftAccessor(tables: [ContactsNetwork])
 class ContactsNetworkDao extends DatabaseAccessor<AppDatabase>
     with _$ContactsNetworkDaoMixin {
-  ContactsNetworkDao(AppDatabase db) : super(db);
+  ContactsNetworkDao(super.db);
 
   // Get a single network by ID.
   Future<ContactsNetwork?> getNetworkById(String id) => (select(
@@ -41,7 +41,7 @@ class ContactsNetworkDao extends DatabaseAccessor<AppDatabase>
 @DriftAccessor(tables: [ContactNetworkMembers])
 class ContactNetworkMembersDao extends DatabaseAccessor<AppDatabase>
     with _$ContactNetworkMembersDaoMixin {
-  ContactNetworkMembersDao(AppDatabase db) : super(db);
+  ContactNetworkMembersDao(super.db);
 
   // Add a contact to a network.
   Future<int> addMember(String networkId, String contactId) =>

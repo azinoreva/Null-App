@@ -11,7 +11,7 @@ part 'servers_queries.g.dart';
 /// Data Access Object for the `Servers` table.
 @DriftAccessor(tables: [Servers])
 class ServersDao extends DatabaseAccessor<AppDatabase> with _$ServersDaoMixin {
-  ServersDao(AppDatabase db) : super(db);
+  ServersDao(super.db);
 
   // Fetch a single server by its ID.
   Future<Servers?> getServerById(String id) => (select(

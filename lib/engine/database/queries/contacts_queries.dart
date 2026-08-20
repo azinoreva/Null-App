@@ -8,7 +8,7 @@ part 'contacts_queries.g.dart';
 @DriftAccessor(tables: [Contacts])
 class ContactsDao extends DatabaseAccessor<AppDatabase>
     with _$ContactsDaoMixin {
-  ContactsDao(AppDatabase db) : super(db);
+  ContactsDao(super.db);
 
   // Get a single contact by ID.
   Future<Contacts?> getContactById(String id) => (select(

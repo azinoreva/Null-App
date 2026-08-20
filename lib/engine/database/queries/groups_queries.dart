@@ -7,7 +7,7 @@ part 'groups_queries.g.dart';
 /// Data Access Object for the `Groups` table.
 @DriftAccessor(tables: [Groups])
 class GroupsDao extends DatabaseAccessor<AppDatabase> with _$GroupsDaoMixin {
-  GroupsDao(AppDatabase db) : super(db);
+  GroupsDao(super.db);
 
   // Get a single group by its ID.
   Future<Groups?> getGroupById(String id) =>

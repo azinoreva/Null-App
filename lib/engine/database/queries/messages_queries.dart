@@ -8,7 +8,7 @@ part 'messages_queries.g.dart';
 @DriftAccessor(tables: [Messages])
 class MessagesDao extends DatabaseAccessor<AppDatabase>
     with _$MessagesDaoMixin {
-  MessagesDao(AppDatabase db) : super(db);
+  MessagesDao(super.db);
 
   // Get a single message by its ID.
   Future<Messages?> getMessageById(String id) => (select(
