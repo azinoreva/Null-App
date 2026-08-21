@@ -6,6 +6,7 @@ import 'package:drift/drift.dart';
 /// It stores profile data, security settings, and sync preferences.
 class Identity extends Table {
   TextColumn get identityId => text()();
+  
   TextColumn get displayName => text()();
   TextColumn get avatar => text().nullable()();
   TextColumn get bio => text().nullable()();

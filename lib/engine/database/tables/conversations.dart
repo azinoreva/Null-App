@@ -17,9 +17,13 @@ class Conversations extends Table {
   IntColumn get archived =>
       integer().withDefault(const Constant(0)).check(archived.isIn([0, 1]))();
   TextColumn get draft => text().nullable()();
+
   TextColumn get serverId => text()();
+
   IntColumn get createdAt => integer()();
+
   IntColumn get updatedAt => integer()();
+  
   TextColumn get sound => text().nullable()();
   IntColumn get badge =>
       integer().withDefault(const Constant(0)).check(badge.isIn([0, 1, 2]))();
