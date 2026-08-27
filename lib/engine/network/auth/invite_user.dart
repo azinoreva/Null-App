@@ -1,15 +1,67 @@
-curl -X 'POST' \
-  'http://127.0.0.1:8000/api/invite-user' \
-  -H 'accept: application/json' \
-  -H 'Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI1ZWViYTYxMS04ZDc4LTQ4ODYtOTBlZS1lNGFjNjkyODk4NGQiLCJpYXQiOjE3ODc0Nzc1NzAsImV4cCI6MTc4NzU2Mzk3MH0.9hp4DZYaiQ-nWgPva7L_zfzpLmTmwRcuaJFN19EPdn4' \
-  -d ''
+import 'package:dio/dio.dart';
 
+import '../api_client.dart';
 
+/// Represents the response of POST /api/invite-user
+class InviteUserResponse {
+  final String invitationToken;
+  final String inviterUserId;
+  final int expiration;
 
-  Response:
+  InviteUserResponse({
+    required this.invitationToken,
+    required this.inviterUserId,
+    required this.expiration,
+  });
 
-  {
-  "invitation_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjoiY2YwMGEwYjctNzAzMi00YWQ5LTlhNTYtZDEwOGQwZmE2ZDhhIiwiaWF0IjoxNzg3NDgxMjU3LCJleHAiOjE3ODc0ODI0NTd9.Q3F5mf-mJ7hLYvoMWERSdc1M5gbNydYz6EfRK9tt8Rg",
-  "inviter_user_id": "5eeba611-8d78-4886-90ee-e4ac6928984d",
-  "expiration": 1200
+  factory InviteUserResponse.fromJson(Map<String, dynamic> json) {
+    return InviteUserResponse(
+      invitationToken: json['invitation_token'] as String,
+      inviterUserId: json['inviter_user_id'] as String,
+      expiration: json['expiration'] as int,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'invitation_token': invitationToken,
+      'inviter_user_id': inviterUserId,
+      'expiration': expiration,
+    };
+  }
+
+  /// `expiration` here is a duration in seconds (e.g. 1200 = 20 minutes),
+  /// not a timestamp, so this computes the actual expiry moment based on
+  /// when the response was received.
+  DateTime get expiresAt =>
+      DateTime.now().add(Duration(seconds: expiration));
+
+  @override
+  String toString() =>
+      'InviteUserResponse(inviterUserId: $inviterUserId, expiration: ${expiration}s)';
+}
+
+class InviteUserService {
+  final String serverId;
+
+  Dio get _dio => ApiClient.instance(serverId);
+
+  const InviteUserService({required this.serverId});
+
+  /// Generates a new invitation token for the current user to share.
+  ///
+  /// Auth (Bearer access token) and refresh-on-401 are handled automatically
+  /// by ApiClient's interceptors.
+  Future<InviteUserResponse> inviteUser() async {
+    final response = await _dio.post(
+      '/api/invite-user',
+      options: Options(
+        headers: {
+          'accept': 'application/json',
+        },
+      ),
+    );
+
+    return InviteUserResponse.fromJson(response.data as Map<String, dynamic>);
+  }
 }

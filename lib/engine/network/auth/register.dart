@@ -1,43 +1,133 @@
-Query:   
+import 'package:dio/dio.dart';
 
-curl -X 'POST' \
-  'http://127.0.0.1:8000/api/create-new-user-preprocess' \
-  -H 'accept: application/json' \
-  -H 'Content-Type: application/json' \
-  -d '{
-  "phone_number": "+2347049195903"
-}'
+import '../main_server_client.dart';
 
-Response model
-{
-  "phone_number": "2347049195903",
-  "otp_sent": true,
-  "message": "A pin has been sent to your phone number. It will expire in 10 minutes."
+/// Represents the response of POST /api/create-new-user-preprocess
+class CreateUserPreprocessResponse {
+  final String phoneNumber;
+  final bool otpSent;
+  final String message;
+
+  CreateUserPreprocessResponse({
+    required this.phoneNumber,
+    required this.otpSent,
+    required this.message,
+  });
+
+  factory CreateUserPreprocessResponse.fromJson(Map<String, dynamic> json) {
+    return CreateUserPreprocessResponse(
+      phoneNumber: json['phone_number'] as String,
+      otpSent: json['otp_sent'] as bool,
+      message: json['message'] as String,
+    );
+  }
+
+  @override
+  String toString() =>
+      'CreateUserPreprocessResponse(phoneNumber: $phoneNumber, otpSent: $otpSent)';
 }
 
+/// Represents the response of POST /api/create-new-user-postprocess
+class CreateUserPostprocessResponse {
+  final String userId;
+  final String saltVersion;
+  final String securityToken;
+  final int schemaVersion;
+  final String recoveryType;
+  final int invitationCount;
 
+  CreateUserPostprocessResponse({
+    required this.userId,
+    required this.saltVersion,
+    required this.securityToken,
+    required this.schemaVersion,
+    required this.recoveryType,
+    required this.invitationCount,
+  });
 
-Query: curl -X 'POST' \
-  'http://127.0.0.1:8000/api/create-new-user-postprocess' \
-  -H 'accept: application/json' \
-  -H 'Content-Type: application/json' \
-  -d '{
-  "phone_number": "+2347049195903",
-  "pin": "964620",
-  "password": "Azino@123",
-  "encrypted_blob": "#sample:Azino@123#"
-}'
+  factory CreateUserPostprocessResponse.fromJson(Map<String, dynamic> json) {
+    return CreateUserPostprocessResponse(
+      userId: json['user_id'] as String,
+      saltVersion: json['salt_version'] as String,
+      securityToken: json['security_token'] as String,
+      schemaVersion: json['schema_version'] as int,
+      recoveryType: json['recovery_type'] as String,
+      invitationCount: json['invitation_count'] as int,
+    );
+  }
 
-Response model:
-
-
-{
-  "user_id": "83028084-a507-46a1-9d53-18dc3a28eeee",
-  "salt_version": "v1",
-  "security_token": "v1:8411d5a786510448:eyJhbGciOiJkaXIiLCJlbmMiOiJBMjU2R0NNIiwidHlwIjoiSldFIn0..dH5Z4PSML5Drxa2K.2-ARBOQFugCdfJVjKeV_UxlHZlskaZneml2v0XmlEHh27dVvuzA2oPjj57mqMXkx43bU3v-C_3v8oBXfOLX5x90G7xk8FdQETJCzP-5B_akCVnrzbUjvOzN3dkReUGfvm7XA770brJIh6xXcowdcWJhIuNC0DGzHEMMaOhWA4g8ANTjwFepHuujZoCrfAJ5xWJFGv1kYykY2cLdQQCJqVCpDcwjmCWYsOTFmuKnZc-gNchfnQJIRAAIyIZUwLuCrdUJOgbIk31X1HOFnSOURwtYchVy3HMZgx8S4dPxNl3GSnILEh2SmHojxGTa_Z7lTsg4ktlBQflrAOo7UuVWhjnOlCTWyO8XDqz3Dxa9AwDsd9ywjySh4-7gRK_AlOAirym_3X3x14Nh4xrpzBVQrV5Bx2WSeLxF-NnLF0nJi0XZAzkRFNPYUP-ew2IMaszUS3xt8N7KAtqtJQ4899vjzoy8-0XihMZpODuCrJrCxoY7m55dm5pctSM6t.rJXBt44tExpu9rB2b2W8og",
-  "schema_version": 1,
-  "recovery_type": "standard",
-  "invitation_count": 0
+  @override
+  String toString() =>
+      'CreateUserPostprocessResponse(userId: $userId, recoveryType: $recoveryType)';
 }
 
+/// Handles new-user registration against the main server — the one
+/// stable, authoritative backend (unlike the dynamically discovered
+/// per-user servers from /api/servers), so this does NOT go through
+/// ApiClient's multi-server registry — it shares MainServerClient.dio
+/// instead. Call MainServerClient.init(baseUrl: ...) once at app startup.
+///
+/// Both calls are unauthenticated — there's no user/token yet at this
+/// point in the flow — so no auth interceptor is needed here at all.
+class UserRegistrationService {
+  Dio get _client => MainServerClient.dio;
 
+  /// Step 1: submit a phone number to kick off registration. The server
+  /// sends an OTP/pin to that number, valid for 10 minutes.
+  Future<CreateUserPreprocessResponse> preprocess({
+    required String phoneNumber,
+  }) async {
+    final response = await _client.post(
+      '/api/create-new-user-preprocess',
+      options: Options(
+        headers: {
+          'accept': 'application/json',
+          'Content-Type': 'application/json',
+        },
+      ),
+      data: {
+        'phone_number': phoneNumber,
+      },
+    );
+
+    return CreateUserPreprocessResponse.fromJson(
+      response.data as Map<String, dynamic>,
+    );
+  }
+
+  /// Step 2: complete registration by submitting the OTP [pin] received
+  /// from [preprocess], along with the chosen [password] and an
+  /// [encryptedBlob] (client-side encrypted payload — e.g. wrapped key
+  /// material — produced before this call, not by this service).
+  ///
+  /// On success, save [CreateUserPostprocessResponse.userId] and
+  /// [CreateUserPostprocessResponse.securityToken] as needed by your auth
+  /// flow (this endpoint does not return access/refresh tokens — those
+  /// come from wherever your login step is, separately).
+  Future<CreateUserPostprocessResponse> postprocess({
+    required String phoneNumber,
+    required String pin,
+    required String password,
+    required String encryptedBlob,
+  }) async {
+    final response = await _client.post(
+      '/api/create-new-user-postprocess',
+      options: Options(
+        headers: {
+          'accept': 'application/json',
+          'Content-Type': 'application/json',
+        },
+      ),
+      data: {
+        'phone_number': phoneNumber,
+        'pin': pin,
+        'password': password,
+        'encrypted_blob': encryptedBlob,
+      },
+    );
+
+    return CreateUserPostprocessResponse.fromJson(
+      response.data as Map<String, dynamic>,
+    );
+  }
+}

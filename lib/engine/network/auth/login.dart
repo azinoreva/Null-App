@@ -1,16 +1,72 @@
-curl -X 'POST' \
-  'http://127.0.0.1:8000/api/sign-in' \
-  -H 'accept: application/json' \
-  -H 'Content-Type: application/json' \
-  -d '{
-  "phone_number": "+2349054821617",
-  "password": "Azino@123"
-}'
+import 'package:dio/dio.dart';
 
+import '../api_client.dart';
+import '../main_server_client.dart';
 
+/// Represents the response of POST /api/sign-in
+class SignInResponse {
+  final String accessToken;
+  final String refreshToken;
+  final int expires;
 
-{
-  "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI1ZWViYTYxMS04ZDc4LTQ4ODYtOTBlZS1lNGFjNjkyODk4NGQiLCJpYXQiOjE3ODc0Nzc1NzAsImV4cCI6MTc4NzU2Mzk3MH0.9hp4DZYaiQ-nWgPva7L_zfzpLmTmwRcuaJFN19EPdn4",
-  "refresh_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI1ZWViYTYxMS04ZDc4LTQ4ODYtOTBlZS1lNGFjNjkyODk4NGQiLCJpYXQiOjE3ODc0Nzc1NzAsImV4cCI6MTc4ODA4MjM3MCwidHlwZSI6InJlZnJlc2hfdG9rZW4ifQ.amb6EjUUfc0U1tx94bXLR19_1hEqubywA6TD5W6BjCk",
-  "expires": 86400
+  SignInResponse({
+    required this.accessToken,
+    required this.refreshToken,
+    required this.expires,
+  });
+
+  factory SignInResponse.fromJson(Map<String, dynamic> json) {
+    return SignInResponse(
+      accessToken: json['access_token'] as String,
+      refreshToken: json['refresh_token'] as String,
+      expires: json['expires'] as int,
+    );
+  }
+}
+
+/// Signs a returning user in on the main server using phone number +
+/// password, and saves the resulting tokens into ApiClient so the main
+/// server is immediately usable via ApiClient.instance(mainServerId).
+///
+/// Uses MainServerClient (the shared, single-backend client) for the
+/// request itself, since sign-in is unauthenticated and happens before
+/// any tokens exist — but stores the result through ApiClient, since from
+/// this point on the main server behaves like any other registered server
+/// (its own access/refresh tokens, auto-refresh-on-401, etc.).
+class SignInService {
+  /// [mainServerId] is whatever id you use when calling
+  /// ApiClient.registerServer(...) for the main server (e.g. 'main') —
+  /// tokens are saved under that id so ApiClient.instance('main') works
+  /// right after sign-in succeeds.
+  Future<SignInResponse> signIn({
+    required String mainServerId,
+    required String phoneNumber,
+    required String password,
+  }) async {
+    final response = await MainServerClient.dio.post(
+      '/api/sign-in',
+      options: Options(
+        headers: {
+          'accept': 'application/json',
+          'Content-Type': 'application/json',
+        },
+      ),
+      data: {
+        'phone_number': phoneNumber,
+        'password': password,
+      },
+    );
+
+    final result = SignInResponse.fromJson(
+      response.data as Map<String, dynamic>,
+    );
+
+    await ApiClient.saveTokens(
+      serverId: mainServerId,
+      accessToken: result.accessToken,
+      refreshToken: result.refreshToken,
+    );
+
+    return result;
+  }
 }
