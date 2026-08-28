@@ -155,6 +155,42 @@ class AppDatabase extends _$AppDatabase {
           await customStatement(
             'CREATE INDEX idx_tasks_server_id ON tasks(server_id);',
           );
+
+          // Identity
+          await customStatement(
+            'CREATE INDEX idx_identity_server_id ON identity(server_id);',
+          );
+
+          // Servers
+          await customStatement(
+            'CREATE INDEX idx_servers_name ON servers(server_name);',
+          );
+
+          // ContactsNetwork
+          await customStatement(
+            'CREATE INDEX idx_contacts_network_server ON contacts_network(server_id);',
+          );
+
+          // ContactNetworkMembers
+          await customStatement(
+            'CREATE INDEX idx_contact_network_members_network ON contact_network_members(network_id);',
+          );
+          await customStatement(
+            'CREATE INDEX idx_contact_network_members_contact ON contact_network_members(contact_id);',
+          );
+
+          // ShamirsSecret
+          await customStatement(
+            'CREATE INDEX idx_shamirs_secret_server ON shamirs_secret(server_id);',
+          );
+
+          // SecretShare
+          await customStatement(
+            'CREATE INDEX idx_secret_share_identity ON secret_share(identity_id);',
+          );
+          await customStatement(
+            'CREATE INDEX idx_secret_share_secret ON secret_share(secret_id);',
+          );
         },
         onUpgrade: (Migrator m, int from, int to) async {
           // Future migrations will be handled here

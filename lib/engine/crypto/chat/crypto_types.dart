@@ -1,3 +1,5 @@
+// module_name: crypto_types
+
 import 'dart:typed_data';
 
 class DhKeyPair {

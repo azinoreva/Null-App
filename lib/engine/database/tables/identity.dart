@@ -1,3 +1,5 @@
+// module name: identity
+
 import 'package:drift/drift.dart';
 
 /// Drift table definition for the `Identity` table.
@@ -11,12 +13,14 @@ class Identity extends Table {
   TextColumn get avatar => text().nullable()();
   TextColumn get bio => text().nullable()();
   TextColumn get phoneNumber => text().nullable()();
-  IntColumn get securityProtocol => integer().withDefault(const Constant(0))();
+  IntColumn get saltVersion => integer().withDefault(const Constant(0))();
   IntColumn get shamirNumber => integer().withDefault(const Constant(0))();
   TextColumn get publicKey => text().nullable()();
   IntColumn get passportVersion => integer().withDefault(const Constant(1))();
   IntColumn get autoSync => integer().withDefault(const Constant(0))();
   IntColumn get allowConnectReq => integer().withDefault(const Constant(0))();
+  TextColumn get recoveryType => text().nullable()();
+  IntColumn get invitationCount => integer().withDefault(const Constant(1))();
 
   @override
   Set<Column> get primaryKey => {identityId};
