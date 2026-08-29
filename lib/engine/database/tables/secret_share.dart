@@ -1,3 +1,5 @@
+//module name: secret_share.dart
+
 import 'package:drift/drift.dart';
 import 'identity.dart';
 

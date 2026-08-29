@@ -1,3 +1,5 @@
+//module name: secret_share_queries.g.dart
+
 import 'package:drift/drift.dart';
 import '../tables/secret_share.dart';
 

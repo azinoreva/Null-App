@@ -30,7 +30,7 @@ class CreateUserPreprocessResponse {
 /// Represents the response of POST /api/create-new-user-postprocess
 class CreateUserPostprocessResponse {
   final String userId;
-  final String saltVersion;
+  final int saltVersion;
   final String securityToken;
   final int schemaVersion;
   final String recoveryType;
@@ -48,7 +48,7 @@ class CreateUserPostprocessResponse {
   factory CreateUserPostprocessResponse.fromJson(Map<String, dynamic> json) {
     return CreateUserPostprocessResponse(
       userId: json['user_id'] as String,
-      saltVersion: json['salt_version'] as String,
+      saltVersion: json['salt_version'] as int,
       securityToken: json['security_token'] as String,
       schemaVersion: json['schema_version'] as int,
       recoveryType: json['recovery_type'] as String,

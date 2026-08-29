@@ -53,6 +53,7 @@ Future<void> saveVaultWithoutRawKey(
     payload: vault.payload,
     key: '',
     keyHash: vault.keyHash,
+    passwordVersion: vault.passwordVersion,
   );
   return saveVaultToSecureStorage(stripped, storageKey: storageKey);
 }
@@ -81,6 +82,7 @@ Future<VaultResult?> getVaultFromSecureStorage({
 ///       payload: newPayload,
 ///       key: vault.key,
 ///       keyHash: vault.keyHash,
+///       passwordVersion: vault.passwordVersion,
 ///     ));
 /// ```
 Future<VaultResult> editVaultInSecureStorage(
@@ -178,6 +180,7 @@ Future<VaultResult> reencryptWithExistingKey(
     payload: newPayload, // only the encrypted blob is replaced
     key: current.key, // unchanged
     keyHash: current.keyHash, // unchanged — same key, same hash
+    passwordVersion: current.passwordVersion + 1,
   );
 
   await saveVaultToSecureStorage(updated, storageKey: storageKey);

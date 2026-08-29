@@ -172,9 +172,7 @@ Future<RegistrationResult> registerNewUser({
         avatar: null,
         bio: null,
         phoneNumber: phoneNumber,
-        // Server returns saltVersion as a string; the local column is an
-        // int. Adjust this parse if your saltVersion format differs.
-        saltVersion: int.tryParse(response.saltVersion) ?? 0,
+        saltVersion: response.saltVersion,
         // No shares have been handed to trusted contacts yet at
         // registration time.
         shamirNumber: 0,

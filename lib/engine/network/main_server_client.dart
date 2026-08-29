@@ -13,7 +13,7 @@ class MainServerClient {
   static Dio? _dio;
 
   static void init({
-    required String baseUrl,
+    String baseUrl = const String.fromEnvironment('MAIN_SERVER_URL'),
     Duration connectTimeout = const Duration(seconds: 5),
     Duration receiveTimeout = const Duration(seconds: 3),
   }) {

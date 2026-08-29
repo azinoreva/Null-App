@@ -52,16 +52,18 @@ class EncryptedPayload {
 /// `keyHash` for verifying a key presented later, and distribute the 5
 /// `shares` to separate custodians. Don't persist `key` yourself.
 class VaultResult {
-  final List<Share> shares; // 5 shares, any 2 reconstruct the key
+  final List<Share> shares; // remaining unshared shares; starts at 5
   final EncryptedPayload payload; // the encrypted password
   final String key; // raw AES key, hex — show once, then discard
   final String keyHash; // SHA-256(key), hex — safe to store long-term
+  final int passwordVersion; // starts at 1, incremented on each re-encrypt
 
   const VaultResult({
     required this.shares,
     required this.payload,
     required this.key,
     required this.keyHash,
+    required this.passwordVersion,
   });
 
   Map<String, dynamic> toJson() => {
@@ -69,6 +71,7 @@ class VaultResult {
         'payload': payload.toJson(),
         'key': key,
         'keyHash': keyHash,
+        'passwordVersion': passwordVersion,
       };
 
   factory VaultResult.fromJson(Map<String, dynamic> json) => VaultResult(
@@ -80,6 +83,9 @@ class VaultResult {
         ),
         key: json['key'] as String,
         keyHash: json['keyHash'] as String,
+        // Vaults saved before this field existed won't have it; treat
+        // those as version 1 rather than failing to parse.
+        passwordVersion: json['passwordVersion'] as int? ?? 1,
       );
 }
 
@@ -122,6 +128,7 @@ Future<VaultResult> createPasswordVault(String password) async {
     payload: payload,
     key: _bytesToHex(keyBytes),
     keyHash: keyHash,
+    passwordVersion: 1,
   );
 }
 
