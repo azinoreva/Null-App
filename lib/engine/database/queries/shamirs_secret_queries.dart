@@ -1,6 +1,6 @@
 
 // module name: shamirs_secret_queries
-//
+
 // Fixed from the version provided: the table's primary key is
 // `identityId` (one secret-share row per recipient), not `secretId` —
 // that column doesn't exist on ShamirsSecret. Lookups/deletes are now

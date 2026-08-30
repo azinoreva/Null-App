@@ -15,7 +15,7 @@ class GroupMembers extends Table {
 
   TextColumn get publicKey => text().nullable()();
   TextColumn get bio => text().nullable()();
-  TextColumn get avatar => text().nullable()();
+  BlobColumn get avatar => blob().nullable()();
 
   // Column name `_name` (reserved, so use `name` getter).
   TextColumn get name => text().named('_name').nullable()();

@@ -41,6 +41,8 @@ dependencies:
   cryptography: ^2.9.0
   flutter_secure_storage: ^11.0.0
   dio: ^5.11.0
+  uuid: ^4.6.0
+  image: ^4.9.2
 
 dev_dependencies:
   flutter_test:

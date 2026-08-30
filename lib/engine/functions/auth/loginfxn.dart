@@ -1,4 +1,4 @@
-import '../network/auth/login.dart';
+import '../../network/auth/login.dart';
 
 final _signInService = SignInService();
 

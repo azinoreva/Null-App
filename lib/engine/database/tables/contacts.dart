@@ -9,7 +9,7 @@ import 'conversations.dart'; // for foreign key reference
 class Contacts extends Table {
   TextColumn get contactId => text()();
   TextColumn get nickname => text().nullable()();
-  TextColumn get avatar => text().nullable()();
+  BlobColumn get avatar => blob().nullable()(); // Changed to BLOB
   TextColumn get bio => text().nullable()();
 
   IntColumn get muted =>

@@ -1,3 +1,5 @@
+//module name: connection_requests_queries
+
 import 'package:drift/drift.dart';
 
 import '../tables/connection_requests.dart';

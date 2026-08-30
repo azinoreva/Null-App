@@ -10,11 +10,11 @@ import 'dart:convert';
 
 import 'package:dio/dio.dart';
 
-import '../database/queries/identity_queries.dart'; // AppDatabase, IdentityDao, Identity
-import '../crypto/shamirs/password_vault.dart'; // createPasswordVault, VaultResult
-import '../network/auth/register.dart'; // registerNewUser
-import '../securestore/security_token.dart';
-import '../crypto/shamirs/vault_secrets.dart'; // saveVaultToSecureStorage, hasVaultInSecureStorage
+import '../../database/queries/identity_queries.dart'; // AppDatabase, IdentityDao, Identity
+import '../../crypto/shamirs/password_vault.dart'; // createPasswordVault, VaultResult
+import '../../network/auth/register.dart'; // registerNewUser
+import '../../securestore/security_token.dart';
+import '../../crypto/shamirs/vault_secrets.dart'; // saveVaultToSecureStorage, hasVaultInSecureStorage
 
 /// How [registerNewUser] concluded.
 enum RegistrationOutcome { success, alreadyExists, failed }

@@ -1,4 +1,5 @@
 import 'package:drift/drift.dart';
+import 'dart:typed_data'; // for Uint8List
 
 import '../tables/contacts.dart';
 
@@ -91,4 +92,15 @@ class ContactsDao extends DatabaseAccessor<AppDatabase>
     await (update(db.contacts)..where((t) => t.contactId.equals(contactId)))
         .write(ContactsCompanion(conversationId: Value(conversationId)));
   }
+
+  // NEW: Update the avatar (binary image data) for a contact.
+  Future<void> updateAvatar(String contactId, Uint8List? avatar) async {
+    await (update(db.contacts)..where((t) => t.contactId.equals(contactId)))
+        .write(ContactsCompanion(avatar: Value(avatar)));
+  }
+
+  // NEW: Retrieve contacts that have a non‑null avatar.
+  Future<List<Contacts>> getContactsWithAvatar() => (select(db.contacts)
+        ..where((t) => t.avatar.isNotNull()))
+      .get();
 }
