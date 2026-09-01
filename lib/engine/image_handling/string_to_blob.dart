@@ -1,3 +1,5 @@
+//module name: string_to_blob
+
 import 'dart:convert';
 import 'dart:typed_data';
 

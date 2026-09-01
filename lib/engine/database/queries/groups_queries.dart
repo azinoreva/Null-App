@@ -1,4 +1,5 @@
 import 'package:drift/drift.dart';
+import 'dart:typed_data'; // for Uint8List
 
 import '../tables/groups.dart';
 
@@ -127,15 +128,16 @@ class GroupsDao extends DatabaseAccessor<AppDatabase>
   }
 
   /// Update the group avatar.
+  /// Now accepts binary image data as [Uint8List?].
   Future<void> updateGroupAvatar(
     String groupId,
-    String? avatarUrl,
+    Uint8List? avatar, // changed from String? to Uint8List?
   ) async {
     await (update(db.groups)
           ..where((t) => t.groupId.equals(groupId)))
         .write(
       GroupsCompanion(
-        avatar: Value(avatarUrl),
+        avatar: Value(avatar),
         updatedAt: Value(
           DateTime.now().millisecondsSinceEpoch,
         ),

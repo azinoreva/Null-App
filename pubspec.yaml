@@ -43,6 +43,7 @@ dependencies:
   dio: ^5.11.0
   uuid: ^4.6.0
   image: ^4.9.2
+  http: ^1.6.0
 
 dev_dependencies:
   flutter_test:

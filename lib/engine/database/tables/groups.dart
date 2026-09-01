@@ -22,7 +22,7 @@ class Groups extends Table {
   IntColumn get groupType =>
       integer().check(groupType.isIn([0, 1]))(); // 0 = private, 1 = public
 
-  TextColumn get avatar => text().nullable()();
+  BlobColumn get avatar => blob().nullable()();
 
   /// Currently active symmetric group encryption key.
   TextColumn get privateKey => text().nullable()();

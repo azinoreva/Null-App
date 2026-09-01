@@ -1,3 +1,4 @@
+//module name: servers_queries
 import 'package:drift/drift.dart';
 
 import '../tables/servers.dart';
@@ -62,5 +63,14 @@ class ServersDao extends DatabaseAccessor<AppDatabase> with _$ServersDaoMixin {
     await (update(db.servers)..where((t) => t.serverId.equals(serverId))).write(
       ServersCompanion(capabilities: Value(newCapabilities)),
     );
+  }
+
+  // NEW: Retrieve all distinct colour values used by servers.
+  Future<List<int>> getAllDistinctColours() async {
+    final query = selectOnly(db.servers)
+      ..addColumns([db.servers.colour])
+      ..distinct = true;
+    final rows = await query.get();
+    return rows.map((row) => row.read(db.servers.colour)).toList();
   }
 }

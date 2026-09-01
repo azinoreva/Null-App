@@ -2,7 +2,7 @@
 
 import 'package:drift/drift.dart';
 import 'dart:typed_data';
-import '../database/queries/group_members_queries.dart';
+import '../../database/queries/group_members_queries.dart';
 
 /// Adds a new member to a group.
 Future<void> createGroupMember(

@@ -1,5 +1,5 @@
 import 'package:uuid/uuid.dart';
-import '../database/queries/connection_requests_queries.dart';
+import '../../database/queries/connection_requests_queries.dart';
 
 const _uuid = Uuid();
 const _thirtyDaysMs = 30 * 24 * 60 * 60 * 1000;

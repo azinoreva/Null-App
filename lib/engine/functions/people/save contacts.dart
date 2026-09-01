@@ -2,7 +2,7 @@
 
 import 'package:drift/drift.dart';
 import 'dart:typed_data';
-import '../database/queries/contacts_queries.dart';
+import '../../database/queries/contacts_queries.dart';
 
 
 Future<void> saveContact(

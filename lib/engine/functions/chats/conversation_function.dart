@@ -1,5 +1,5 @@
 import 'package:drift/drift.dart';
-import '../database/queries/conversations_queries.dart';
+import '../../database/queries/conversations_queries.dart';
 
 /// Creates a new conversation with sensible defaults.
 Future<void> createConversation(
