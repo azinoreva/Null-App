@@ -6,6 +6,8 @@ import 'dart:typed_data';
 import 'package:cryptography/cryptography.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
+import '../../database/queries/identity_queries.dart';
+
 class IdentityCrypto {
   static final Ed25519 _ed25519 = Ed25519();
 
@@ -17,16 +19,26 @@ class IdentityCrypto {
 
   static const _privateKeyName = 'identity:private_key';
 
-  Future<void> generateIdentityKey() async {
+  Future<void> generateIdentityKey({AppDatabase? database}) async {
     final pair = await _ed25519.newKeyPair();
 
-    final privateKey =
-        await pair.extractPrivateKeyBytes();
+    final privateKey = await pair.extractPrivateKeyBytes();
+    final publicKey = await pair.extractPublicKey();
 
     await storage.write(
       key: _privateKeyName,
       value: base64UrlEncode(privateKey),
     );
+
+    if (database != null) {
+      final current = await database.identityDao.getCurrentIdentityOrNull();
+
+      if (current != null) {
+        await database.identityDao.setPublicKey(
+          base64UrlEncode(publicKey.bytes),
+        );
+      }
+    }
   }
 
   Future<Uint8List?> loadPrivateKey() async {

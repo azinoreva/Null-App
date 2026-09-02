@@ -1,1 +1,0 @@
-So to start a chat, we must send a message to a user_id... Now it means that user gave you thier public key, and that user is in the contacts list. 

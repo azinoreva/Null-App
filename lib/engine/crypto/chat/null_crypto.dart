@@ -1,5 +1,6 @@
 import 'dart:typed_data';
 
+import '../../database/queries/identity_queries.dart';
 import 'crypto_types.dart';
 import 'identity_crypto.dart';
 import 'key_exchange.dart';
@@ -20,8 +21,8 @@ class NullCrypto {
   // IDENTITY
   // ------------------------------------------------------------
 
-  Future<void> createIdentityKey() {
-    return identity.generateIdentityKey();
+  Future<void> createIdentityKey({AppDatabase? database}) {
+    return identity.generateIdentityKey(database: database);
   }
 
   Future<Uint8List> getIdentityPublicKey() {
