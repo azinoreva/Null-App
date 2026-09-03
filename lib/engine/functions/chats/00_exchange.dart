@@ -429,6 +429,7 @@ class ConversationsDao extends DatabaseAccessor<AppDatabase>
 
 Now to save the message to the db: 
 
+
 import 'package:drift/drift.dart';
 
 import '../tables/messages.dart';
@@ -485,6 +486,17 @@ class MessagesDao extends DatabaseAccessor<AppDatabase>
         .write(MessagesCompanion(status: Value(newStatus)));
   }
 
+  // Update only the decrypted content of a message.
+  Future<void> updateDecryptedMessage(
+    String messageId,
+    String? decryptedMessage,
+  ) async {
+    await (update(db.messages)..where((t) => t.messageId.equals(messageId)))
+        .write(
+          MessagesCompanion(decryptedMessage: Value(decryptedMessage)),
+        );
+  }
+
   // Delete a message by ID.
   Future<int> deleteMessage(String id) =>
       (delete(db.messages)..where((t) => t.messageId.equals(id))).go();
@@ -519,7 +531,15 @@ class MessagesDao extends DatabaseAccessor<AppDatabase>
 
 
 For the empty message use the following structure:
-TextColumn get messageId => text()();
+message order is 0, nonce is null accordingly, chain index is 0
+
+import 'package:drift/drift.dart';
+
+import 'conversations.dart'; // for foreign key reference
+
+/// Drift table definition for the `Messages` table.
+class Messages extends Table {
+  TextColumn get messageId => text()();
   TextColumn get logicalMessageId => text()();
 
   // Foreign key to Conversations with cascade delete.
@@ -540,6 +560,7 @@ TextColumn get messageId => text()();
 
   BlobColumn get ciphertext => blob()();
   BlobColumn get nonce => blob()();
+  TextColumn get decryptedMessage => text().nullable()();
 
   IntColumn get messageType => integer()();
 
@@ -558,3 +579,8 @@ TextColumn get messageId => text()();
 
   IntColumn get receivedAt => integer().nullable()();
   IntColumn get readAt => integer().nullable()();
+
+  @override
+  Set<Column> get primaryKey => {messageId};
+}
+Just tell me what you did with it

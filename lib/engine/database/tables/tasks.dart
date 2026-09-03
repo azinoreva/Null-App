@@ -8,7 +8,14 @@ class Tasks extends Table {
   TextColumn get taskId => text()();
   IntColumn get taskType => integer()();
   IntColumn get taskStatus => integer()();
-  TextColumn get taskName => text()();
+  TextColumn get functionName => text()();
+  TextColumn get functionArgs => text()();  
+  //function params are seperated by commas. A field with "null" is translated as not having a parameter. Then if it has a blob, it would be written as blobparam1 or 2 and so on
+  BlobColumn get blobparam1 => blob().nullable()();
+  BlobColumn get blobparam2 => blob().nullable()();
+  BlobColumn get blobparam3 => blob().nullable()();
+  BlobColumn get blobparam4 => blob().nullable()();
+  BlobColumn get blobparam5 => blob().nullable()();
 
   // Timestamps stored as Unix epoch milliseconds.
   IntColumn get createdAt => integer()();

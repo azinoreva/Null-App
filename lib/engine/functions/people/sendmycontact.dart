@@ -74,3 +74,63 @@ Future<SendMessageResponse> sendContactDetails(
 
   return result;
 }
+
+// module name: send_contact_details (updated sendContactDetailsBack)
+
+/// Completes the mutual-exchange handshake: sends OUR identity card back
+/// to a contact, encrypted with THEIR public key — read from the
+/// Contacts table (set previously by receiveContactDetails), not passed
+/// in by the caller anymore.
+Future<SendMessageResponse> sendContactDetailsBack(
+  IdentityDao identityDao,
+  ContactsDao contactsDao, {
+  required String recipientUserId,
+  required String serverId,
+}) async {
+  final identity = await identityDao.getCurrentIdentityOrNull();
+  if (identity == null) {
+    throw StateError('No local identity found — cannot send contact details.');
+  }
+
+  final recipientContact = await contactsDao.getContactById(recipientUserId);
+  if (recipientContact == null) {
+    throw StateError('Contact $recipientUserId not found locally.');
+  }
+
+  final contactPublicKey = recipientContact.publicKey;
+  if (contactPublicKey == null) {
+    throw StateError('Contact $recipientUserId has no public key on file.');
+  }
+
+  final identityCard = {
+    'contact_id': identity.identityId,
+    'nickname': identity.displayName,
+    'bio': identity.bio,
+    'avatar': identity.avatar,
+    'server_id': serverId,
+  };
+  final identityCardJson = jsonEncode(identityCard);
+
+  final encryptedMessage = await encryptMessage(
+    publicKey: contactPublicKey,
+    plaintext: identityCardJson,
+  );
+
+  final recipientUserName = recipientContact.nickname ?? recipientUserId;
+
+  final service = SendMessageService(serverId: serverId);
+
+  return service.sendMessage(
+    recipientIds: [
+      MessageRecipient(userId: recipientUserId, userName: recipientUserName),
+    ],
+    messageId: _uuid.v4(),
+    logicalId: _uuid.v4(),
+    conversationId: recipientUserId,
+    messageType: 22, // vcard
+    message: encryptedMessage,
+    messageOrder: 0,
+    nonce: 'none',
+    senderSequence: 0,
+  );
+}
