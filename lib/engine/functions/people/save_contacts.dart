@@ -11,6 +11,7 @@ Future<void> saveContact(
   String? nickname,
   Uint8List? avatar,
   String? bio,
+  String? publicKey,
   required String serverId,
   int connectionStatus = 1,  // assumed default: 1 = pending
 }) async {
@@ -21,6 +22,7 @@ Future<void> saveContact(
     nickname: Value(nickname),
     avatar: Value(avatar),
     bio: Value(bio),
+    publicKey: Value(publicKey),
     serverId: serverId,
     connectionStatus: connectionStatus,
     createdAt: now,

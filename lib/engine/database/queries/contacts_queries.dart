@@ -66,6 +66,12 @@ class ContactsDao extends DatabaseAccessor<AppDatabase>
         .write(ContactsCompanion(lastSeen: Value(timestamp)));
   }
 
+  // Update the public key for a contact.
+  Future<void> setPublicKey(String contactId, String? publicKey) async {
+    await (update(db.contacts)..where((t) => t.contactId.equals(contactId)))
+        .write(ContactsCompanion(publicKey: Value(publicKey)));
+  }
+
   // Toggle the mute flag for a contact.
   Future<void> setMuted(String contactId, int muted) async {
     await (update(db.contacts)..where((t) => t.contactId.equals(contactId)))

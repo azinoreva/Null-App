@@ -70,7 +70,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase(super.executor);
 
   @override
-  int get schemaVersion => 1;
+  int get schemaVersion => 3;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -85,7 +85,12 @@ class AppDatabase extends _$AppDatabase {
         },
 
         onUpgrade: (Migrator m, int from, int to) async {
-          // Add version-specific migrations here.
+          if (from < 2) {
+            await m.addColumn(db.contacts, db.contacts.publicKey);
+          }
+          if (from < 3) {
+            await m.addColumn(db.messages, db.messages.decryptedMessage);
+          }
         },
 
         beforeOpen: (details) async {

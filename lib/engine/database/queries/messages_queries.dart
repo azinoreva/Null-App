@@ -54,6 +54,17 @@ class MessagesDao extends DatabaseAccessor<AppDatabase>
         .write(MessagesCompanion(status: Value(newStatus)));
   }
 
+  // Update only the decrypted content of a message.
+  Future<void> updateDecryptedMessage(
+    String messageId,
+    String? decryptedMessage,
+  ) async {
+    await (update(db.messages)..where((t) => t.messageId.equals(messageId)))
+        .write(
+          MessagesCompanion(decryptedMessage: Value(decryptedMessage)),
+        );
+  }
+
   // Delete a message by ID.
   Future<int> deleteMessage(String id) =>
       (delete(db.messages)..where((t) => t.messageId.equals(id))).go();

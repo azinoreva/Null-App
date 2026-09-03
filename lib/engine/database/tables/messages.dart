@@ -25,6 +25,7 @@ class Messages extends Table {
 
   BlobColumn get ciphertext => blob()();
   BlobColumn get nonce => blob()();
+  TextColumn get decryptedMessage => text().nullable()();
 
   IntColumn get messageType => integer()();
 

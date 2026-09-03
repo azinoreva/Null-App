@@ -11,6 +11,7 @@ class Contacts extends Table {
   TextColumn get nickname => text().nullable()();
   BlobColumn get avatar => blob().nullable()(); // Changed to BLOB
   TextColumn get bio => text().nullable()();
+  TextColumn get publicKey => text().nullable()();
 
   IntColumn get muted =>
       integer().withDefault(const Constant(0)).check(muted.isIn([0, 1]))();

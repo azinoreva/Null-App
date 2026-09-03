@@ -37,6 +37,7 @@ Future<SendMessageResponse> sendContactDetails(
     'nickname': identity.displayName,
     'bio': identity.bio,
     'avatar': identity.avatar, // assumed already stored as a base64 string
+    'public_key': publicKey,
     'server_id': serverId,
   };
   final identityCardJson = jsonEncode(identityCard);
