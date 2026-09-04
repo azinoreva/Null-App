@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:video_player/video_player.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import '../main.dart'; // for DecisionScreen
 
 class SplashScreen extends StatefulWidget {
-  const SplashScreen({super.key});
+  final SharedPreferences prefs;
+
+  const SplashScreen({super.key, required this.prefs});
 
   @override
   State<SplashScreen> createState() => _SplashScreenState();
@@ -11,8 +15,8 @@ class SplashScreen extends StatefulWidget {
 class _SplashScreenState extends State<SplashScreen>
     with SingleTickerProviderStateMixin {
   late VideoPlayerController _videoController;
-  late AnimationController _bgAnimationController;
-  late Animation<Color?> _bgColorAnimation;
+  late AnimationController _animationController;
+  late Animation<Color> _colorAnimation;
   bool _showImage = false;
 
   @override
@@ -25,45 +29,36 @@ class _SplashScreenState extends State<SplashScreen>
         _videoController.play();
       });
 
-    _bgAnimationController = AnimationController(
+    _animationController = AnimationController(
       vsync: this,
       duration: const Duration(seconds: 10),
     );
 
-    _bgColorAnimation = ColorTweenSequence<Color?>([
-      ColorTweenSequenceItem(
-        tween: ColorTween(begin: Colors.black, end: Colors.black),
-        weight: 20,
-      ),
-      ColorTweenSequenceItem(
-        tween: ColorTween(begin: Colors.black, end: Colors.white),
-        weight: 10,
-      ),
-      ColorTweenSequenceItem(
-        tween: ColorTween(begin: Colors.white, end: Colors.white),
-        weight: 40,
-      ),
-      ColorTweenSequenceItem(
-        tween: ColorTween(begin: Colors.white, end: Colors.black),
-        weight: 10,
-      ),
-      ColorTweenSequenceItem(
-        tween: ColorTween(begin: Colors.black, end: Colors.black),
-        weight: 20,
-      ),
-    ]).animate(_bgAnimationController)
+    _colorAnimation = _BackgroundColorTween().animate(_animationController)
       ..addListener(() {
         setState(() {});
       });
 
-    _bgAnimationController.forward();
+    _animationController.forward();
 
+    // After 10 seconds, show image, set flag, and navigate
     Future.delayed(const Duration(seconds: 10), () {
       if (mounted) {
         setState(() {
           _showImage = true;
         });
         _videoController.pause();
+
+        // Mark as launched
+        widget.prefs.setBool('is_launched', true);
+
+        // Navigate to DecisionScreen
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (context) => DecisionScreen(prefs: widget.prefs),
+          ),
+        );
       }
     });
   }
@@ -71,7 +66,7 @@ class _SplashScreenState extends State<SplashScreen>
   @override
   void dispose() {
     _videoController.dispose();
-    _bgAnimationController.dispose();
+    _animationController.dispose();
     super.dispose();
   }
 
@@ -83,9 +78,7 @@ class _SplashScreenState extends State<SplashScreen>
       body: Stack(
         fit: StackFit.expand,
         children: [
-          Container(
-            color: _bgColorAnimation.value ?? Colors.black,
-          ),
+          Container(color: _colorAnimation.value),
           Center(
             child: _showImage
                 ? Image.asset(
@@ -112,11 +105,7 @@ class _SplashScreenState extends State<SplashScreen>
                 fontSize: size.width * 0.08,
                 fontWeight: FontWeight.bold,
                 shadows: const [
-                  Shadow(
-                    blurRadius: 10,
-                    color: Colors.black45,
-                    offset: Offset(0, 2),
-                  ),
+                  Shadow(blurRadius: 10, color: Colors.black45, offset: Offset(0, 2)),
                 ],
               ),
             ),
@@ -133,11 +122,7 @@ class _SplashScreenState extends State<SplashScreen>
                 fontSize: size.width * 0.045,
                 fontWeight: FontWeight.w300,
                 shadows: const [
-                  Shadow(
-                    blurRadius: 8,
-                    color: Colors.black45,
-                    offset: Offset(0, 2),
-                  ),
+                  Shadow(blurRadius: 8, color: Colors.black45, offset: Offset(0, 2)),
                 ],
               ),
             ),
@@ -145,5 +130,23 @@ class _SplashScreenState extends State<SplashScreen>
         ],
       ),
     );
+  }
+}
+
+// Custom Tween for background color (works on all Flutter versions)
+class _BackgroundColorTween extends Tween<Color> {
+  @override
+  Color lerp(double t) {
+    if (t <= 0.2) return Colors.black;
+    if (t <= 0.3) {
+      final localT = (t - 0.2) / 0.1;
+      return Color.lerp(Colors.black, Colors.white, localT)!;
+    }
+    if (t <= 0.7) return Colors.white;
+    if (t <= 0.8) {
+      final localT = (t - 0.7) / 0.1;
+      return Color.lerp(Colors.white, Colors.black, localT)!;
+    }
+    return Colors.black;
   }
 }
