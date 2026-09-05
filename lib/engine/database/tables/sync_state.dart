@@ -11,6 +11,8 @@ class SyncState extends Table {
 
   TextColumn get displayName => text()();
   TextColumn get avatar => text().nullable()();
+  IntColumn get status => integer().withDefault(const Constant(0))();
+  // 0 is offline grey colour 1 is online green colour 2 is away yellow colour 3 is busy red colour
 
   IntColumn get unreadCount => integer().withDefault(const Constant(0))();
 
