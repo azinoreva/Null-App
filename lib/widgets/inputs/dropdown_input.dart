@@ -45,6 +45,7 @@ class CustomDropdownField<T> extends StatelessWidget {
       value: value,
       items: items,
       onChanged: onChanged,
+      isExpanded: true,
       style: textStyle,
       dropdownColor: themeExtension.background, // Dropdown popup menu background
       icon: const Icon(

@@ -97,40 +97,6 @@ class _SplashScreenState extends State<SplashScreen>
                       )
                     : const CircularProgressIndicator(),
           ),
-          Positioned(
-            top: size.height * 0.12,
-            left: 0,
-            right: 0,
-            child: Text(
-              'Stay in Control',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: size.width * 0.08,
-                fontWeight: FontWeight.bold,
-                shadows: const [
-                  Shadow(blurRadius: 10, color: Colors.black45, offset: Offset(0, 2)),
-                ],
-              ),
-            ),
-          ),
-          Positioned(
-            bottom: size.height * 0.10,
-            left: 0,
-            right: 0,
-            child: Text(
-              'Made with V',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: size.width * 0.045,
-                fontWeight: FontWeight.w300,
-                shadows: const [
-                  Shadow(blurRadius: 8, color: Colors.black45, offset: Offset(0, 2)),
-                ],
-              ),
-            ),
-          ),
         ],
       ),
     );

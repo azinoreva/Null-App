@@ -68,6 +68,8 @@ flutter:
   assets:
     - assets/splash_video.mp4
     - assets/splash_image.png
+    - assets/images/dark_image_trans_icon.png
+    - assets/images/light_image_trans_icon.png
 
   # The following line ensures that the Material Icons font is
   # included with your application, so that you can use the icons in
