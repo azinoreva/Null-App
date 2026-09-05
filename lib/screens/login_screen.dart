@@ -47,7 +47,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
-                    crossAxisAlignment: CrossAlignment.stretch,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       _buildHeaderSection(context, themeExtension),
                       const SizedBox(height: 48.0),
@@ -77,7 +77,7 @@ class _LoginScreenState extends State<LoginScreen> {
       BuildContext context, AppColorScheme themeExtension) {
     return Column(
       mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAlignment.center,
+      crossAxisAlignment: CrossAxisAlignment.center,
       children: [
         const SizedBox(
           width: 120,
@@ -114,7 +114,7 @@ class _LoginScreenState extends State<LoginScreen> {
       BuildContext context, AppColorScheme themeExtension) {
     return Column(
       mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAlignment.stretch,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         // Password Label with Lock Icon
         Row(
@@ -181,7 +181,7 @@ class _LoginScreenState extends State<LoginScreen> {
       BuildContext context, AppColorScheme themeExtension) {
     return Column(
       mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAlignment.stretch,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         // Divider
         Row(

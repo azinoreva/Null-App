@@ -47,7 +47,7 @@ class SquareFeatureButton extends StatelessWidget {
             padding: const EdgeInsets.all(16.0),
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
                 // Icon with Colored Halo
                 Container(

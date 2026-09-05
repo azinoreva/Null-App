@@ -4,6 +4,7 @@ import 'screens/splash_screen.dart';   // your splash screen
 import 'screens/chat_screen.dart';     // placeholder
 import 'screens/signup_screen.dart';   // placeholder
 import 'screens/login_screen.dart';    // placeholder
+import 'widgets/app_theme.dart';
 
 void main() {
   runApp(const MyApp());
@@ -44,12 +45,22 @@ class _MyAppState extends State<MyApp> {
     final bool isLaunched = _prefs!.getBool('is_launched') ?? false;
 
     return MaterialApp(
-      title: 'My App',
-      theme: ThemeData(colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple)),
+      title: 'Null App',
+      theme: ThemeData(
+        brightness: Brightness.dark,
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: AppColors.darkGreen,
+          brightness: Brightness.dark,
+        ),
+        extensions: const [AppColorScheme.dark],
+      ),
       debugShowCheckedModeBanner: false,
       home: isLaunched
           ? DecisionScreen(prefs: _prefs!)      // skip splash
-          : SplashScreen(prefs: _prefs!),       // show splash first
+          : SplashScreen(
+              prefs: _prefs!,
+              destination: DecisionScreen(prefs: _prefs!),
+            ),
     );
   }
 }
@@ -68,7 +79,7 @@ class DecisionScreen extends StatelessWidget {
     if (isLoggedIn) {
       return const ChatScreen();
     } else if (!hasSignedUp) {
-      return const SignUpScreen();
+      return const SignupScreen();
     } else {
       return const LoginScreen();
     }

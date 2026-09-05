@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import '../widgets/app_theme.dart';
-import '../widgets/buttons/send_button.dart';
+import '../widgets/buttons/send_button.dart' as send;
 import '../widgets/inputs/input_field.dart';
 import '../widgets/inputs/dropdown_input.dart';
 import '../widgets/buttons/transparent_button.dart';
@@ -50,7 +50,7 @@ class _SignupScreenState extends State<SignupScreen> {
                   ),
                   child: isWideScreen
                       ? Row(
-                          crossAxisAlignment: CrossAlignment.center,
+                          crossAxisAlignment: CrossAxisAlignment.center,
                           children: [
                             Expanded(
                               flex: 1,
@@ -73,7 +73,7 @@ class _SignupScreenState extends State<SignupScreen> {
                         )
                       : Column(
                           mainAxisAlignment: MainAxisAlignment.center,
-                          crossAxisAlignment: CrossAlignment.stretch,
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
                             _buildHeaderSection(
                               context,
@@ -105,7 +105,7 @@ class _SignupScreenState extends State<SignupScreen> {
     return Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment:
-          isWideScreen ? CrossAlignment.start : CrossAlignment.center,
+          isWideScreen ? CrossAxisAlignment.start : CrossAxisAlignment.center,
       children: [
         Center(
           child: SizedBox(
@@ -151,7 +151,7 @@ class _SignupScreenState extends State<SignupScreen> {
   }) {
     return Column(
       mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAlignment.stretch,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Row(
           children: [
@@ -225,10 +225,10 @@ class _SignupScreenState extends State<SignupScreen> {
           obscureText: true,
         ),
         const SizedBox(height: 28.0),
-        SendButton(
+        send.SendButton(
           text: 'Sign Up',
           icon: Icons.chevron_right,
-          iconPosition: IconPosition.right,
+          iconPosition: send.IconPosition.right,
           onPressed: () {},
         ),
         const SizedBox(height: 16.0),

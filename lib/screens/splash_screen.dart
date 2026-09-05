@@ -1,12 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:video_player/video_player.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import '../main.dart'; // for DecisionScreen
 
 class SplashScreen extends StatefulWidget {
   final SharedPreferences prefs;
+  final Widget destination;
 
-  const SplashScreen({super.key, required this.prefs});
+  const SplashScreen({
+    super.key,
+    required this.prefs,
+    required this.destination,
+  });
 
   @override
   State<SplashScreen> createState() => _SplashScreenState();
@@ -56,7 +60,7 @@ class _SplashScreenState extends State<SplashScreen>
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(
-            builder: (context) => DecisionScreen(prefs: widget.prefs),
+            builder: (context) => widget.destination,
           ),
         );
       }

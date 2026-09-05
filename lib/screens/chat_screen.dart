@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 // Assuming AppColorScheme, AppTypography, AppColors, and ConversationListItem 
 // are available in your project from the previous components.
-import 'app_theme.dart';
-import 'conversation_list_item.dart';
+import '../widgets/app_theme.dart';
+import '../widgets/display/conversation_card.dart';
 
 class ChatScreen extends StatelessWidget {
   const ChatScreen({super.key});
