@@ -1,4 +1,5 @@
 import 'package:drift/drift.dart';
+import '../app_database.dart';
 import 'dart:typed_data'; // for Uint8List
 
 import '../tables/contacts.dart';
@@ -12,42 +13,42 @@ class ContactsDao extends DatabaseAccessor<AppDatabase>
   ContactsDao(super.db);
 
   // Get a single contact by ID.
-  Future<Contacts?> getContactById(String id) => (select(
+  Future<Contact?> getContactById(String id) => (select(
     db.contacts,
   )..where((t) => t.contactId.equals(id))).getSingleOrNull();
 
   // Get all contacts.
-  Future<List<Contacts>> getAllContacts() => select(db.contacts).get();
+  Future<List<Contact>> getAllContacts() => select(db.contacts).get();
 
   // Get contacts by connection status (1=Pending, 2=Connected, etc.).
-  Future<List<Contacts>> getContactsByStatus(int status) => (select(
+  Future<List<Contact>> getContactsByStatus(int status) => (select(
     db.contacts,
   )..where((t) => t.connectionStatus.equals(status))).get();
 
   // Get only connected contacts (status = 2).
-  Future<List<Contacts>> getConnectedContacts() => getContactsByStatus(2);
+  Future<List<Contact>> getConnectedContacts() => getContactsByStatus(2);
 
   // Get contacts that are online and connected.
-  Future<List<Contacts>> getOnlineConnectedContacts() => (select(
+  Future<List<Contact>> getOnlineConnectedContacts() => (select(
     db.contacts,
   )..where((t) => t.connectionStatus.equals(2) & t.isOnline.equals(1))).get();
 
   // Get a contact by its linked conversation ID.
-  Future<Contacts?> getContactByConversationId(String conversationId) =>
+  Future<Contact?> getContactByConversationId(String conversationId) =>
       (select(db.contacts)
             ..where((t) => t.conversationId.equals(conversationId)))
           .getSingleOrNull();
 
   // Insert a new contact.
-  Future<int> insertContact(Insertable<Contacts> contact) =>
+  Future<int> insertContact(Insertable<Contact> contact) =>
       into(db.contacts).insert(contact);
 
   // Upsert (insert or update) a contact.
-  Future<void> upsertContact(Contacts contact) =>
+  Future<void> upsertContact(Contact contact) =>
       into(db.contacts).insertOnConflictUpdate(contact);
 
   // Update an existing contact row.
-  Future<bool> updateContact(Contacts contact) =>
+  Future<bool> updateContact(Contact contact) =>
       update(db.contacts).replace(contact);
 
   // Delete a contact by ID.
@@ -106,7 +107,7 @@ class ContactsDao extends DatabaseAccessor<AppDatabase>
   }
 
   // NEW: Retrieve contacts that have a non‑null avatar.
-  Future<List<Contacts>> getContactsWithAvatar() => (select(db.contacts)
+  Future<List<Contact>> getContactsWithAvatar() => (select(db.contacts)
         ..where((t) => t.avatar.isNotNull()))
       .get();
 }

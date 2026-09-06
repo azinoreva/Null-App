@@ -9783,37 +9783,31 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final $SecretShareTable secretShare = $SecretShareTable(this);
   late final $SyncStateTable syncState = $SyncStateTable(this);
   late final IdentityDao identityDao = IdentityDao(this as AppDatabase);
-  late final ServersDao serversDao = ServersDao(this as dynamic /* = invalid*/);
+  late final ServersDao serversDao = ServersDao(this as AppDatabase);
   late final ConversationsDao conversationsDao = ConversationsDao(
-    this as dynamic /* = invalid*/,
+    this as AppDatabase,
   );
-  late final MessagesDao messagesDao = MessagesDao(
-    this as dynamic /* = invalid*/,
-  );
-  late final ContactsDao contactsDao = ContactsDao(
-    this as dynamic /* = invalid*/,
-  );
+  late final MessagesDao messagesDao = MessagesDao(this as AppDatabase);
+  late final ContactsDao contactsDao = ContactsDao(this as AppDatabase);
   late final ContactsNetworkDao contactsNetworkDao = ContactsNetworkDao(
-    this as dynamic /* = invalid*/,
+    this as AppDatabase,
   );
   late final ContactNetworkMembersDao contactNetworkMembersDao =
-      ContactNetworkMembersDao(this as dynamic /* = invalid*/);
-  late final GroupsDao groupsDao = GroupsDao(this as dynamic /* = invalid*/);
+      ContactNetworkMembersDao(this as AppDatabase);
+  late final GroupsDao groupsDao = GroupsDao(this as AppDatabase);
   late final GroupMembersDao groupMembersDao = GroupMembersDao(
-    this as dynamic /* = invalid*/,
+    this as AppDatabase,
   );
   late final ConnectionRequestsDao connectionRequestsDao =
-      ConnectionRequestsDao(this as dynamic /* = invalid*/);
-  late final TasksDao tasksDao = TasksDao(this as dynamic /* = invalid*/);
+      ConnectionRequestsDao(this as AppDatabase);
+  late final TasksDao tasksDao = TasksDao(this as AppDatabase);
   late final ShamirsSecretDao shamirsSecretDao = ShamirsSecretDao(
     this as AppDatabase,
   );
   late final SecretShareDao secretShareDao = SecretShareDao(
-    this as dynamic /* = invalid*/,
+    this as AppDatabase,
   );
-  late final SyncStateDao syncStateDao = SyncStateDao(
-    this as dynamic /* = invalid*/,
-  );
+  late final SyncStateDao syncStateDao = SyncStateDao(this as AppDatabase);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();

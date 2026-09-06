@@ -7,14 +7,15 @@ import 'package:cryptography/cryptography.dart';
 import 'package:drift/drift.dart';
 import 'package:uuid/uuid.dart';
 
-import 'contacts_queries.dart';
-import 'conversations_queries.dart';
-import 'identity_queries.dart';
-import 'sessions_queries.dart';
-import 'key_exchange.dart'; // KeyExchange
-import 'identity_crypto.dart'; // IdentityCrypto
-import 'send_message.dart';
-import 'handshake_registry.dart';
+import '../../database/app_database.dart';
+import '../../database/queries/contacts_queries.dart';
+import '../../database/queries/conversations_queries.dart';
+import '../../database/queries/identity_queries.dart';
+import '../../database/queries/sessions_queries.dart';
+import '../../crypto/chat/key_exchange.dart'; // KeyExchange
+import '../../crypto/chat/identity_crypto.dart'; // IdentityCrypto
+import '../../network/chats/send_message.dart';
+import 'handshake_registry.dart.dart';
 
 const _uuid = Uuid();
 

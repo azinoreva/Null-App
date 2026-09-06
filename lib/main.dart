@@ -7,10 +7,13 @@ import 'screens/login_screen.dart';    // placeholder
 import 'widgets/app_theme.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'engine/network/main_server_client.dart';
+import 'engine/database/init_db.dart';
 
 void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
   await dotenv.load();
   MainServerClient.init();
+  await DatabaseInitializer.initialize();
   runApp(const MyApp());
 }
 

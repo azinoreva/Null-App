@@ -3,7 +3,7 @@
 part of 'sync_state_queries.dart';
 
 // ignore_for_file: type=lint
-mixin _$SyncStateDaoMixin on DatabaseAccessor<dynamic /* = invalid*/> {
+mixin _$SyncStateDaoMixin on DatabaseAccessor<AppDatabase> {
   $SyncStateTable get syncState => attachedDatabase.syncState;
   SyncStateDaoManager get managers => SyncStateDaoManager(this);
 }

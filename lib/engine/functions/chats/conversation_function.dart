@@ -1,4 +1,5 @@
 import 'package:drift/drift.dart';
+import '../../database/app_database.dart';
 import '../../database/queries/conversations_queries.dart';
 
 /// Creates a new conversation with sensible defaults.

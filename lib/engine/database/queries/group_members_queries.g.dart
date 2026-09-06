@@ -3,7 +3,7 @@
 part of 'group_members_queries.dart';
 
 // ignore_for_file: type=lint
-mixin _$GroupMembersDaoMixin on DatabaseAccessor<dynamic /* = invalid*/> {
+mixin _$GroupMembersDaoMixin on DatabaseAccessor<AppDatabase> {
   $GroupsTable get groups => attachedDatabase.groups;
   $IdentityTable get identity => attachedDatabase.identity;
   $GroupMembersTable get groupMembers => attachedDatabase.groupMembers;

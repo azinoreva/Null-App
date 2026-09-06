@@ -5,6 +5,7 @@ import 'dart:typed_data';
 import 'package:cryptography/cryptography.dart';
 import 'package:drift/drift.dart';
 
+import '../../database/app_database.dart';
 import '../../database/queries/contacts_queries.dart';
 import '../../crypto/chat/asymetric_encryption.dart'; // decryptMessage
 import '../../image_handling/string_to_blob.dart';

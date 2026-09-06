@@ -1,4 +1,5 @@
 import 'package:drift/drift.dart';
+import '../app_database.dart';
 import '../tables/conversations.dart';
 
 part 'conversations_queries.g.dart';
@@ -10,30 +11,30 @@ class ConversationsDao extends DatabaseAccessor<AppDatabase>
   ConversationsDao(super.db);
 
   // Get a single conversation by ID.
-  Future<Conversations?> getConversationById(String id) =>
+  Future<Conversation?> getConversationById(String id) =>
       (select(db.conversations)..where((t) => t.conversationId.equals(id)))
           .getSingleOrNull();
 
   // Get all conversations (optionally filter by archived/pinned later).
-  Future<List<Conversations>> getAllConversations() =>
+  Future<List<Conversation>> getAllConversations() =>
       select(db.conversations).get();
 
   // Get conversations ordered by last message time (descending).
-  Future<List<Conversations>> getConversationsByLastMessage() =>
+  Future<List<Conversation>> getConversationsByLastMessage() =>
       (select(db.conversations)..orderBy([
         (t) => OrderingTerm(expression: t.lastMessageTime, mode: OrderingMode.desc),
       ])).get();
 
   // Insert a new conversation.
-  Future<int> insertConversation(Insertable<Conversations> conversation) =>
+  Future<int> insertConversation(Insertable<Conversation> conversation) =>
       into(db.conversations).insert(conversation);
 
   // Upsert (insert or update) a conversation.
-  Future<void> upsertConversation(Conversations conversation) =>
+  Future<void> upsertConversation(Conversation conversation) =>
       into(db.conversations).insertOnConflictUpdate(conversation);
 
   // Update an existing conversation.
-  Future<bool> updateConversation(Conversations conversation) =>
+  Future<bool> updateConversation(Conversation conversation) =>
       update(db.conversations).replace(conversation);
 
   // Delete a conversation.

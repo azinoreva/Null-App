@@ -3,7 +3,7 @@
 part of 'tasks_queries.dart';
 
 // ignore_for_file: type=lint
-mixin _$TasksDaoMixin on DatabaseAccessor<dynamic /* = invalid*/> {
+mixin _$TasksDaoMixin on DatabaseAccessor<AppDatabase> {
   $ServersTable get servers => attachedDatabase.servers;
   $TasksTable get tasks => attachedDatabase.tasks;
   TasksDaoManager get managers => TasksDaoManager(this);

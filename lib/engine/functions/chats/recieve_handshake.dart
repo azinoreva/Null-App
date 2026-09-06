@@ -3,13 +3,13 @@
 import 'dart:convert';
 import 'package:cryptography/cryptography.dart';
 
-import 'contacts_queries.dart';
-import 'identity_queries.dart';
-import 'messages_queries.dart';
-import 'sessions_queries.dart';
-import 'key_exchange.dart';
-import 'identity_crypto.dart';
-import 'handshake_registry.dart';
+import '../../database/queries/contacts_queries.dart';
+import '../../database/queries/identity_queries.dart';
+import '../../database/queries/messages_queries.dart';
+import '../../database/queries/sessions_queries.dart';
+import '../../crypto/chat/key_exchange.dart';
+import '../../crypto/chat/identity_crypto.dart';
+import 'handshake_registry.dart.dart';
 
 /// Call this from your SSE listener for every incoming message where
 /// messageType is 0 or 1. Returns true if it handled the message.

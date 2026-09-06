@@ -1,6 +1,7 @@
 //module name: connection_requests_queries
 
 import 'package:drift/drift.dart';
+import '../app_database.dart';
 
 import '../tables/connection_requests.dart';
 
@@ -13,31 +14,31 @@ class ConnectionRequestsDao extends DatabaseAccessor<AppDatabase>
   ConnectionRequestsDao(super.db);
 
   // Get a single request by ID.
-  Future<ConnectionRequests?> getRequestById(String id) => (select(
+  Future<ConnectionRequest?> getRequestById(String id) => (select(
     db.connectionRequests,
   )..where((t) => t.requestId.equals(id))).getSingleOrNull();
 
   // Get all requests where the given identity is the recipient.
-  Future<List<ConnectionRequests>> getRequestsForRecipient(
+  Future<List<ConnectionRequest>> getRequestsForRecipient(
     String recipientId,
   ) => (select(
     db.connectionRequests,
   )..where((t) => t.recipientId.equals(recipientId))).get();
 
   // Get all requests where the given identity is the requester.
-  Future<List<ConnectionRequests>> getRequestsByRequester(String requesterId) =>
+  Future<List<ConnectionRequest>> getRequestsByRequester(String requesterId) =>
       (select(
         db.connectionRequests,
       )..where((t) => t.requesterId.equals(requesterId))).get();
 
   // Get all requests for a specific group.
-  Future<List<ConnectionRequests>> getRequestsForGroup(String groupId) =>
+  Future<List<ConnectionRequest>> getRequestsForGroup(String groupId) =>
       (select(
         db.connectionRequests,
       )..where((t) => t.groupId.equals(groupId))).get();
 
   // Get pending (status = 0) requests for a recipient.
-  Future<List<ConnectionRequests>> getPendingRequestsForRecipient(
+  Future<List<ConnectionRequest>> getPendingRequestsForRecipient(
     String recipientId,
   ) =>
       (select(db.connectionRequests)..where(
@@ -46,11 +47,11 @@ class ConnectionRequestsDao extends DatabaseAccessor<AppDatabase>
           .get();
 
   // Insert a new connection request.
-  Future<int> insertRequest(Insertable<ConnectionRequests> request) =>
+  Future<int> insertRequest(Insertable<ConnectionRequest> request) =>
       into(db.connectionRequests).insert(request);
 
   // Update an existing request row.
-  Future<bool> updateRequest(ConnectionRequests request) =>
+  Future<bool> updateRequest(ConnectionRequest request) =>
       update(db.connectionRequests).replace(request);
 
   // Delete a request by ID.

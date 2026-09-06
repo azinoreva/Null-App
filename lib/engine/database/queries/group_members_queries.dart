@@ -1,4 +1,5 @@
 import 'package:drift/drift.dart';
+import '../app_database.dart';
 import 'dart:typed_data'; // for Uint8List
 
 import '../tables/group_members.dart';
@@ -12,7 +13,7 @@ class GroupMembersDao extends DatabaseAccessor<AppDatabase>
   GroupMembersDao(super.db);
 
   // Add a new member to a group.
-  Future<int> addMember(Insertable<GroupMembers> member) =>
+  Future<int> addMember(Insertable<GroupMember> member) =>
       into(db.groupMembers).insert(member);
 
   // Remove a member from a group.
@@ -35,11 +36,11 @@ class GroupMembersDao extends DatabaseAccessor<AppDatabase>
   }
 
   // Get all members of a group.
-  Future<List<GroupMembers>> getMembersOfGroup(String groupId) =>
+  Future<List<GroupMember>> getMembersOfGroup(String groupId) =>
       (select(db.groupMembers)..where((t) => t.groupId.equals(groupId))).get();
 
   // Get all groups a user belongs to.
-  Future<List<GroupMembers>> getGroupsOfIdentity(String identityId) => (select(
+  Future<List<GroupMember>> getGroupsOfIdentity(String identityId) => (select(
     db.groupMembers,
   )..where((t) => t.identityId.equals(identityId))).get();
 

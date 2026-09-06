@@ -4,11 +4,12 @@ import 'dart:convert';
 import 'package:uuid/uuid.dart';
 import 'package:drift/drift.dart';
 
-import 'contacts_queries.dart';
-import 'identity_queries.dart';
-import 'messages_queries.dart';
-import 'null_crypto.dart'; // NullCrypto, EncryptedMessage
-import 'send_message.dart'; // SendMessageService, MessageRecipient, SendMessageResponse
+import '../../database/app_database.dart';
+import '../../database/queries/contacts_queries.dart';
+import '../../database/queries/identity_queries.dart';
+import '../../database/queries/messages_queries.dart';
+import '../../crypto/chat/null_crypto.dart'; // NullCrypto, EncryptedMessage
+import '../../network/chats/send_message.dart'; // SendMessageService, MessageRecipient, SendMessageResponse
 
 const _uuid = Uuid();
 

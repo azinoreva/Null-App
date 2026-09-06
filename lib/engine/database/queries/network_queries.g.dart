@@ -3,7 +3,7 @@
 part of 'network_queries.dart';
 
 // ignore_for_file: type=lint
-mixin _$ContactsNetworkDaoMixin on DatabaseAccessor<dynamic /* = invalid*/> {
+mixin _$ContactsNetworkDaoMixin on DatabaseAccessor<AppDatabase> {
   $ContactsNetworkTable get contactsNetwork => attachedDatabase.contactsNetwork;
   ContactsNetworkDaoManager get managers => ContactsNetworkDaoManager(this);
 }
@@ -18,8 +18,7 @@ class ContactsNetworkDaoManager {
       );
 }
 
-mixin _$ContactNetworkMembersDaoMixin
-    on DatabaseAccessor<dynamic /* = invalid*/> {
+mixin _$ContactNetworkMembersDaoMixin on DatabaseAccessor<AppDatabase> {
   $ContactsNetworkTable get contactsNetwork => attachedDatabase.contactsNetwork;
   $ConversationsTable get conversations => attachedDatabase.conversations;
   $ContactsTable get contacts => attachedDatabase.contacts;

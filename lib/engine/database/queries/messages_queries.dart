@@ -1,4 +1,5 @@
 import 'package:drift/drift.dart';
+import '../app_database.dart';
 
 import '../tables/messages.dart';
 
@@ -11,19 +12,19 @@ class MessagesDao extends DatabaseAccessor<AppDatabase>
   MessagesDao(super.db);
 
   // Get a single message by its ID.
-  Future<Messages?> getMessageById(String id) => (select(
+  Future<Message?> getMessageById(String id) => (select(
     db.messages,
   )..where((t) => t.messageId.equals(id))).getSingleOrNull();
 
   // Get all messages in a conversation, ordered by message_order.
-  Future<List<Messages>> getMessagesForConversation(String conversationId) =>
+  Future<List<Message>> getMessagesForConversation(String conversationId) =>
       (select(db.messages)
             ..where((t) => t.conversationId.equals(conversationId))
             ..orderBy([(t) => OrderingTerm(expression: t.messageOrder)]))
           .get();
 
   // Get messages for a conversation with pagination.
-  Future<List<Messages>> getMessagesForConversationPaginated(
+  Future<List<Message>> getMessagesForConversationPaginated(
     String conversationId, {
     int limit = 50,
     int offset = 0,
@@ -35,17 +36,17 @@ class MessagesDao extends DatabaseAccessor<AppDatabase>
           .get();
 
   // Insert a new message.
-  Future<int> insertMessage(Insertable<Messages> message) =>
+  Future<int> insertMessage(Insertable<Message> message) =>
       into(db.messages).insert(message);
 
   // Insert multiple messages in a batch (atomic).
-  Future<void> insertMessages(List<Insertable<Messages>> messages) =>
+  Future<void> insertMessages(List<Insertable<Message>> messages) =>
       batch((batch) {
         batch.insertAll(db.messages, messages);
       });
 
   // Update an existing message row.
-  Future<bool> updateMessage(Messages message) =>
+  Future<bool> updateMessage(Message message) =>
       update(db.messages).replace(message);
 
   // Update only the status of a message.
@@ -70,7 +71,7 @@ class MessagesDao extends DatabaseAccessor<AppDatabase>
       (delete(db.messages)..where((t) => t.messageId.equals(id))).go();
 
   // Get the latest message in a conversation (ordered by message_order desc).
-  Future<Messages?> getLatestMessage(String conversationId) =>
+  Future<Message?> getLatestMessage(String conversationId) =>
       (select(db.messages)
             ..where((t) => t.conversationId.equals(conversationId))
             ..orderBy([
@@ -83,7 +84,7 @@ class MessagesDao extends DatabaseAccessor<AppDatabase>
           .getSingleOrNull();
 
   // Find messages with a specific status (useful for sync).
-  Future<List<Messages>> getMessagesByStatus(
+  Future<List<Message>> getMessagesByStatus(
     String conversationId,
     int status,
   ) =>

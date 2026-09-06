@@ -3,7 +3,7 @@
 part of 'secret_share_queries.dart';
 
 // ignore_for_file: type=lint
-mixin _$SecretShareDaoMixin on DatabaseAccessor<dynamic /* = invalid*/> {
+mixin _$SecretShareDaoMixin on DatabaseAccessor<AppDatabase> {
   $IdentityTable get identity => attachedDatabase.identity;
   $SecretShareTable get secretShare => attachedDatabase.secretShare;
   SecretShareDaoManager get managers => SecretShareDaoManager(this);

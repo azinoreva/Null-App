@@ -1,4 +1,5 @@
 import 'package:drift/drift.dart';
+import '../app_database.dart';
 
 import '../tables/networks.dart';
 import '../tables/contacts.dart';
@@ -12,24 +13,24 @@ class ContactsNetworkDao extends DatabaseAccessor<AppDatabase>
   ContactsNetworkDao(super.db);
 
   // Get a single network by ID.
-  Future<ContactsNetwork?> getNetworkById(String id) => (select(
+  Future<ContactsNetworkData?> getNetworkById(String id) => (select(
     db.contactsNetwork,
   )..where((t) => t.networkId.equals(id))).getSingleOrNull();
 
   // Get all networks.
-  Future<List<ContactsNetwork>> getAllNetworks() =>
+  Future<List<ContactsNetworkData>> getAllNetworks() =>
       select(db.contactsNetwork).get();
 
   // Insert a new network.
-  Future<int> insertNetwork(Insertable<ContactsNetwork> network) =>
+  Future<int> insertNetwork(Insertable<ContactsNetworkData> network) =>
       into(db.contactsNetwork).insert(network);
 
   // Upsert a network.
-  Future<void> upsertNetwork(ContactsNetwork network) =>
+  Future<void> upsertNetwork(ContactsNetworkData network) =>
       into(db.contactsNetwork).insertOnConflictUpdate(network);
 
   // Update an existing network.
-  Future<bool> updateNetwork(ContactsNetwork network) =>
+  Future<bool> updateNetwork(ContactsNetworkData network) =>
       update(db.contactsNetwork).replace(network);
 
   // Delete a network by ID.

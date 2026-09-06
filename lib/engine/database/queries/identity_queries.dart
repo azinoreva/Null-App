@@ -1,6 +1,7 @@
 //module name: identity_queries
 
 import 'package:drift/drift.dart';
+import '../app_database.dart';
 import '../tables/identity.dart';
 import '../app_database.dart';
 

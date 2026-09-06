@@ -35,7 +35,7 @@ dependencies:
   # Use with the CupertinoIcons class for iOS style icons.
   cupertino_icons: ^1.0.8
   drift: ^2.34.3
-  sqlite3_flutter_libs: ^0.6.0+eol
+  sqlcipher_flutter_libs: ^0.7.0+eol
   path_provider: ^2.1.6
   path: ^1.9.1
   cryptography: ^2.9.0
@@ -67,6 +67,7 @@ dev_dependencies:
 # The following section is specific to Flutter packages.
 flutter:
   assets:
+    - .env
     - assets/splash_video.mp4
     - assets/splash_image.png
     - assets/images/dark_image_trans_icon.png

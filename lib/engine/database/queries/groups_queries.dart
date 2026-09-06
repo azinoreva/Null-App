@@ -1,4 +1,5 @@
 import 'package:drift/drift.dart';
+import '../app_database.dart';
 import 'dart:typed_data'; // for Uint8List
 
 import '../tables/groups.dart';
@@ -25,32 +26,32 @@ class GroupsDao extends DatabaseAccessor<AppDatabase>
   // ------------------------------------------------------------
 
   /// Get a single group by ID.
-  Future<Groups?> getGroupById(String id) =>
+  Future<Group?> getGroupById(String id) =>
       (select(db.groups)
             ..where((t) => t.groupId.equals(id)))
           .getSingleOrNull();
 
   /// Get all groups.
-  Future<List<Groups>> getAllGroups() =>
+  Future<List<Group>> getAllGroups() =>
       select(db.groups).get();
 
   /// Get groups by type.
   ///
   /// 0 = private
   /// 1 = public
-  Future<List<Groups>> getGroupsByType(int type) =>
+  Future<List<Group>> getGroupsByType(int type) =>
       (select(db.groups)
             ..where((t) => t.groupType.equals(type)))
           .get();
 
   /// Get groups owned by the current user.
-  Future<List<Groups>> getOwnedGroups() =>
+  Future<List<Group>> getOwnedGroups() =>
       (select(db.groups)
             ..where((t) => t.isOwner.equals(1)))
           .get();
 
   /// Get groups that currently have a pending key rotation.
-  Future<List<Groups>> getGroupsWithPendingKeyRotation() =>
+  Future<List<Group>> getGroupsWithPendingKeyRotation() =>
       (select(db.groups)
             ..where((t) => t.newPrivateKey.isNotNull()))
           .get();
@@ -58,7 +59,7 @@ class GroupsDao extends DatabaseAccessor<AppDatabase>
   /// Get groups whose pending key should now become active.
   ///
   /// The caller can use this during synchronization or startup.
-  Future<List<Groups>> getGroupsReadyForKeySwap(
+  Future<List<Group>> getGroupsReadyForKeySwap(
     int currentTime,
   ) =>
       (select(db.groups)
@@ -78,13 +79,13 @@ class GroupsDao extends DatabaseAccessor<AppDatabase>
 
   /// Insert a new group.
   Future<int> insertGroup(
-    Insertable<Groups> group,
+    Insertable<Group> group,
   ) =>
       into(db.groups).insert(group);
 
   /// Insert or update a group.
   Future<void> upsertGroup(
-    Groups group,
+    Group group,
   ) =>
       into(db.groups).insertOnConflictUpdate(group);
 
@@ -94,7 +95,7 @@ class GroupsDao extends DatabaseAccessor<AppDatabase>
 
   /// Replace an existing group row.
   Future<bool> updateGroup(
-    Groups group,
+    Group group,
   ) =>
       update(db.groups).replace(group);
 
@@ -198,7 +199,6 @@ class GroupsDao extends DatabaseAccessor<AppDatabase>
   Future<void> scheduleKeyRotation({
     required String groupId,
     required String newPrivateKey,
-    required int newKeyVersion,
     required int swapTime,
   }) async {
     await (update(db.groups)
@@ -207,7 +207,6 @@ class GroupsDao extends DatabaseAccessor<AppDatabase>
       GroupsCompanion(
         newPrivateKey: Value(newPrivateKey),
         swapTime: Value(swapTime),
-        keyVersion: Value(newKeyVersion),
         updatedAt: Value(
           DateTime.now().millisecondsSinceEpoch,
         ),

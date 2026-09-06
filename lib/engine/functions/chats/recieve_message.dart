@@ -3,10 +3,10 @@
 import 'dart:convert';
 import 'package:drift/drift.dart';
 
-import 'contacts_queries.dart';
-import 'identity_queries.dart';
-import 'messages_queries.dart';
-import 'null_crypto.dart'; // NullCrypto
+import '../../database/queries/contacts_queries.dart';
+import '../../database/queries/identity_queries.dart';
+import '../../database/queries/messages_queries.dart';
+import '../../crypto/chat/null_crypto.dart'; // NullCrypto
 
 /// Receives an incoming chat message (messageType 1), decrypts it via
 /// NullCrypto's ratchet, and stores it in the Messages table with the

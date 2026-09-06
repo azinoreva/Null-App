@@ -1,4 +1,5 @@
 import 'package:drift/drift.dart';
+import '../app_database.dart';
 import '../tables/tasks.dart';
 
 part 'tasks_queries.g.dart';
@@ -22,31 +23,31 @@ class TasksDao extends DatabaseAccessor<AppDatabase> with _$TasksDaoMixin {
   // ---------------------------------------------------------------------
 
   /// Get a single task by its ID.
-  Future<Tasks?> getTaskById(String id) =>
+  Future<Task?> getTaskById(String id) =>
       (select(db.tasks)..where((t) => t.taskId.equals(id))).getSingleOrNull();
 
   /// Get all tasks.
-  Future<List<Tasks>> getAllTasks() => select(db.tasks).get();
+  Future<List<Task>> getAllTasks() => select(db.tasks).get();
 
   /// Get tasks by status.
-  Future<List<Tasks>> getTasksByStatus(int status) =>
+  Future<List<Task>> getTasksByStatus(int status) =>
       (select(db.tasks)..where((t) => t.taskStatus.equals(status))).get();
 
   /// Get tasks that are not completed (status != 2).
-  Future<List<Tasks>> getIncompleteTasks() =>
+  Future<List<Task>> getIncompleteTasks() =>
       (select(db.tasks)..where((t) => t.taskStatus.equals(TaskStatus.completed).not())).get();
 
   /// Get tasks for a specific server.
-  Future<List<Tasks>> getTasksForServer(String serverId) =>
+  Future<List<Task>> getTasksForServer(String serverId) =>
       (select(db.tasks)..where((t) => t.serverId.equals(serverId))).get();
 
   /// Get tasks by type.
-  Future<List<Tasks>> getTasksByType(int taskType) =>
+  Future<List<Task>> getTasksByType(int taskType) =>
       (select(db.tasks)..where((t) => t.taskType.equals(taskType))).get();
 
   /// Get tasks that have not been synced to a particular target.
   /// `target` can be one of: 'state', 'server', 'client', 'db'.
-  Future<List<Tasks>> getUnsyncedTasks(String target) {
+  Future<List<Task>> getUnsyncedTasks(String target) {
     final flagColumn = switch (target) {
       'state' => db.tasks.syncedToState,
       'server' => db.tasks.syncedToServer,
@@ -62,7 +63,7 @@ class TasksDao extends DatabaseAccessor<AppDatabase> with _$TasksDaoMixin {
   // ---------------------------------------------------------------------
 
   /// Insert a new task. Accepts either a [Tasks] object or a [TasksCompanion].
-  Future<int> insertTask(Insertable<Tasks> task) =>
+  Future<int> insertTask(Insertable<Task> task) =>
       into(db.tasks).insert(task);
 
   /// Upsert (insert or update) a task using a companion.
@@ -71,7 +72,7 @@ class TasksDao extends DatabaseAccessor<AppDatabase> with _$TasksDaoMixin {
 
   /// Replace an entire task row with a [Tasks] object.
   /// Only use this if you are sure all fields are populated correctly.
-  Future<bool> updateTask(Tasks task) =>
+  Future<bool> updateTask(Task task) =>
       update(db.tasks).replace(task);
 
   /// Update specific fields of a task using a companion.

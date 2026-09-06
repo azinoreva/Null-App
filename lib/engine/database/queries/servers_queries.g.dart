@@ -3,7 +3,7 @@
 part of 'servers_queries.dart';
 
 // ignore_for_file: type=lint
-mixin _$ServersDaoMixin on DatabaseAccessor<dynamic /* = invalid*/> {
+mixin _$ServersDaoMixin on DatabaseAccessor<AppDatabase> {
   $ServersTable get servers => attachedDatabase.servers;
   ServersDaoManager get managers => ServersDaoManager(this);
 }

@@ -9,6 +9,7 @@
 // access and the generated part file to line up).
 
 import 'package:drift/drift.dart';
+import '../app_database.dart';
 
 import '../app_database.dart';
 import '../tables/shamirs_secret.dart';
@@ -21,24 +22,24 @@ class ShamirsSecretDao extends DatabaseAccessor<AppDatabase>
   ShamirsSecretDao(super.db);
 
   /// Get the secret-share row stored for a given recipient identity.
-  Future<ShamirsSecret?> getShamirsSecretByIdentityId(String identityId) {
+  Future<ShamirsSecretData?> getShamirsSecretByIdentityId(String identityId) {
     return (select(shamirsSecret)
           ..where((tbl) => tbl.identityId.equals(identityId)))
         .getSingleOrNull();
   }
 
   /// Get all secret-share rows.
-  Future<List<ShamirsSecret>> getAllShamirsSecrets() {
+  Future<List<ShamirsSecretData>> getAllShamirsSecrets() {
     return select(shamirsSecret).get();
   }
 
   /// Insert a new secret-share row.
-  Future<void> insertShamirsSecret(Insertable<ShamirsSecret> secret) {
+  Future<void> insertShamirsSecret(Insertable<ShamirsSecretData> secret) {
     return into(shamirsSecret).insert(secret);
   }
 
   /// Update an existing secret-share row.
-  Future<bool> updateShamirsSecret(ShamirsSecret secret) {
+  Future<bool> updateShamirsSecret(ShamirsSecretData secret) {
     return update(shamirsSecret).replace(secret);
   }
 

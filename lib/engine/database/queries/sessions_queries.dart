@@ -1,6 +1,7 @@
 // module name: sessions_queries
 
 import 'package:drift/drift.dart';
+import '../app_database.dart';
 import 'dart:typed_data';
 
 import '../tables/sessions.dart';

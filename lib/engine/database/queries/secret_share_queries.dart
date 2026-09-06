@@ -1,6 +1,7 @@
 //module name: secret_share_queries.g.dart
 
 import 'package:drift/drift.dart';
+import '../app_database.dart';
 import '../tables/secret_share.dart';
 
 part 'secret_share_queries.g.dart';
@@ -12,23 +13,23 @@ class SecretShareDao extends DatabaseAccessor<AppDatabase>
   SecretShareDao(super.db);
 
   // Get the share record for a specific identity.
-  Future<SecretShare?> getShareForIdentity(String identityId) =>
+  Future<SecretShareData?> getShareForIdentity(String identityId) =>
       (select(db.secretShare)..where((t) => t.identityId.equals(identityId)))
           .getSingleOrNull();
 
   // Get all share records.
-  Future<List<SecretShare>> getAllShares() => select(db.secretShare).get();
+  Future<List<SecretShareData>> getAllShares() => select(db.secretShare).get();
 
   // Insert a new share record.
-  Future<int> insertShare(Insertable<SecretShare> share) =>
+  Future<int> insertShare(Insertable<SecretShareData> share) =>
       into(db.secretShare).insert(share);
 
   // Upsert (insert or update) a share record.
-  Future<void> upsertShare(SecretShare share) =>
+  Future<void> upsertShare(SecretShareData share) =>
       into(db.secretShare).insertOnConflictUpdate(share);
 
   // Update an existing share record.
-  Future<bool> updateShare(SecretShare share) =>
+  Future<bool> updateShare(SecretShareData share) =>
       update(db.secretShare).replace(share);
 
   // Delete a share record by identity ID.

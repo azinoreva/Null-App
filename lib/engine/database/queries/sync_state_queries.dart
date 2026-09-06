@@ -1,4 +1,5 @@
 import 'package:drift/drift.dart';
+import '../app_database.dart';
 import '../tables/sync_state.dart';
 
 part 'sync_state_queries.g.dart';
@@ -10,12 +11,12 @@ class SyncStateDao extends DatabaseAccessor<AppDatabase>
   SyncStateDao(super.db);
 
   // Get a single sync state by conversation ID.
-  Future<SyncState?> getSyncStateById(String conversationId) =>
+  Future<SyncStateData?> getSyncStateById(String conversationId) =>
       (select(db.syncState)..where((t) => t.conversationId.equals(conversationId)))
           .getSingleOrNull();
 
   // Get all sync states, ordered by pinned first, then updated_at descending.
-  Future<List<SyncState>> getAllSyncStates() => (select(db.syncState)
+  Future<List<SyncStateData>> getAllSyncStates() => (select(db.syncState)
         ..orderBy([
           (t) => OrderingTerm(expression: t.pinned, mode: OrderingMode.desc),
           (t) => OrderingTerm(expression: t.updatedAt, mode: OrderingMode.desc),
@@ -23,21 +24,21 @@ class SyncStateDao extends DatabaseAccessor<AppDatabase>
       .get();
 
   // Get sync states for a given conversation type.
-  Future<List<SyncState>> getSyncStatesByType(int conversationType) =>
+  Future<List<SyncStateData>> getSyncStatesByType(int conversationType) =>
       (select(db.syncState)
             ..where((t) => t.conversationType.equals(conversationType)))
           .get();
 
   // Insert a new sync state.
-  Future<int> insertSyncState(Insertable<SyncState> syncState) =>
+  Future<int> insertSyncState(Insertable<SyncStateData> syncState) =>
       into(db.syncState).insert(syncState);
 
   // Upsert (insert or update) a sync state.
-  Future<void> upsertSyncState(SyncState syncState) =>
+  Future<void> upsertSyncState(SyncStateData syncState) =>
       into(db.syncState).insertOnConflictUpdate(syncState);
 
   // Update an existing sync state row.
-  Future<bool> updateSyncState(SyncState syncState) =>
+  Future<bool> updateSyncState(SyncStateData syncState) =>
       update(db.syncState).replace(syncState);
 
   // Delete a sync state by conversation ID.

@@ -1,5 +1,6 @@
 //module name: servers_queries
 import 'package:drift/drift.dart';
+import '../app_database.dart';
 
 import '../tables/servers.dart';
 
@@ -15,23 +16,23 @@ class ServersDao extends DatabaseAccessor<AppDatabase> with _$ServersDaoMixin {
   ServersDao(super.db);
 
   // Fetch a single server by its ID.
-  Future<Servers?> getServerById(String id) => (select(
+  Future<Server?> getServerById(String id) => (select(
     db.servers,
   )..where((t) => t.serverId.equals(id))).getSingleOrNull();
 
   // Retrieve all servers.
-  Future<List<Servers>> getAllServers() => select(db.servers).get();
+  Future<List<Server>> getAllServers() => select(db.servers).get();
 
   // Insert a new server.
-  Future<int> insertServer(Insertable<Servers> server) =>
+  Future<int> insertServer(Insertable<Server> server) =>
       into(db.servers).insert(server);
 
   // Replace an existing server (upsert).
-  Future<void> upsertServer(Servers server) =>
+  Future<void> upsertServer(Server server) =>
       into(db.servers).insertOnConflictUpdate(server);
 
   // Update an existing server row.
-  Future<bool> updateServer(Servers server) =>
+  Future<bool> updateServer(Server server) =>
       update(db.servers).replace(server);
 
   // Delete a server by ID.
@@ -67,10 +68,12 @@ class ServersDao extends DatabaseAccessor<AppDatabase> with _$ServersDaoMixin {
 
   // NEW: Retrieve all distinct colour values used by servers.
   Future<List<int>> getAllDistinctColours() async {
-    final query = selectOnly(db.servers)
-      ..addColumns([db.servers.colour])
-      ..distinct = true;
+    final query = selectOnly(db.servers, distinct: true)
+      ..addColumns([db.servers.colour]);
     final rows = await query.get();
-    return rows.map((row) => row.read(db.servers.colour)).toList();
+    return rows
+        .map((row) => row.read(db.servers.colour))
+        .whereType<int>()
+        .toList();
   }
 }

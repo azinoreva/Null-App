@@ -3,7 +3,7 @@
 part of 'sessions_queries.dart';
 
 // ignore_for_file: type=lint
-mixin _$SessionsDaoMixin on DatabaseAccessor<dynamic /* = invalid*/> {
+mixin _$SessionsDaoMixin on DatabaseAccessor<AppDatabase> {
   $ConversationsTable get conversations => attachedDatabase.conversations;
   $SessionsTable get sessions => attachedDatabase.sessions;
   SessionsDaoManager get managers => SessionsDaoManager(this);

@@ -3,7 +3,7 @@
 part of 'connection_requests_queries.dart';
 
 // ignore_for_file: type=lint
-mixin _$ConnectionRequestsDaoMixin on DatabaseAccessor<dynamic /* = invalid*/> {
+mixin _$ConnectionRequestsDaoMixin on DatabaseAccessor<AppDatabase> {
   $IdentityTable get identity => attachedDatabase.identity;
   $GroupsTable get groups => attachedDatabase.groups;
   $ConnectionRequestsTable get connectionRequests =>
