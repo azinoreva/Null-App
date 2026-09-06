@@ -23,6 +23,11 @@ class Share {
 
   const Share({required this.id, required this.value});
 
+  Map<String, dynamic> toJson() => {'id': id, 'value': value};
+
+  factory Share.fromJson(Map<String, dynamic> json) =>
+      Share(id: json['id'] as int, value: json['value'] as String);
+
   @override
   String toString() => 'Share(id: $id, value: $value)';
 }

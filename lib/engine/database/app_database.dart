@@ -86,10 +86,10 @@ class AppDatabase extends _$AppDatabase {
 
         onUpgrade: (Migrator m, int from, int to) async {
           if (from < 2) {
-            await m.addColumn(db.contacts, db.contacts.publicKey);
+            await m.addColumn(contacts, contacts.publicKey);
           }
           if (from < 3) {
-            await m.addColumn(db.messages, db.messages.decryptedMessage);
+            await m.addColumn(messages, messages.decryptedMessage);
           }
         },
 

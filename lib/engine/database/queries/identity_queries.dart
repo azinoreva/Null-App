@@ -2,37 +2,9 @@
 
 import 'package:drift/drift.dart';
 import '../tables/identity.dart';
+import '../app_database.dart';
 
 part 'identity_queries.g.dart';
-
-@DriftDatabase(tables: [Identity], daos: [IdentityDao])
-class AppDatabase extends _$AppDatabase {
-  AppDatabase(super.e);
-
-  @override
-  int get schemaVersion => 2; // Increment because we may have added new columns
-
-  @override
-  MigrationStrategy get migration => MigrationStrategy(
-    onCreate: (Migrator m) async {
-      await m.createAll();
-    },
-    onUpgrade: (Migrator m, int from, int to) async {
-      if (from < 2) {
-        // If you added columns after the initial creation, alter the table.
-        // Example: add missing columns (adjust to match your actual additions).
-        // If the table was created with all columns from the start, you can omit this.
-        // For safety, you can also use m.addColumn for each new column.
-        // Below is a generic approach – replace with your actual column names.
-        await m.addColumn(db.identity, db.identity.avatar);
-        await m.addColumn(db.identity, db.identity.bio);
-        await m.addColumn(db.identity, db.identity.publicKey);
-        await m.addColumn(db.identity, db.identity.recoveryType);
-        // ... add any other new columns
-      }
-    },
-  );
-}
 
 @DriftAccessor(tables: [Identity])
 class IdentityDao extends DatabaseAccessor<AppDatabase>
@@ -40,22 +12,22 @@ class IdentityDao extends DatabaseAccessor<AppDatabase>
   IdentityDao(super.db);
 
   /// Returns the current (single) identity row.
-  Future<Identity> getCurrentIdentity() => select(db.identity).getSingle();
+  Future<IdentityData> getCurrentIdentity() => select(db.identity).getSingle();
 
   /// Returns the single identity row, or `null` if the table is empty.
-  Future<Identity?> getCurrentIdentityOrNull() =>
+  Future<IdentityData?> getCurrentIdentityOrNull() =>
       select(db.identity).getSingleOrNull();
 
   /// Inserts a new identity (only if table is empty).
-  Future<int> insertIdentity(Insertable<Identity> identity) =>
+  Future<int> insertIdentity(Insertable<IdentityData> identity) =>
       into(db.identity).insert(identity);
 
   /// Replaces the current identity (upsert).
-  Future<void> upsertIdentity(Identity identity) =>
+  Future<void> upsertIdentity(IdentityData identity) =>
       into(db.identity).insertOnConflictUpdate(identity);
 
   /// Updates an existing identity row based on its primary key.
-  Future<bool> updateIdentity(Identity identity) =>
+  Future<bool> updateIdentity(IdentityData identity) =>
       update(db.identity).replace(identity);
 
   /// Deletes the identity row with the given [identityId].
@@ -194,7 +166,7 @@ class IdentityDao extends DatabaseAccessor<AppDatabase>
   }
 
   /// Fetches an identity by phone number.
-  Future<Identity?> getIdentityByPhoneNumber(String phone) => (select(
+  Future<IdentityData?> getIdentityByPhoneNumber(String phone) => (select(
     db.identity,
   )..where((t) => t.phoneNumber.equals(phone))).getSingleOrNull();
 }

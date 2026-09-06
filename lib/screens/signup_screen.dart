@@ -1,10 +1,17 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:dio/dio.dart';
 import '../widgets/app_theme.dart';
 import '../widgets/buttons/send_button.dart' as send;
 import '../widgets/inputs/input_field.dart';
 import '../widgets/inputs/dropdown_input.dart';
 import '../widgets/buttons/transparent_button.dart';
 import '../widgets/display/icon.dart';
+import '../engine/database/init_db.dart';
+import '../engine/functions/auth/registerfxn.dart';
+import '../engine/network/auth/register.dart';
+import 'modals/otp_modal.dart';
+import 'chat_screen.dart';
 
 class SignupScreen extends StatefulWidget {
   const SignupScreen({super.key});
@@ -17,12 +24,139 @@ class _SignupScreenState extends State<SignupScreen> {
   String _selectedCountryCode = '+1';
   final TextEditingController _phoneController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
+  bool _isSubmitting = false;
 
   @override
   void dispose() {
     _phoneController.dispose();
     _passwordController.dispose();
     super.dispose();
+  }
+
+  String get _phoneDigits =>
+      _phoneController.text.trim().replaceAll(RegExp(r'\s+'), '');
+
+  String get _fullPhoneNumber => '$_selectedCountryCode$_phoneDigits';
+
+  Future<void> _onSignUpPressed() async {
+    final messenger = ScaffoldMessenger.of(context);
+    final password = _passwordController.text;
+
+    if (_phoneDigits.isEmpty || password.isEmpty) {
+      messenger.showSnackBar(
+        const SnackBar(
+          content: Text('Enter your phone number and a password to continue.'),
+        ),
+      );
+      return;
+    }
+
+    setState(() => _isSubmitting = true);
+    try {
+      final result = await UserRegistrationService().preprocess(
+        phoneNumber: _fullPhoneNumber,
+      );
+      if (!mounted) return;
+
+      if (result.otpSent) {
+        await _showOtpModal(result.phoneNumber);
+      } else {
+        messenger.showSnackBar(SnackBar(content: Text(result.message)));
+      }
+    } on DioException catch (e) {
+      final message = e.response?.data is Map
+          ? (e.response?.data as Map)['message']?.toString()
+          : null;
+      if (!mounted) return;
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(
+            message ?? 'Could not reach the registration server. Try again.',
+          ),
+        ),
+      );
+    } on Exception catch (_) {
+      if (!mounted) return;
+      messenger.showSnackBar(
+        const SnackBar(
+          content: Text('Could not start signup. Check your connection.'),
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _isSubmitting = false);
+    }
+  }
+
+  Future<void> _showOtpModal(String phoneNumber) async {
+    final completed = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) => OtpComponent(
+        phoneNumber: phoneNumber,
+        onSubmit: (code) => _completeRegistration(dialogContext, code),
+        onResend: _resendOtp,
+      ),
+    );
+
+    if (completed == true) {
+      await _finalizeSuccessfulSignup();
+    }
+  }
+
+  Future<void> _resendOtp() async {
+    await UserRegistrationService().preprocess(
+      phoneNumber: _fullPhoneNumber,
+    );
+  }
+
+  Future<bool> _completeRegistration(
+    BuildContext dialogContext,
+    String code,
+  ) async {
+    final messenger = ScaffoldMessenger.of(dialogContext);
+    try {
+      final database = await DatabaseInitializer.initialize();
+      final result = await registerNewUser(
+        phoneNumber: _fullPhoneNumber,
+        pin: code,
+        password: _passwordController.text,
+        database: database,
+      );
+
+      if (result.isSuccess ||
+          result.outcome == RegistrationOutcome.alreadyExists) {
+        return true;
+      }
+
+      final step = result.failedStep == null ? '' : ' (${result.failedStep})';
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(
+            result.errorMessage != null
+                ? 'Signup failed$step: ${result.errorMessage}'
+                : 'Signup failed. Please try again.',
+          ),
+        ),
+      );
+      return false;
+    } on Exception catch (e) {
+      messenger.showSnackBar(
+        SnackBar(content: Text('Could not complete signup: $e')),
+      );
+      return false;
+    }
+  }
+
+  Future<void> _finalizeSuccessfulSignup() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('has_signed_up', true);
+    await prefs.setBool('is_logged_in', true);
+
+    if (!mounted) return;
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute(builder: (_) => const ChatScreen()),
+      (route) => false,
+    );
   }
 
   @override
@@ -229,11 +363,12 @@ class _SignupScreenState extends State<SignupScreen> {
           text: 'Sign Up',
           icon: Icons.chevron_right,
           iconPosition: send.IconPosition.right,
-          onPressed: () {},
+          isLocked: _isSubmitting,
+          onPressed: _onSignUpPressed,
         ),
         const SizedBox(height: 16.0),
         TransparentButton(
-          text: 'Accept an invitation from a NULL user instead',
+          text: 'Accept an invitation instead',
           icon: Icons.verified_user_outlined,
           iconPosition: IconPosition.left,
           onPressed: () {},

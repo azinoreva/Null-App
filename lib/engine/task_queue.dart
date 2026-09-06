@@ -4,8 +4,8 @@ import 'dart:typed_data';
 
 import 'package:drift/drift.dart';
 
-import 'app_database.dart';
-import 'tasks.dart';
+import 'database/app_database.dart';
+import 'database/queries/tasks_queries.dart';
 
 typedef TaskExecutor = Future<void> Function(
   Tasks task,

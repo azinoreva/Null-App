@@ -7,7 +7,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 const String kSecurityTokenStorageKey = 'securityToken';
 
 const FlutterSecureStorage _secureStorage = FlutterSecureStorage(
-  aOptions: AndroidOptions(encryptedSharedPreferences: true),
+  aOptions: AndroidOptions(resetOnError: false),
 );
 
 /// Saves [token] to secure storage under [storageKey].

@@ -10,7 +10,7 @@ import 'dart:convert';
 
 import 'package:dio/dio.dart';
 
-import '../../database/queries/identity_queries.dart'; // AppDatabase, IdentityDao, Identity
+import '../../database/app_database.dart'; // AppDatabase, IdentityDao, IdentityData
 import '../../crypto/shamirs/password_vault.dart'; // createPasswordVault, VaultResult
 import '../../network/auth/register.dart'; // registerNewUser
 import '../../securestore/security_token.dart';
@@ -166,7 +166,7 @@ Future<RegistrationResult> registerNewUser({
 
     // 6. Persist the Identity row.
     try {
-      final identity = Identity(
+      final identity = IdentityData(
         identityId: response.userId,
         displayName: 'Null User',
         avatar: null,

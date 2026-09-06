@@ -6,7 +6,7 @@ import 'dart:typed_data';
 import 'package:cryptography/cryptography.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
-import '../../database/queries/identity_queries.dart';
+import '../../database/app_database.dart';
 
 class IdentityCrypto {
   static final Ed25519 _ed25519 = Ed25519();

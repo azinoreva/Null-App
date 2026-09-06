@@ -1,5 +1,6 @@
 import 'package:drift/drift.dart';
-import '../../database/queries/identity_queries.dart';
+import '../../database/queries/identity_queries.dart' show IdentityDao;
+import '../../database/app_database.dart' show IdentityCompanion;
 
 Future<void> saveProfile(
   IdentityDao identityDao, {

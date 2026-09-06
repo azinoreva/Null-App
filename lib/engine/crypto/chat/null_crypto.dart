@@ -2,7 +2,7 @@
 
 import 'dart:typed_data';
 
-import '../../database/queries/identity_queries.dart';
+import '../../database/app_database.dart';
 import 'crypto_types.dart';
 import 'identity_crypto.dart';
 import 'key_exchange.dart';

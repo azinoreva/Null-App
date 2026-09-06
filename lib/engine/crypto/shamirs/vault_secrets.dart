@@ -18,7 +18,7 @@ import 'password_vault.dart';
 const String kShamirSecretStorageKey = 'shamir_secret';
 
 const FlutterSecureStorage _secureStorage = FlutterSecureStorage(
-  aOptions: AndroidOptions(encryptedSharedPreferences: true),
+  aOptions: AndroidOptions(resetOnError: false),
 );
 
 /// Serializes and saves a [VaultResult] to platform secure storage under
