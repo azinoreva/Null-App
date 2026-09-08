@@ -26,6 +26,8 @@ class Contacts extends Table {
   IntColumn get connectionStatus => integer()();
 
   TextColumn get serverId => text()();
+  TextColumn get mainServerId=> text().nullable()();
+  // This is the main server_id the contact is linked to. So this is only added when the contact does switch servers.
 
   // Unix epoch milliseconds.
   IntColumn get createdAt => integer()();

@@ -218,13 +218,6 @@ class AppDatabase extends _$AppDatabase {
       'ON tasks(server_id);',
     );
 
-    // Identity
-
-    await customStatement(
-      'CREATE INDEX idx_identity_server_id '
-      'ON identity(server_id);',
-    );
-
     // Servers
 
     await customStatement(

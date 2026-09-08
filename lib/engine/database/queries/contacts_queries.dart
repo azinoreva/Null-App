@@ -100,6 +100,12 @@ class ContactsDao extends DatabaseAccessor<AppDatabase>
         .write(ContactsCompanion(conversationId: Value(conversationId)));
   }
 
+  // NEW: Update the main server ID for a contact.
+  Future<void> setMainServerId(String contactId, String? mainServerId) async {
+    await (update(db.contacts)..where((t) => t.contactId.equals(contactId)))
+        .write(ContactsCompanion(mainServerId: Value(mainServerId)));
+  }
+
   // NEW: Update the avatar (binary image data) for a contact.
   Future<void> updateAvatar(String contactId, Uint8List? avatar) async {
     await (update(db.contacts)..where((t) => t.contactId.equals(contactId)))

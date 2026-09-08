@@ -3587,6 +3587,17 @@ class $ContactsTable extends Contacts with TableInfo<$ContactsTable, Contact> {
     type: DriftSqlType.string,
     requiredDuringInsert: true,
   );
+  static const VerificationMeta _mainServerIdMeta = const VerificationMeta(
+    'mainServerId',
+  );
+  @override
+  late final GeneratedColumn<String> mainServerId = GeneratedColumn<String>(
+    'main_server_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _createdAtMeta = const VerificationMeta(
     'createdAt',
   );
@@ -3649,6 +3660,7 @@ class $ContactsTable extends Contacts with TableInfo<$ContactsTable, Contact> {
     lastSeen,
     connectionStatus,
     serverId,
+    mainServerId,
     createdAt,
     updatedAt,
     ignorePing,
@@ -3741,6 +3753,15 @@ class $ContactsTable extends Contacts with TableInfo<$ContactsTable, Contact> {
     } else if (isInserting) {
       context.missing(_serverIdMeta);
     }
+    if (data.containsKey('main_server_id')) {
+      context.handle(
+        _mainServerIdMeta,
+        mainServerId.isAcceptableOrUnknown(
+          data['main_server_id']!,
+          _mainServerIdMeta,
+        ),
+      );
+    }
     if (data.containsKey('created_at')) {
       context.handle(
         _createdAtMeta,
@@ -3825,6 +3846,10 @@ class $ContactsTable extends Contacts with TableInfo<$ContactsTable, Contact> {
         DriftSqlType.string,
         data['${effectivePrefix}server_id'],
       )!,
+      mainServerId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}main_server_id'],
+      ),
       createdAt: attachedDatabase.typeMapping.read(
         DriftSqlType.int,
         data['${effectivePrefix}created_at'],
@@ -3862,6 +3887,7 @@ class Contact extends DataClass implements Insertable<Contact> {
   final int? lastSeen;
   final int connectionStatus;
   final String serverId;
+  final String? mainServerId;
   final int createdAt;
   final int updatedAt;
   final int ignorePing;
@@ -3878,6 +3904,7 @@ class Contact extends DataClass implements Insertable<Contact> {
     this.lastSeen,
     required this.connectionStatus,
     required this.serverId,
+    this.mainServerId,
     required this.createdAt,
     required this.updatedAt,
     required this.ignorePing,
@@ -3907,6 +3934,9 @@ class Contact extends DataClass implements Insertable<Contact> {
     }
     map['connection_status'] = Variable<int>(connectionStatus);
     map['server_id'] = Variable<String>(serverId);
+    if (!nullToAbsent || mainServerId != null) {
+      map['main_server_id'] = Variable<String>(mainServerId);
+    }
     map['created_at'] = Variable<int>(createdAt);
     map['updated_at'] = Variable<int>(updatedAt);
     map['ignore_ping'] = Variable<int>(ignorePing);
@@ -3937,6 +3967,9 @@ class Contact extends DataClass implements Insertable<Contact> {
           : Value(lastSeen),
       connectionStatus: Value(connectionStatus),
       serverId: Value(serverId),
+      mainServerId: mainServerId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(mainServerId),
       createdAt: Value(createdAt),
       updatedAt: Value(updatedAt),
       ignorePing: Value(ignorePing),
@@ -3963,6 +3996,7 @@ class Contact extends DataClass implements Insertable<Contact> {
       lastSeen: serializer.fromJson<int?>(json['lastSeen']),
       connectionStatus: serializer.fromJson<int>(json['connectionStatus']),
       serverId: serializer.fromJson<String>(json['serverId']),
+      mainServerId: serializer.fromJson<String?>(json['mainServerId']),
       createdAt: serializer.fromJson<int>(json['createdAt']),
       updatedAt: serializer.fromJson<int>(json['updatedAt']),
       ignorePing: serializer.fromJson<int>(json['ignorePing']),
@@ -3984,6 +4018,7 @@ class Contact extends DataClass implements Insertable<Contact> {
       'lastSeen': serializer.toJson<int?>(lastSeen),
       'connectionStatus': serializer.toJson<int>(connectionStatus),
       'serverId': serializer.toJson<String>(serverId),
+      'mainServerId': serializer.toJson<String?>(mainServerId),
       'createdAt': serializer.toJson<int>(createdAt),
       'updatedAt': serializer.toJson<int>(updatedAt),
       'ignorePing': serializer.toJson<int>(ignorePing),
@@ -4003,6 +4038,7 @@ class Contact extends DataClass implements Insertable<Contact> {
     Value<int?> lastSeen = const Value.absent(),
     int? connectionStatus,
     String? serverId,
+    Value<String?> mainServerId = const Value.absent(),
     int? createdAt,
     int? updatedAt,
     int? ignorePing,
@@ -4019,6 +4055,7 @@ class Contact extends DataClass implements Insertable<Contact> {
     lastSeen: lastSeen.present ? lastSeen.value : this.lastSeen,
     connectionStatus: connectionStatus ?? this.connectionStatus,
     serverId: serverId ?? this.serverId,
+    mainServerId: mainServerId.present ? mainServerId.value : this.mainServerId,
     createdAt: createdAt ?? this.createdAt,
     updatedAt: updatedAt ?? this.updatedAt,
     ignorePing: ignorePing ?? this.ignorePing,
@@ -4041,6 +4078,9 @@ class Contact extends DataClass implements Insertable<Contact> {
           ? data.connectionStatus.value
           : this.connectionStatus,
       serverId: data.serverId.present ? data.serverId.value : this.serverId,
+      mainServerId: data.mainServerId.present
+          ? data.mainServerId.value
+          : this.mainServerId,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
       ignorePing: data.ignorePing.present
@@ -4066,6 +4106,7 @@ class Contact extends DataClass implements Insertable<Contact> {
           ..write('lastSeen: $lastSeen, ')
           ..write('connectionStatus: $connectionStatus, ')
           ..write('serverId: $serverId, ')
+          ..write('mainServerId: $mainServerId, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt, ')
           ..write('ignorePing: $ignorePing, ')
@@ -4087,6 +4128,7 @@ class Contact extends DataClass implements Insertable<Contact> {
     lastSeen,
     connectionStatus,
     serverId,
+    mainServerId,
     createdAt,
     updatedAt,
     ignorePing,
@@ -4107,6 +4149,7 @@ class Contact extends DataClass implements Insertable<Contact> {
           other.lastSeen == this.lastSeen &&
           other.connectionStatus == this.connectionStatus &&
           other.serverId == this.serverId &&
+          other.mainServerId == this.mainServerId &&
           other.createdAt == this.createdAt &&
           other.updatedAt == this.updatedAt &&
           other.ignorePing == this.ignorePing &&
@@ -4125,6 +4168,7 @@ class ContactsCompanion extends UpdateCompanion<Contact> {
   final Value<int?> lastSeen;
   final Value<int> connectionStatus;
   final Value<String> serverId;
+  final Value<String?> mainServerId;
   final Value<int> createdAt;
   final Value<int> updatedAt;
   final Value<int> ignorePing;
@@ -4142,6 +4186,7 @@ class ContactsCompanion extends UpdateCompanion<Contact> {
     this.lastSeen = const Value.absent(),
     this.connectionStatus = const Value.absent(),
     this.serverId = const Value.absent(),
+    this.mainServerId = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
     this.ignorePing = const Value.absent(),
@@ -4160,6 +4205,7 @@ class ContactsCompanion extends UpdateCompanion<Contact> {
     this.lastSeen = const Value.absent(),
     required int connectionStatus,
     required String serverId,
+    this.mainServerId = const Value.absent(),
     required int createdAt,
     required int updatedAt,
     this.ignorePing = const Value.absent(),
@@ -4182,6 +4228,7 @@ class ContactsCompanion extends UpdateCompanion<Contact> {
     Expression<int>? lastSeen,
     Expression<int>? connectionStatus,
     Expression<String>? serverId,
+    Expression<String>? mainServerId,
     Expression<int>? createdAt,
     Expression<int>? updatedAt,
     Expression<int>? ignorePing,
@@ -4200,6 +4247,7 @@ class ContactsCompanion extends UpdateCompanion<Contact> {
       if (lastSeen != null) 'last_seen': lastSeen,
       if (connectionStatus != null) 'connection_status': connectionStatus,
       if (serverId != null) 'server_id': serverId,
+      if (mainServerId != null) 'main_server_id': mainServerId,
       if (createdAt != null) 'created_at': createdAt,
       if (updatedAt != null) 'updated_at': updatedAt,
       if (ignorePing != null) 'ignore_ping': ignorePing,
@@ -4220,6 +4268,7 @@ class ContactsCompanion extends UpdateCompanion<Contact> {
     Value<int?>? lastSeen,
     Value<int>? connectionStatus,
     Value<String>? serverId,
+    Value<String?>? mainServerId,
     Value<int>? createdAt,
     Value<int>? updatedAt,
     Value<int>? ignorePing,
@@ -4238,6 +4287,7 @@ class ContactsCompanion extends UpdateCompanion<Contact> {
       lastSeen: lastSeen ?? this.lastSeen,
       connectionStatus: connectionStatus ?? this.connectionStatus,
       serverId: serverId ?? this.serverId,
+      mainServerId: mainServerId ?? this.mainServerId,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       ignorePing: ignorePing ?? this.ignorePing,
@@ -4282,6 +4332,9 @@ class ContactsCompanion extends UpdateCompanion<Contact> {
     if (serverId.present) {
       map['server_id'] = Variable<String>(serverId.value);
     }
+    if (mainServerId.present) {
+      map['main_server_id'] = Variable<String>(mainServerId.value);
+    }
     if (createdAt.present) {
       map['created_at'] = Variable<int>(createdAt.value);
     }
@@ -4314,6 +4367,7 @@ class ContactsCompanion extends UpdateCompanion<Contact> {
           ..write('lastSeen: $lastSeen, ')
           ..write('connectionStatus: $connectionStatus, ')
           ..write('serverId: $serverId, ')
+          ..write('mainServerId: $mainServerId, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt, ')
           ..write('ignorePing: $ignorePing, ')
@@ -12246,6 +12300,7 @@ typedef $$ContactsTableCreateCompanionBuilder = ContactsCompanion Function({
   Value<int?> lastSeen,
   required int connectionStatus,
   required String serverId,
+  Value<String?> mainServerId,
   required int createdAt,
   required int updatedAt,
   Value<int> ignorePing,
@@ -12264,6 +12319,7 @@ typedef $$ContactsTableUpdateCompanionBuilder = ContactsCompanion Function({
   Value<int?> lastSeen,
   Value<int> connectionStatus,
   Value<String> serverId,
+  Value<String?> mainServerId,
   Value<int> createdAt,
   Value<int> updatedAt,
   Value<int> ignorePing,
@@ -12385,6 +12441,11 @@ class $$ContactsTableFilterComposer
 
   ColumnFilters<String> get serverId => $composableBuilder(
     column: $table.serverId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get mainServerId => $composableBuilder(
+    column: $table.mainServerId,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -12517,6 +12578,11 @@ class $$ContactsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get mainServerId => $composableBuilder(
+    column: $table.mainServerId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<int> get createdAt => $composableBuilder(
     column: $table.createdAt,
     builder: (column) => ColumnOrderings(column),
@@ -12599,6 +12665,11 @@ class $$ContactsTableAnnotationComposer
 
   GeneratedColumn<String> get serverId =>
       $composableBuilder(column: $table.serverId, builder: (column) => column);
+
+  GeneratedColumn<String> get mainServerId => $composableBuilder(
+    column: $table.mainServerId,
+    builder: (column) => column,
+  );
 
   GeneratedColumn<int> get createdAt =>
       $composableBuilder(column: $table.createdAt, builder: (column) => column);
@@ -12703,6 +12774,7 @@ class $$ContactsTableTableManager
                 Value<int?> lastSeen = const Value.absent(),
                 Value<int> connectionStatus = const Value.absent(),
                 Value<String> serverId = const Value.absent(),
+                Value<String?> mainServerId = const Value.absent(),
                 Value<int> createdAt = const Value.absent(),
                 Value<int> updatedAt = const Value.absent(),
                 Value<int> ignorePing = const Value.absent(),
@@ -12720,6 +12792,7 @@ class $$ContactsTableTableManager
                 lastSeen: lastSeen,
                 connectionStatus: connectionStatus,
                 serverId: serverId,
+                mainServerId: mainServerId,
                 createdAt: createdAt,
                 updatedAt: updatedAt,
                 ignorePing: ignorePing,
@@ -12739,6 +12812,7 @@ class $$ContactsTableTableManager
                 Value<int?> lastSeen = const Value.absent(),
                 required int connectionStatus,
                 required String serverId,
+                Value<String?> mainServerId = const Value.absent(),
                 required int createdAt,
                 required int updatedAt,
                 Value<int> ignorePing = const Value.absent(),
@@ -12756,6 +12830,7 @@ class $$ContactsTableTableManager
                 lastSeen: lastSeen,
                 connectionStatus: connectionStatus,
                 serverId: serverId,
+                mainServerId: mainServerId,
                 createdAt: createdAt,
                 updatedAt: updatedAt,
                 ignorePing: ignorePing,

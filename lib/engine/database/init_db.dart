@@ -61,6 +61,8 @@ final class DatabaseInitializer {
 
     final database = AppDatabase(executor);
 
+    await database.customStatement('SELECT 1');
+
     _database = database;
 
     return database;
@@ -239,15 +241,6 @@ final class DatabaseInitializer {
 
     database.execute(
       "PRAGMA hexkey = '$encodedKey';",
-    );
-
-    // Force SQLite to actually read the database.
-    //
-    // If an existing encrypted database is opened with the wrong key,
-    // this operation fails instead of allowing the application to continue
-    // with an invalid database state.
-    database.select(
-      'SELECT count(*) FROM sqlite_master;',
     );
   }
 
