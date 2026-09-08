@@ -13,6 +13,7 @@ import 'package:dio/dio.dart';
 import '../../database/app_database.dart'; // AppDatabase, IdentityDao, IdentityData
 import '../../crypto/shamirs/password_vault.dart'; // createPasswordVault, VaultResult
 import '../../network/auth/register.dart'; // registerNewUser
+import '../../network/server_error_exception.dart';
 import '../../securestore/security_token.dart';
 import '../../crypto/shamirs/vault_secrets.dart'; // saveVaultToSecureStorage, hasVaultInSecureStorage
 
@@ -145,13 +146,12 @@ Future<RegistrationResult> registerNewUser({
         password: password,
         encryptedBlob: encryptedBlob,
       );
+    } on ServerErrorException catch (e) {
+      return RegistrationResult.failed('network_call', e.message);
     } on DioException catch (e) {
-      final serverMessage = e.response?.data is Map
-          ? (e.response?.data as Map)['message']?.toString()
-          : null;
       return RegistrationResult.failed(
         'network_call',
-        serverMessage ?? e.message ?? 'Network request failed',
+        e.message ?? 'Network request failed',
       );
     } catch (e) {
       return RegistrationResult.failed('network_call', e.toString());

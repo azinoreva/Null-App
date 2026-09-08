@@ -10,6 +10,7 @@ import '../widgets/display/icon.dart';
 import '../engine/database/init_db.dart';
 import '../engine/functions/auth/registerfxn.dart';
 import '../engine/network/auth/register.dart';
+import '../engine/network/server_error_exception.dart';
 import 'modals/otp_modal.dart';
 import 'chat_screen.dart';
 
@@ -63,16 +64,22 @@ class _SignupScreenState extends State<SignupScreen> {
       } else {
         messenger.showSnackBar(SnackBar(content: Text(result.message)));
       }
-    } on DioException catch (e) {
-      final message = e.response?.data is Map
-          ? (e.response?.data as Map)['message']?.toString()
-          : null;
+    } on ServerErrorException catch (e) {
       if (!mounted) return;
       messenger.showSnackBar(
         SnackBar(
           content: Text(
-            message ?? 'Could not reach the registration server. Try again.',
+            e.message.isEmpty
+                ? 'Could not reach the registration server. Try again.'
+                : e.message,
           ),
+        ),
+      );
+    } on DioException catch (_) {
+      if (!mounted) return;
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text('Could not reach the registration server. Try again.'),
         ),
       );
     } on Exception catch (_) {
