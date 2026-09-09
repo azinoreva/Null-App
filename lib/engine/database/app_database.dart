@@ -101,166 +101,148 @@ class AppDatabase extends _$AppDatabase {
       );
 
   Future<void> _createIndexes() async {
-    // Conversations
+    // Drop indexes that no longer back any query (or reference columns that
+    // do not exist) so existing installations actually shed them.
 
+    // Conversations
+    await customStatement(
+      'DROP INDEX IF EXISTS idx_conversations_badge;',
+    );
+    await customStatement(
+      'DROP INDEX IF EXISTS idx_conversations_pinned;',
+    );
+    await customStatement(
+      'DROP INDEX IF EXISTS idx_conversations_archived;',
+    );
+    await customStatement(
+      'DROP INDEX IF EXISTS idx_conversations_server;',
+    );
+
+    // Messages
+    await customStatement(
+      'DROP INDEX IF EXISTS idx_messages_conversation_timestamp;',
+    );
+    await customStatement(
+      'DROP INDEX IF EXISTS idx_messages_logical_message;',
+    );
+    await customStatement(
+      'DROP INDEX IF EXISTS idx_messages_sender_sequence;',
+    );
+    await customStatement(
+      'DROP INDEX IF EXISTS idx_messages_chain_index;',
+    );
+    await customStatement(
+      'DROP INDEX IF EXISTS idx_messages_reply_to;',
+    );
+    await customStatement(
+      'DROP INDEX IF EXISTS idx_messages_protocol_version;',
+    );
+
+    // Groups
+    await customStatement(
+      'DROP INDEX IF EXISTS idx_groups_group_type;',
+    );
+    await customStatement(
+      'DROP INDEX IF EXISTS idx_groups_owner_id;',
+    );
+
+    // Servers / ContactsNetwork
+    await customStatement(
+      'DROP INDEX IF EXISTS idx_servers_name;',
+    );
+    await customStatement(
+      'DROP INDEX IF EXISTS idx_contacts_network_server;',
+    );
+
+    // Connection requests (recreated as group_id-only below).
+    await customStatement(
+      'DROP INDEX IF EXISTS idx_connection_requests_group_status;',
+    );
+
+    // ShamirsSecret has no `server_id` column.
+    await customStatement(
+      'DROP INDEX IF EXISTS idx_shamirs_secret_server;',
+    );
+
+    // SecretShare: `identity_id` is already the PK (auto-indexed) and there
+    // is no `secret_id` column.
+    await customStatement(
+      'DROP INDEX IF EXISTS idx_secret_share_identity;',
+    );
+    await customStatement(
+      'DROP INDEX IF EXISTS idx_secret_share_secret;',
+    );
+
+    // Create indexes that back real queries.
+
+    // Conversations: chat list ordered by last message time.
     await customStatement(
       'CREATE INDEX IF NOT EXISTS idx_conversations_last_message_time '
       'ON conversations(last_message_time DESC);',
     );
 
-    await customStatement(
-      'CREATE INDEX IF NOT EXISTS idx_conversations_badge '
-      'ON conversations(badge);',
-    );
-
-    await customStatement(
-      'CREATE INDEX IF NOT EXISTS idx_conversations_pinned '
-      'ON conversations(pinned);',
-    );
-
-    await customStatement(
-      'CREATE INDEX IF NOT EXISTS idx_conversations_archived '
-      'ON conversations(archived);',
-    );
-
-    await customStatement(
-      'CREATE INDEX IF NOT EXISTS idx_conversations_server '
-      'ON conversations(server_id);',
-    );
-
-    // Messages
-
+    // Messages: per-conversation ordering and status lookups.
     await customStatement(
       'CREATE INDEX IF NOT EXISTS idx_messages_conversation_order '
       'ON messages(conversation_id, message_order);',
     );
-
-    await customStatement(
-      'CREATE INDEX IF NOT EXISTS idx_messages_conversation_timestamp '
-      'ON messages(conversation_id, _timestamp);',
-    );
-
-    await customStatement(
-      'CREATE INDEX IF NOT EXISTS idx_messages_logical_message '
-      'ON messages(conversation_id, logical_message_id);',
-    );
-
-    await customStatement(
-      'CREATE INDEX IF NOT EXISTS idx_messages_sender_sequence '
-      'ON messages(conversation_id, sender_id, sender_sequence);',
-    );
-
-    await customStatement(
-      'CREATE INDEX IF NOT EXISTS idx_messages_chain_index '
-      'ON messages(conversation_id, sender_id, chain_index);',
-    );
-
     await customStatement(
       'CREATE INDEX IF NOT EXISTS idx_messages_status '
       'ON messages(conversation_id, _status);',
     );
 
-    await customStatement(
-      'CREATE INDEX IF NOT EXISTS idx_messages_reply_to '
-      'ON messages(reply_to);',
-    );
-
-    await customStatement(
-      'CREATE INDEX IF NOT EXISTS idx_messages_protocol_version '
-      'ON messages(protocol_version);',
-    );
-
     // Contacts
-
     await customStatement(
       'CREATE INDEX IF NOT EXISTS idx_contacts_connection_status '
       'ON contacts(connection_status);',
     );
-
     await customStatement(
       'CREATE INDEX IF NOT EXISTS idx_contacts_conversation_id '
       'ON contacts(conversation_id);',
     );
 
-    // Groups
-
-    await customStatement(
-      'CREATE INDEX IF NOT EXISTS idx_groups_group_type '
-      'ON groups(group_type);',
-    );
-
-    await customStatement(
-      'CREATE INDEX IF NOT EXISTS idx_groups_owner_id '
-      'ON groups(owner_id);',
-    );
-
     // Connection requests
-
     await customStatement(
       'CREATE INDEX IF NOT EXISTS idx_connection_requests_recipient_status '
       'ON connection_requests(recipient_id, _status);',
     );
-
     await customStatement(
-      'CREATE INDEX IF NOT EXISTS idx_connection_requests_group_status '
-      'ON connection_requests(group_id, _status);',
+      'CREATE INDEX IF NOT EXISTS idx_connection_requests_group '
+      'ON connection_requests(group_id);',
+    );
+    await customStatement(
+      'CREATE INDEX IF NOT EXISTS idx_connection_requests_requester '
+      'ON connection_requests(requester_id);',
+    );
+    await customStatement(
+      'CREATE INDEX IF NOT EXISTS idx_connection_requests_status_expires '
+      'ON connection_requests(_status, expires_at);',
     );
 
     // Tasks
-
     await customStatement(
       'CREATE INDEX IF NOT EXISTS idx_tasks_status '
       'ON tasks(task_status);',
     );
-
     await customStatement(
       'CREATE INDEX IF NOT EXISTS idx_tasks_server_id '
       'ON tasks(server_id);',
     );
 
-    // Servers
-
-    await customStatement(
-      'CREATE INDEX IF NOT EXISTS idx_servers_name '
-      'ON servers(server_name);',
-    );
-
-    // ContactsNetwork
-
-    await customStatement(
-      'CREATE INDEX IF NOT EXISTS idx_contacts_network_server '
-      'ON contacts_network(server_id);',
-    );
-
-    // ContactNetworkMembers
-
+    // ContactNetworkMembers (junction table)
     await customStatement(
       'CREATE INDEX IF NOT EXISTS idx_contact_network_members_network '
       'ON contact_network_members(network_id);',
     );
-
     await customStatement(
       'CREATE INDEX IF NOT EXISTS idx_contact_network_members_contact '
       'ON contact_network_members(contact_id);',
     );
 
-    // Shamir's Secret
-
+    // GroupMembers: reverse lookup of groups for an identity.
     await customStatement(
-      'CREATE INDEX IF NOT EXISTS idx_shamirs_secret_server '
-      'ON shamirs_secret(server_id);',
-    );
-
-    // Secret shares
-
-    await customStatement(
-      'CREATE INDEX IF NOT EXISTS idx_secret_share_identity '
-      'ON secret_share(identity_id);',
-    );
-
-    await customStatement(
-      'CREATE INDEX IF NOT EXISTS idx_secret_share_secret '
-      'ON secret_share(secret_id);',
+      'CREATE INDEX IF NOT EXISTS idx_group_members_identity '
+      'ON group_members(identity_id);',
     );
   }
 }

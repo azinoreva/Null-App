@@ -1,26 +1,34 @@
 import 'package:flutter/material.dart';
-// Assuming AppColorScheme, AppTypography, AppColors, and ConversationListItem 
-// are available in your project from the previous components.
+//  AppColorScheme, AppTypography, AppColors, and ConversationListItem 
 import '../widgets/app_theme.dart';
 import '../widgets/display/conversation_card.dart';
+import '../widgets/display/navigation.dart';
 
-class ChatScreen extends StatelessWidget {
+class ChatScreen extends StatefulWidget {
   const ChatScreen({super.key});
+
+  @override
+  State<ChatScreen> createState() => _ChatScreenState();
+}
+
+class _ChatScreenState extends State<ChatScreen> {
+  NavigationTab _currentTab = NavigationTab.chats;
 
   @override
   Widget build(BuildContext context) {
     final themeExtension =
         Theme.of(context).extension<AppColorScheme>() ?? AppColorScheme.dark;
 
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final isDesktop = constraints.maxWidth >= 600 ||
-            MediaQuery.of(context).orientation == Orientation.landscape;
+    return AdaptiveNavigationShell(
+      currentTab: _currentTab,
+      onTabSelected: (tab) => setState(() => _currentTab = tab),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final isDesktop = constraints.maxWidth >= 600 ||
+              MediaQuery.of(context).orientation == Orientation.landscape;
 
-        if (isDesktop) {
-          return Scaffold(
-            backgroundColor: themeExtension.background,
-            body: Row(
+          if (isDesktop) {
+            return Row(
               children: [
                 // Left Panel - Chat List
                 Container(
@@ -41,18 +49,15 @@ class ChatScreen extends StatelessWidget {
                   child: _buildDesktopPlaceholder(context, themeExtension),
                 ),
               ],
-            ),
-          );
-        }
+            );
+          }
 
-        // Mobile Layout
-        return Scaffold(
-          backgroundColor: themeExtension.background,
-          body: SafeArea(
+          // Mobile Layout
+          return SafeArea(
             child: _buildChatListPanel(context, themeExtension, isDesktop: false),
-          ),
-        );
-      },
+          );
+        },
+      ),
     );
   }
 
