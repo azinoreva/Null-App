@@ -1,6 +1,8 @@
+// module name: task_queue.dart
+
 import 'dart:async';
-import 'dart:convert';
-import 'dart:typed_data';
+import 'convert';
+import 'typed_data';
 
 import 'package:drift/drift.dart';
 
@@ -22,11 +24,17 @@ class TaskQueue {
   final Map<String, TaskExecutor> _executors;
 
   Timer? _nudgeTimer;
+
   bool _running = false;
   bool _nudged = false;
+  bool _started = false;
 
   bool get isRunning => _running;
 
+  /// Queues a new task in the database and wakes the queue.
+  ///
+  /// The database is the source of truth. The in-memory nudge only tells
+  /// the queue that it should look at the database again.
   Future<String> queueTask({
     required String functionName,
     required List<dynamic> args,
@@ -34,19 +42,28 @@ class TaskQueue {
     String? serverId,
     String? taskData,
   }) async {
-    final taskId = 'task_${DateTime.now().microsecondsSinceEpoch}';
+    final taskId = _generateTaskId();
     final now = DateTime.now().millisecondsSinceEpoch;
 
     final encodedArguments = <dynamic>[];
-    final blobs = <Uint8List?>[null, null, null, null, null];
+    final blobs = <Uint8List?>[
+      null,
+      null,
+      null,
+      null,
+      null,
+    ];
 
     var blobIndex = 0;
 
     for (final argument in args) {
       if (argument is Uint8List || argument is List<int>) {
         blobIndex++;
+
         if (blobIndex > 5) {
-          throw ArgumentError('A task can contain at most 5 blob parameters.');
+          throw ArgumentError(
+            'A task can contain at most 5 blob parameters.',
+          );
         }
 
         final blob = argument is Uint8List
@@ -54,6 +71,7 @@ class TaskQueue {
             : Uint8List.fromList(argument);
 
         blobs[blobIndex - 1] = blob;
+
         encodedArguments.add('__BLOB__:$blobIndex');
       } else {
         _validateSerializableArgument(argument);
@@ -80,24 +98,50 @@ class TaskQueue {
       ),
     );
 
-    _scheduleNudge();
+    nudge();
+
     return taskId;
   }
 
+  /// Starts the queue.
+  ///
+  /// This performs crash recovery once and then processes actionable tasks.
+  Future<void> start() async {
+    if (_started) {
+      nudge();
+      return;
+    }
+
+    _started = true;
+
+    try {
+      await _recoverInterruptedTasks();
+    } catch (_) {
+      // Recovery failure must not crash the application.
+      //
+      // The database remains the source of truth. A later nudge/start
+      // can attempt recovery again.
+    }
+
+    nudge();
+  }
+
+  /// Wakes the queue.
+  ///
+  /// This does not start another queue if one is already processing.
   void nudge() {
     _nudged = true;
+
     if (!_running) {
       unawaited(_process());
     }
   }
 
-  Future<void> start() async {
-    await _recoverInterruptedTasks();
-    nudge();
-  }
-
+  /// Delays a nudge slightly so multiple writes occurring together do not
+  /// cause unnecessary queue wakeups.
   void _scheduleNudge() {
     _nudgeTimer?.cancel();
+
     _nudgeTimer = Timer(
       const Duration(milliseconds: 500),
       nudge,
@@ -105,85 +149,162 @@ class TaskQueue {
   }
 
   Future<void> _process() async {
-    if (_running) return;
+    if (_running) {
+      _nudged = true;
+      return;
+    }
 
     _running = true;
 
     try {
       do {
         _nudged = false;
-        await _processPendingTasks();
 
-        if (await _hasPendingTasks()) {
+        await _processTasks();
+
+        // A task may have been inserted or transitioned into an actionable
+        // state while processing was underway.
+        if (await _hasActionableTasks()) {
           _nudged = true;
         }
       } while (_nudged);
+    } catch (_) {
+      // The queue must never take down the application.
+      //
+      // Individual task failures are handled inside _executeTask().
     } finally {
       _running = false;
+
+      // A nudge can arrive between the final database check and setting
+      // _running to false.
       if (_nudged) {
         unawaited(_process());
       }
     }
   }
 
-  Future<void> _processPendingTasks() async {
+  /// Processes tasks serially.
+  ///
+  /// Worker-isolate concurrency can be introduced above/below this layer
+  /// without changing the database/task semantics.
+  Future<void> _processTasks() async {
     while (true) {
       final task = await _claimNextTask();
-      if (task == null) return;
+
+      if (task == null) {
+        return;
+      }
+
       await _executeTask(task);
     }
   }
 
+  /// Gets the highest-priority actionable task and atomically claims it.
+  ///
+  /// Priority:
+  ///   1. pending tasks
+  ///   2. eligible retry tasks
+  ///
+  /// The DAO performs the actual atomic state transition.
   Future<Tasks?> _claimNextTask() async {
-    final task = await database.tasksDao.getNextPendingTask();
-    if (task == null) return null;
+    final candidates = await database.tasksDao.getNextTasks(
+      DateTime.now().millisecondsSinceEpoch,
+      limit: 1,
+    );
 
-    final claimed = await database.tasksDao.claimTask(task.taskId);
-    if (!claimed) return null;
+    if (candidates.isEmpty) {
+      return null;
+    }
 
-    return database.tasksDao.getTaskById(task.taskId);
+    final candidate = candidates.first;
+
+    bool claimed;
+
+    switch (candidate.taskStatus) {
+      case TaskStatus.pending:
+        claimed = await database.tasksDao.claimPendingTask(
+          candidate.taskId,
+        );
+        break;
+
+      case TaskStatus.retry:
+        claimed = await database.tasksDao.claimRetryTask(
+          candidate.taskId,
+          DateTime.now().millisecondsSinceEpoch,
+        );
+        break;
+
+      default:
+        return null;
+    }
+
+    if (!claimed) {
+      // Another queue/worker/process may have claimed it.
+      //
+      // Do not mutate it. Simply wake the queue again and let the database
+      // determine what should happen next.
+      _nudged = true;
+      return null;
+    }
+
+    return database.tasksDao.getTaskById(candidate.taskId);
   }
 
   Future<void> _executeTask(Tasks task) async {
     final executor = _executors[task.functionName];
 
     if (executor == null) {
-      await database.tasksDao.markTaskFailed(
+      await database.tasksDao.failOrRetryTask(
         task.taskId,
-        'No executor registered for "${task.functionName}".',
+        failure: 'No executor registered for "${task.functionName}".',
+        failureType: 'executor_not_found',
       );
+
       return;
     }
 
     try {
       final args = TaskArguments.fromTask(task);
+
       await executor(task, args);
-      await database.tasksDao.markTaskCompleted(task.taskId);
-    } catch (error, stackTrace) {
-      await database.tasksDao.markTaskFailed(
+
+      await database.tasksDao.markTaskCompleted(
         task.taskId,
-        '$error\n$stackTrace',
+      );
+    } catch (error, stackTrace) {
+      await database.tasksDao.failOrRetryTask(
+        task.taskId,
+        failure: error.toString(),
+        failureType: 'execution_error',
+        failureStackTrace: stackTrace.toString(),
       );
     }
   }
 
-  Future<bool> _hasPendingTasks() async {
-    return await database.tasksDao.getNextPendingTask() != null;
-  }
-
-  Future<void> _recoverInterruptedTasks() async {
-    final tasks = await database.tasksDao.getTasksByStatus(
-      TaskStatus.inProgress,
+  /// Returns whether there is work that can currently be executed.
+  ///
+  /// This includes:
+  ///   - pending tasks
+  ///   - retry tasks whose nextRetryAt has arrived
+  Future<bool> _hasActionableTasks() async {
+    final tasks = await database.tasksDao.getNextTasks(
+      DateTime.now().millisecondsSinceEpoch,
+      limit: 1,
     );
 
-    for (final task in tasks) {
-      await database.tasksDao.updateTaskCompanion(
-        task.taskId,
-        const TasksCompanion(
-          taskStatus: Value(TaskStatus.pending),
-        ),
-      );
-    }
+    return tasks.isNotEmpty;
+  }
+
+  /// Converts tasks left in RUNNING state after an application/process
+  /// interruption into retryable tasks.
+  ///
+  /// The DAO owns the state transition and retry accounting.
+  Future<void> _recoverInterruptedTasks() async {
+    await database.tasksDao.recoverRunningTasks();
+  }
+
+  static String _generateTaskId() {
+    return 'task_${DateTime.now().microsecondsSinceEpoch}';
   }
 
   static void _validateSerializableArgument(dynamic value) {
@@ -198,16 +319,21 @@ class TaskQueue {
       for (final item in value) {
         _validateSerializableArgument(item);
       }
+
       return;
     }
 
     if (value is Map) {
       for (final entry in value.entries) {
         if (entry.key is! String) {
-          throw ArgumentError('Task map keys must be strings.');
+          throw ArgumentError(
+            'Task map keys must be strings.',
+          );
         }
+
         _validateSerializableArgument(entry.value);
       }
+
       return;
     }
 
@@ -220,6 +346,8 @@ class TaskQueue {
   void dispose() {
     _nudgeTimer?.cancel();
     _nudgeTimer = null;
+
+    _nudged = false;
   }
 }
 
@@ -247,17 +375,22 @@ class TaskArguments {
       final value = values[i];
 
       if (value is String && value.startsWith('__BLOB__:')) {
-        final index = int.tryParse(value.substring(9));
+        final index = int.tryParse(
+          value.substring('__BLOB__:'.length),
+        );
 
         if (index == null || index < 1 || index > 5) {
-          throw FormatException('Invalid blob parameter marker: $value');
+          throw FormatException(
+            'Invalid blob parameter marker: $value',
+          );
         }
 
         final blob = _getBlob(task, index);
 
         if (blob == null) {
           throw StateError(
-            'Task ${task.taskId} references blobparam$index, but the blob is missing.',
+            'Task ${task.taskId} references blobparam$index, '
+            'but the blob is missing.',
           );
         }
 
@@ -271,7 +404,10 @@ class TaskArguments {
     );
   }
 
-  static Uint8List? _getBlob(Tasks task, int index) {
+  static Uint8List? _getBlob(
+    Tasks task,
+    int index,
+  ) {
     switch (index) {
       case 1:
         return task.blobparam1;
@@ -283,8 +419,9 @@ class TaskArguments {
         return task.blobparam4;
       case 5:
         return task.blobparam5;
+      default:
+        return null;
     }
-    return null;
   }
 
   int get length => _values.length;
@@ -293,39 +430,68 @@ class TaskArguments {
 
   T get<T>(int index) {
     final value = _values[index];
-    if (value is T) return value;
+
+    if (value is T) {
+      return value;
+    }
 
     throw StateError(
-      'Task argument $index expected $T but received ${value.runtimeType}.',
+      'Task argument $index expected $T '
+      'but received ${value.runtimeType}.',
     );
   }
 
   T? getNullable<T>(int index) {
     final value = _values[index];
-    if (value == null) return null;
-    if (value is T) return value;
+
+    if (value == null) {
+      return null;
+    }
+
+    if (value is T) {
+      return value;
+    }
 
     throw StateError(
-      'Task argument $index expected $T? but received ${value.runtimeType}.',
+      'Task argument $index expected $T? '
+      'but received ${value.runtimeType}.',
     );
   }
 
   Uint8List getBlob(int index) {
     final value = _values[index];
 
-    if (value is Uint8List) return value;
-    if (value is List<int>) return Uint8List.fromList(value);
+    if (value is Uint8List) {
+      return value;
+    }
 
-    throw StateError('Task argument $index is not a blob.');
+    if (value is List<int>) {
+      return Uint8List.fromList(value);
+    }
+
+    throw StateError(
+      'Task argument $index is not a blob.',
+    );
   }
 
   Uint8List? getNullableBlob(int index) {
     final value = _values[index];
 
-    if (value == null) return null;
-    if (value is Uint8List) return value;
-    if (value is List<int>) return Uint8List.fromList(value);
+    if (value == null) {
+      return null;
+    }
 
-    throw StateError('Task argument $index is not a blob.');
+    if (value is Uint8List) {
+      return value;
+    }
+
+    if (value is List<int>) {
+      return Uint8List.fromList(value);
+    }
+
+    throw StateError(
+      'Task argument $index is not a blob.',
+    );
   }
 }
+
