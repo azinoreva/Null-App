@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../widgets/app_theme.dart';
 import '../widgets/display/conversation_card.dart';
 import '../widgets/display/navigation.dart';
+import 'contacts_screen.dart';
 
 class ChatScreen extends StatefulWidget {
   const ChatScreen({super.key});
@@ -21,7 +22,16 @@ class _ChatScreenState extends State<ChatScreen> {
 
     return AdaptiveNavigationShell(
       currentTab: _currentTab,
-      onTabSelected: (tab) => setState(() => _currentTab = tab),
+      onTabSelected: (tab) {
+        if (tab == NavigationTab.contacts) {
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(builder: (_) => const ContactsScreen()),
+          );
+          return;
+        }
+
+        setState(() => _currentTab = tab);
+      },
       child: LayoutBuilder(
         builder: (context, constraints) {
           final isDesktop = constraints.maxWidth >= 600 ||
