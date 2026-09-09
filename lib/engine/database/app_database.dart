@@ -80,8 +80,6 @@ class AppDatabase extends _$AppDatabase {
           await customStatement(
             'PRAGMA foreign_keys = ON;',
           );
-
-          await _createIndexes();
         },
 
         onUpgrade: (Migrator m, int from, int to) async {
@@ -97,6 +95,8 @@ class AppDatabase extends _$AppDatabase {
           await customStatement(
             'PRAGMA foreign_keys = ON;',
           );
+
+          await _createIndexes();
         },
       );
 
@@ -104,162 +104,162 @@ class AppDatabase extends _$AppDatabase {
     // Conversations
 
     await customStatement(
-      'CREATE INDEX idx_conversations_last_message_time '
+      'CREATE INDEX IF NOT EXISTS idx_conversations_last_message_time '
       'ON conversations(last_message_time DESC);',
     );
 
     await customStatement(
-      'CREATE INDEX idx_conversations_badge '
+      'CREATE INDEX IF NOT EXISTS idx_conversations_badge '
       'ON conversations(badge);',
     );
 
     await customStatement(
-      'CREATE INDEX idx_conversations_pinned '
+      'CREATE INDEX IF NOT EXISTS idx_conversations_pinned '
       'ON conversations(pinned);',
     );
 
     await customStatement(
-      'CREATE INDEX idx_conversations_archived '
+      'CREATE INDEX IF NOT EXISTS idx_conversations_archived '
       'ON conversations(archived);',
     );
 
     await customStatement(
-      'CREATE INDEX idx_conversations_server '
+      'CREATE INDEX IF NOT EXISTS idx_conversations_server '
       'ON conversations(server_id);',
     );
 
     // Messages
 
     await customStatement(
-      'CREATE INDEX idx_messages_conversation_order '
+      'CREATE INDEX IF NOT EXISTS idx_messages_conversation_order '
       'ON messages(conversation_id, message_order);',
     );
 
     await customStatement(
-      'CREATE INDEX idx_messages_conversation_timestamp '
+      'CREATE INDEX IF NOT EXISTS idx_messages_conversation_timestamp '
       'ON messages(conversation_id, _timestamp);',
     );
 
     await customStatement(
-      'CREATE INDEX idx_messages_logical_message '
+      'CREATE INDEX IF NOT EXISTS idx_messages_logical_message '
       'ON messages(conversation_id, logical_message_id);',
     );
 
     await customStatement(
-      'CREATE INDEX idx_messages_sender_sequence '
+      'CREATE INDEX IF NOT EXISTS idx_messages_sender_sequence '
       'ON messages(conversation_id, sender_id, sender_sequence);',
     );
 
     await customStatement(
-      'CREATE INDEX idx_messages_chain_index '
+      'CREATE INDEX IF NOT EXISTS idx_messages_chain_index '
       'ON messages(conversation_id, sender_id, chain_index);',
     );
 
     await customStatement(
-      'CREATE INDEX idx_messages_status '
+      'CREATE INDEX IF NOT EXISTS idx_messages_status '
       'ON messages(conversation_id, _status);',
     );
 
     await customStatement(
-      'CREATE INDEX idx_messages_reply_to '
+      'CREATE INDEX IF NOT EXISTS idx_messages_reply_to '
       'ON messages(reply_to);',
     );
 
     await customStatement(
-      'CREATE INDEX idx_messages_protocol_version '
+      'CREATE INDEX IF NOT EXISTS idx_messages_protocol_version '
       'ON messages(protocol_version);',
     );
 
     // Contacts
 
     await customStatement(
-      'CREATE INDEX idx_contacts_connection_status '
+      'CREATE INDEX IF NOT EXISTS idx_contacts_connection_status '
       'ON contacts(connection_status);',
     );
 
     await customStatement(
-      'CREATE INDEX idx_contacts_conversation_id '
+      'CREATE INDEX IF NOT EXISTS idx_contacts_conversation_id '
       'ON contacts(conversation_id);',
     );
 
     // Groups
 
     await customStatement(
-      'CREATE INDEX idx_groups_group_type '
+      'CREATE INDEX IF NOT EXISTS idx_groups_group_type '
       'ON groups(group_type);',
     );
 
     await customStatement(
-      'CREATE INDEX idx_groups_owner_id '
+      'CREATE INDEX IF NOT EXISTS idx_groups_owner_id '
       'ON groups(owner_id);',
     );
 
     // Connection requests
 
     await customStatement(
-      'CREATE INDEX idx_connection_requests_recipient_status '
+      'CREATE INDEX IF NOT EXISTS idx_connection_requests_recipient_status '
       'ON connection_requests(recipient_id, _status);',
     );
 
     await customStatement(
-      'CREATE INDEX idx_connection_requests_group_status '
+      'CREATE INDEX IF NOT EXISTS idx_connection_requests_group_status '
       'ON connection_requests(group_id, _status);',
     );
 
     // Tasks
 
     await customStatement(
-      'CREATE INDEX idx_tasks_status '
+      'CREATE INDEX IF NOT EXISTS idx_tasks_status '
       'ON tasks(task_status);',
     );
 
     await customStatement(
-      'CREATE INDEX idx_tasks_server_id '
+      'CREATE INDEX IF NOT EXISTS idx_tasks_server_id '
       'ON tasks(server_id);',
     );
 
     // Servers
 
     await customStatement(
-      'CREATE INDEX idx_servers_name '
+      'CREATE INDEX IF NOT EXISTS idx_servers_name '
       'ON servers(server_name);',
     );
 
     // ContactsNetwork
 
     await customStatement(
-      'CREATE INDEX idx_contacts_network_server '
+      'CREATE INDEX IF NOT EXISTS idx_contacts_network_server '
       'ON contacts_network(server_id);',
     );
 
     // ContactNetworkMembers
 
     await customStatement(
-      'CREATE INDEX idx_contact_network_members_network '
+      'CREATE INDEX IF NOT EXISTS idx_contact_network_members_network '
       'ON contact_network_members(network_id);',
     );
 
     await customStatement(
-      'CREATE INDEX idx_contact_network_members_contact '
+      'CREATE INDEX IF NOT EXISTS idx_contact_network_members_contact '
       'ON contact_network_members(contact_id);',
     );
 
     // Shamir's Secret
 
     await customStatement(
-      'CREATE INDEX idx_shamirs_secret_server '
+      'CREATE INDEX IF NOT EXISTS idx_shamirs_secret_server '
       'ON shamirs_secret(server_id);',
     );
 
     // Secret shares
 
     await customStatement(
-      'CREATE INDEX idx_secret_share_identity '
+      'CREATE INDEX IF NOT EXISTS idx_secret_share_identity '
       'ON secret_share(identity_id);',
     );
 
     await customStatement(
-      'CREATE INDEX idx_secret_share_secret '
+      'CREATE INDEX IF NOT EXISTS idx_secret_share_secret '
       'ON secret_share(secret_id);',
     );
   }
