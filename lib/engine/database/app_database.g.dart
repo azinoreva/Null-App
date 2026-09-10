@@ -6908,8 +6908,10 @@ class $TasksTable extends Tasks with TableInfo<$TasksTable, Task> {
     'task_status',
     aliasedName,
     false,
+    check: () => taskStatus.isIn([0, 1, 2, 3, 4]),
     type: DriftSqlType.int,
-    requiredDuringInsert: true,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
   );
   static const VerificationMeta _functionNameMeta = const VerificationMeta(
     'functionName',
@@ -6931,7 +6933,8 @@ class $TasksTable extends Tasks with TableInfo<$TasksTable, Task> {
     aliasedName,
     false,
     type: DriftSqlType.string,
-    requiredDuringInsert: true,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('{}'),
   );
   static const VerificationMeta _blobparam1Meta = const VerificationMeta(
     'blobparam1',
@@ -7022,6 +7025,84 @@ class $TasksTable extends Tasks with TableInfo<$TasksTable, Task> {
     requiredDuringInsert: false,
     defaultValue: const Constant(0),
   );
+  static const VerificationMeta _nextRetryAtMeta = const VerificationMeta(
+    'nextRetryAt',
+  );
+  @override
+  late final GeneratedColumn<int> nextRetryAt = GeneratedColumn<int>(
+    'next_retry_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _startedAtMeta = const VerificationMeta(
+    'startedAt',
+  );
+  @override
+  late final GeneratedColumn<int> startedAt = GeneratedColumn<int>(
+    'started_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _completedAtMeta = const VerificationMeta(
+    'completedAt',
+  );
+  @override
+  late final GeneratedColumn<int> completedAt = GeneratedColumn<int>(
+    'completed_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _failedAtMeta = const VerificationMeta(
+    'failedAt',
+  );
+  @override
+  late final GeneratedColumn<int> failedAt = GeneratedColumn<int>(
+    'failed_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _failureMeta = const VerificationMeta(
+    'failure',
+  );
+  @override
+  late final GeneratedColumn<String> failure = GeneratedColumn<String>(
+    'failure',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _failureTypeMeta = const VerificationMeta(
+    'failureType',
+  );
+  @override
+  late final GeneratedColumn<String> failureType = GeneratedColumn<String>(
+    'failure_type',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _failureStackTraceMeta = const VerificationMeta(
+    'failureStackTrace',
+  );
+  @override
+  late final GeneratedColumn<String> failureStackTrace =
+      GeneratedColumn<String>(
+        'failure_stack_trace',
+        aliasedName,
+        true,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+      );
   static const VerificationMeta _serverIdMeta = const VerificationMeta(
     'serverId',
   );
@@ -7045,28 +7126,6 @@ class $TasksTable extends Tasks with TableInfo<$TasksTable, Task> {
     aliasedName,
     true,
     type: DriftSqlType.string,
-    requiredDuringInsert: false,
-  );
-  static const VerificationMeta _failureMeta = const VerificationMeta(
-    'failure',
-  );
-  @override
-  late final GeneratedColumn<String> failure = GeneratedColumn<String>(
-    'failure',
-    aliasedName,
-    true,
-    type: DriftSqlType.string,
-    requiredDuringInsert: false,
-  );
-  static const VerificationMeta _completedAtMeta = const VerificationMeta(
-    'completedAt',
-  );
-  @override
-  late final GeneratedColumn<int> completedAt = GeneratedColumn<int>(
-    'completed_at',
-    aliasedName,
-    true,
-    type: DriftSqlType.int,
     requiredDuringInsert: false,
   );
   static const VerificationMeta _syncedToStateMeta = const VerificationMeta(
@@ -7121,19 +7180,6 @@ class $TasksTable extends Tasks with TableInfo<$TasksTable, Task> {
     requiredDuringInsert: false,
     defaultValue: const Constant(0),
   );
-  static const VerificationMeta _completedMeta = const VerificationMeta(
-    'completed',
-  );
-  @override
-  late final GeneratedColumn<int> completed = GeneratedColumn<int>(
-    'completed',
-    aliasedName,
-    false,
-    check: () => completed.isIn([0, 1]),
-    type: DriftSqlType.int,
-    requiredDuringInsert: false,
-    defaultValue: const Constant(0),
-  );
   @override
   List<GeneratedColumn> get $columns => [
     taskId,
@@ -7149,15 +7195,19 @@ class $TasksTable extends Tasks with TableInfo<$TasksTable, Task> {
     createdAt,
     updatedAt,
     retryCount,
+    nextRetryAt,
+    startedAt,
+    completedAt,
+    failedAt,
+    failure,
+    failureType,
+    failureStackTrace,
     serverId,
     taskData,
-    failure,
-    completedAt,
     syncedToState,
     syncedToServer,
     syncedToClient,
     syncedToDb,
-    completed,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -7192,8 +7242,6 @@ class $TasksTable extends Tasks with TableInfo<$TasksTable, Task> {
         _taskStatusMeta,
         taskStatus.isAcceptableOrUnknown(data['task_status']!, _taskStatusMeta),
       );
-    } else if (isInserting) {
-      context.missing(_taskStatusMeta);
     }
     if (data.containsKey('function_name')) {
       context.handle(
@@ -7214,8 +7262,6 @@ class $TasksTable extends Tasks with TableInfo<$TasksTable, Task> {
           _functionArgsMeta,
         ),
       );
-    } else if (isInserting) {
-      context.missing(_functionArgsMeta);
     }
     if (data.containsKey('blobparam1')) {
       context.handle(
@@ -7269,6 +7315,60 @@ class $TasksTable extends Tasks with TableInfo<$TasksTable, Task> {
         retryCount.isAcceptableOrUnknown(data['retrys']!, _retryCountMeta),
       );
     }
+    if (data.containsKey('next_retry_at')) {
+      context.handle(
+        _nextRetryAtMeta,
+        nextRetryAt.isAcceptableOrUnknown(
+          data['next_retry_at']!,
+          _nextRetryAtMeta,
+        ),
+      );
+    }
+    if (data.containsKey('started_at')) {
+      context.handle(
+        _startedAtMeta,
+        startedAt.isAcceptableOrUnknown(data['started_at']!, _startedAtMeta),
+      );
+    }
+    if (data.containsKey('completed_at')) {
+      context.handle(
+        _completedAtMeta,
+        completedAt.isAcceptableOrUnknown(
+          data['completed_at']!,
+          _completedAtMeta,
+        ),
+      );
+    }
+    if (data.containsKey('failed_at')) {
+      context.handle(
+        _failedAtMeta,
+        failedAt.isAcceptableOrUnknown(data['failed_at']!, _failedAtMeta),
+      );
+    }
+    if (data.containsKey('failure')) {
+      context.handle(
+        _failureMeta,
+        failure.isAcceptableOrUnknown(data['failure']!, _failureMeta),
+      );
+    }
+    if (data.containsKey('failure_type')) {
+      context.handle(
+        _failureTypeMeta,
+        failureType.isAcceptableOrUnknown(
+          data['failure_type']!,
+          _failureTypeMeta,
+        ),
+      );
+    }
+    if (data.containsKey('failure_stack_trace')) {
+      context.handle(
+        _failureStackTraceMeta,
+        failureStackTrace.isAcceptableOrUnknown(
+          data['failure_stack_trace']!,
+          _failureStackTraceMeta,
+        ),
+      );
+    }
     if (data.containsKey('server_id')) {
       context.handle(
         _serverIdMeta,
@@ -7279,21 +7379,6 @@ class $TasksTable extends Tasks with TableInfo<$TasksTable, Task> {
       context.handle(
         _taskDataMeta,
         taskData.isAcceptableOrUnknown(data['task_data']!, _taskDataMeta),
-      );
-    }
-    if (data.containsKey('failure')) {
-      context.handle(
-        _failureMeta,
-        failure.isAcceptableOrUnknown(data['failure']!, _failureMeta),
-      );
-    }
-    if (data.containsKey('completed_at')) {
-      context.handle(
-        _completedAtMeta,
-        completedAt.isAcceptableOrUnknown(
-          data['completed_at']!,
-          _completedAtMeta,
-        ),
       );
     }
     if (data.containsKey('synced_to_state')) {
@@ -7330,12 +7415,6 @@ class $TasksTable extends Tasks with TableInfo<$TasksTable, Task> {
           data['synced_to_db']!,
           _syncedToDbMeta,
         ),
-      );
-    }
-    if (data.containsKey('completed')) {
-      context.handle(
-        _completedMeta,
-        completed.isAcceptableOrUnknown(data['completed']!, _completedMeta),
       );
     }
     return context;
@@ -7399,6 +7478,34 @@ class $TasksTable extends Tasks with TableInfo<$TasksTable, Task> {
         DriftSqlType.int,
         data['${effectivePrefix}retrys'],
       )!,
+      nextRetryAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}next_retry_at'],
+      ),
+      startedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}started_at'],
+      ),
+      completedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}completed_at'],
+      ),
+      failedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}failed_at'],
+      ),
+      failure: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}failure'],
+      ),
+      failureType: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}failure_type'],
+      ),
+      failureStackTrace: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}failure_stack_trace'],
+      ),
       serverId: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}server_id'],
@@ -7406,14 +7513,6 @@ class $TasksTable extends Tasks with TableInfo<$TasksTable, Task> {
       taskData: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}task_data'],
-      ),
-      failure: attachedDatabase.typeMapping.read(
-        DriftSqlType.string,
-        data['${effectivePrefix}failure'],
-      ),
-      completedAt: attachedDatabase.typeMapping.read(
-        DriftSqlType.int,
-        data['${effectivePrefix}completed_at'],
       ),
       syncedToState: attachedDatabase.typeMapping.read(
         DriftSqlType.int,
@@ -7431,10 +7530,6 @@ class $TasksTable extends Tasks with TableInfo<$TasksTable, Task> {
         DriftSqlType.int,
         data['${effectivePrefix}synced_to_db'],
       )!,
-      completed: attachedDatabase.typeMapping.read(
-        DriftSqlType.int,
-        data['${effectivePrefix}completed'],
-      )!,
     );
   }
 
@@ -7445,28 +7540,110 @@ class $TasksTable extends Tasks with TableInfo<$TasksTable, Task> {
 }
 
 class Task extends DataClass implements Insertable<Task> {
+  /// Unique identifier for this task.
   final String taskId;
+
+  /// Numeric task category.
   final int taskType;
+
+  /// Current lifecycle state of the task.
+  ///
+  /// 0 = pending
+  /// 1 = running
+  /// 2 = retry
+  /// 3 = completed
+  /// 4 = failed
   final int taskStatus;
+
+  /// Name of the function to execute.
+  ///
+  /// The function must exist in functions_list.dart.
   final String functionName;
+
+  /// Serialized function arguments.
+  ///
+  /// Recommended format: JSON instead of comma-separated parameters.
+  ///
+  /// Example:
+  /// {
+  ///   "userId": "123",
+  ///   "messageId": "456",
+  ///   "optionalValue": null
+  /// }
+  ///
+  /// This avoids problems with commas, null values, escaping,
+  /// parameter ordering, and future argument changes.
   final String functionArgs;
+
+  /// Optional binary parameters.
+  ///
+  /// These can be referenced by the serialized functionArgs.
   final Uint8List? blobparam1;
   final Uint8List? blobparam2;
   final Uint8List? blobparam3;
   final Uint8List? blobparam4;
   final Uint8List? blobparam5;
+
+  /// Timestamp when the task was created.
+  ///
+  /// Unix epoch milliseconds.
   final int createdAt;
+
+  /// Timestamp of the most recent modification.
+  ///
+  /// Unix epoch milliseconds.
   final int updatedAt;
+
+  /// Number of failed or timed-out execution attempts.
   final int retryCount;
-  final String? serverId;
-  final String? taskData;
-  final String? failure;
+
+  /// Earliest time at which this retry task may execute again.
+  ///
+  /// Null means the task may execute immediately.
+  ///
+  /// Unix epoch milliseconds.
+  final int? nextRetryAt;
+
+  /// Timestamp when the current execution attempt started.
+  ///
+  /// Used for:
+  /// - execution timing
+  /// - timeout detection
+  /// - recovery of interrupted tasks
+  final int? startedAt;
+
+  /// Timestamp when the task completed successfully.
+  ///
+  /// Unix epoch milliseconds.
   final int? completedAt;
+
+  /// Timestamp when the task permanently failed.
+  ///
+  /// Unix epoch milliseconds.
+  final int? failedAt;
+
+  /// Human-readable error from the most recent failure.
+  final String? failure;
+
+  /// Type or category of the most recent error.
+  final String? failureType;
+
+  /// Stack trace from the most recent failure, where available.
+  final String? failureStackTrace;
+
+  /// Optional server associated with this task.
+  final String? serverId;
+
+  /// Additional task metadata.
+  ///
+  /// JSON stored as text.
+  final String? taskData;
+
+  /// Sync state flags.
   final int syncedToState;
   final int syncedToServer;
   final int syncedToClient;
   final int syncedToDb;
-  final int completed;
   const Task({
     required this.taskId,
     required this.taskType,
@@ -7481,15 +7658,19 @@ class Task extends DataClass implements Insertable<Task> {
     required this.createdAt,
     required this.updatedAt,
     required this.retryCount,
+    this.nextRetryAt,
+    this.startedAt,
+    this.completedAt,
+    this.failedAt,
+    this.failure,
+    this.failureType,
+    this.failureStackTrace,
     this.serverId,
     this.taskData,
-    this.failure,
-    this.completedAt,
     required this.syncedToState,
     required this.syncedToServer,
     required this.syncedToClient,
     required this.syncedToDb,
-    required this.completed,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -7517,23 +7698,37 @@ class Task extends DataClass implements Insertable<Task> {
     map['created_at'] = Variable<int>(createdAt);
     map['updated_at'] = Variable<int>(updatedAt);
     map['retrys'] = Variable<int>(retryCount);
+    if (!nullToAbsent || nextRetryAt != null) {
+      map['next_retry_at'] = Variable<int>(nextRetryAt);
+    }
+    if (!nullToAbsent || startedAt != null) {
+      map['started_at'] = Variable<int>(startedAt);
+    }
+    if (!nullToAbsent || completedAt != null) {
+      map['completed_at'] = Variable<int>(completedAt);
+    }
+    if (!nullToAbsent || failedAt != null) {
+      map['failed_at'] = Variable<int>(failedAt);
+    }
+    if (!nullToAbsent || failure != null) {
+      map['failure'] = Variable<String>(failure);
+    }
+    if (!nullToAbsent || failureType != null) {
+      map['failure_type'] = Variable<String>(failureType);
+    }
+    if (!nullToAbsent || failureStackTrace != null) {
+      map['failure_stack_trace'] = Variable<String>(failureStackTrace);
+    }
     if (!nullToAbsent || serverId != null) {
       map['server_id'] = Variable<String>(serverId);
     }
     if (!nullToAbsent || taskData != null) {
       map['task_data'] = Variable<String>(taskData);
     }
-    if (!nullToAbsent || failure != null) {
-      map['failure'] = Variable<String>(failure);
-    }
-    if (!nullToAbsent || completedAt != null) {
-      map['completed_at'] = Variable<int>(completedAt);
-    }
     map['synced_to_state'] = Variable<int>(syncedToState);
     map['synced_to_server'] = Variable<int>(syncedToServer);
     map['synced_to_client'] = Variable<int>(syncedToClient);
     map['synced_to_db'] = Variable<int>(syncedToDb);
-    map['completed'] = Variable<int>(completed);
     return map;
   }
 
@@ -7562,23 +7757,37 @@ class Task extends DataClass implements Insertable<Task> {
       createdAt: Value(createdAt),
       updatedAt: Value(updatedAt),
       retryCount: Value(retryCount),
+      nextRetryAt: nextRetryAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(nextRetryAt),
+      startedAt: startedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(startedAt),
+      completedAt: completedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(completedAt),
+      failedAt: failedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(failedAt),
+      failure: failure == null && nullToAbsent
+          ? const Value.absent()
+          : Value(failure),
+      failureType: failureType == null && nullToAbsent
+          ? const Value.absent()
+          : Value(failureType),
+      failureStackTrace: failureStackTrace == null && nullToAbsent
+          ? const Value.absent()
+          : Value(failureStackTrace),
       serverId: serverId == null && nullToAbsent
           ? const Value.absent()
           : Value(serverId),
       taskData: taskData == null && nullToAbsent
           ? const Value.absent()
           : Value(taskData),
-      failure: failure == null && nullToAbsent
-          ? const Value.absent()
-          : Value(failure),
-      completedAt: completedAt == null && nullToAbsent
-          ? const Value.absent()
-          : Value(completedAt),
       syncedToState: Value(syncedToState),
       syncedToServer: Value(syncedToServer),
       syncedToClient: Value(syncedToClient),
       syncedToDb: Value(syncedToDb),
-      completed: Value(completed),
     );
   }
 
@@ -7601,15 +7810,21 @@ class Task extends DataClass implements Insertable<Task> {
       createdAt: serializer.fromJson<int>(json['createdAt']),
       updatedAt: serializer.fromJson<int>(json['updatedAt']),
       retryCount: serializer.fromJson<int>(json['retryCount']),
+      nextRetryAt: serializer.fromJson<int?>(json['nextRetryAt']),
+      startedAt: serializer.fromJson<int?>(json['startedAt']),
+      completedAt: serializer.fromJson<int?>(json['completedAt']),
+      failedAt: serializer.fromJson<int?>(json['failedAt']),
+      failure: serializer.fromJson<String?>(json['failure']),
+      failureType: serializer.fromJson<String?>(json['failureType']),
+      failureStackTrace: serializer.fromJson<String?>(
+        json['failureStackTrace'],
+      ),
       serverId: serializer.fromJson<String?>(json['serverId']),
       taskData: serializer.fromJson<String?>(json['taskData']),
-      failure: serializer.fromJson<String?>(json['failure']),
-      completedAt: serializer.fromJson<int?>(json['completedAt']),
       syncedToState: serializer.fromJson<int>(json['syncedToState']),
       syncedToServer: serializer.fromJson<int>(json['syncedToServer']),
       syncedToClient: serializer.fromJson<int>(json['syncedToClient']),
       syncedToDb: serializer.fromJson<int>(json['syncedToDb']),
-      completed: serializer.fromJson<int>(json['completed']),
     );
   }
   @override
@@ -7629,15 +7844,19 @@ class Task extends DataClass implements Insertable<Task> {
       'createdAt': serializer.toJson<int>(createdAt),
       'updatedAt': serializer.toJson<int>(updatedAt),
       'retryCount': serializer.toJson<int>(retryCount),
+      'nextRetryAt': serializer.toJson<int?>(nextRetryAt),
+      'startedAt': serializer.toJson<int?>(startedAt),
+      'completedAt': serializer.toJson<int?>(completedAt),
+      'failedAt': serializer.toJson<int?>(failedAt),
+      'failure': serializer.toJson<String?>(failure),
+      'failureType': serializer.toJson<String?>(failureType),
+      'failureStackTrace': serializer.toJson<String?>(failureStackTrace),
       'serverId': serializer.toJson<String?>(serverId),
       'taskData': serializer.toJson<String?>(taskData),
-      'failure': serializer.toJson<String?>(failure),
-      'completedAt': serializer.toJson<int?>(completedAt),
       'syncedToState': serializer.toJson<int>(syncedToState),
       'syncedToServer': serializer.toJson<int>(syncedToServer),
       'syncedToClient': serializer.toJson<int>(syncedToClient),
       'syncedToDb': serializer.toJson<int>(syncedToDb),
-      'completed': serializer.toJson<int>(completed),
     };
   }
 
@@ -7655,15 +7874,19 @@ class Task extends DataClass implements Insertable<Task> {
     int? createdAt,
     int? updatedAt,
     int? retryCount,
+    Value<int?> nextRetryAt = const Value.absent(),
+    Value<int?> startedAt = const Value.absent(),
+    Value<int?> completedAt = const Value.absent(),
+    Value<int?> failedAt = const Value.absent(),
+    Value<String?> failure = const Value.absent(),
+    Value<String?> failureType = const Value.absent(),
+    Value<String?> failureStackTrace = const Value.absent(),
     Value<String?> serverId = const Value.absent(),
     Value<String?> taskData = const Value.absent(),
-    Value<String?> failure = const Value.absent(),
-    Value<int?> completedAt = const Value.absent(),
     int? syncedToState,
     int? syncedToServer,
     int? syncedToClient,
     int? syncedToDb,
-    int? completed,
   }) => Task(
     taskId: taskId ?? this.taskId,
     taskType: taskType ?? this.taskType,
@@ -7678,15 +7901,21 @@ class Task extends DataClass implements Insertable<Task> {
     createdAt: createdAt ?? this.createdAt,
     updatedAt: updatedAt ?? this.updatedAt,
     retryCount: retryCount ?? this.retryCount,
+    nextRetryAt: nextRetryAt.present ? nextRetryAt.value : this.nextRetryAt,
+    startedAt: startedAt.present ? startedAt.value : this.startedAt,
+    completedAt: completedAt.present ? completedAt.value : this.completedAt,
+    failedAt: failedAt.present ? failedAt.value : this.failedAt,
+    failure: failure.present ? failure.value : this.failure,
+    failureType: failureType.present ? failureType.value : this.failureType,
+    failureStackTrace: failureStackTrace.present
+        ? failureStackTrace.value
+        : this.failureStackTrace,
     serverId: serverId.present ? serverId.value : this.serverId,
     taskData: taskData.present ? taskData.value : this.taskData,
-    failure: failure.present ? failure.value : this.failure,
-    completedAt: completedAt.present ? completedAt.value : this.completedAt,
     syncedToState: syncedToState ?? this.syncedToState,
     syncedToServer: syncedToServer ?? this.syncedToServer,
     syncedToClient: syncedToClient ?? this.syncedToClient,
     syncedToDb: syncedToDb ?? this.syncedToDb,
-    completed: completed ?? this.completed,
   );
   Task copyWithCompanion(TasksCompanion data) {
     return Task(
@@ -7721,12 +7950,23 @@ class Task extends DataClass implements Insertable<Task> {
       retryCount: data.retryCount.present
           ? data.retryCount.value
           : this.retryCount,
-      serverId: data.serverId.present ? data.serverId.value : this.serverId,
-      taskData: data.taskData.present ? data.taskData.value : this.taskData,
-      failure: data.failure.present ? data.failure.value : this.failure,
+      nextRetryAt: data.nextRetryAt.present
+          ? data.nextRetryAt.value
+          : this.nextRetryAt,
+      startedAt: data.startedAt.present ? data.startedAt.value : this.startedAt,
       completedAt: data.completedAt.present
           ? data.completedAt.value
           : this.completedAt,
+      failedAt: data.failedAt.present ? data.failedAt.value : this.failedAt,
+      failure: data.failure.present ? data.failure.value : this.failure,
+      failureType: data.failureType.present
+          ? data.failureType.value
+          : this.failureType,
+      failureStackTrace: data.failureStackTrace.present
+          ? data.failureStackTrace.value
+          : this.failureStackTrace,
+      serverId: data.serverId.present ? data.serverId.value : this.serverId,
+      taskData: data.taskData.present ? data.taskData.value : this.taskData,
       syncedToState: data.syncedToState.present
           ? data.syncedToState.value
           : this.syncedToState,
@@ -7739,7 +7979,6 @@ class Task extends DataClass implements Insertable<Task> {
       syncedToDb: data.syncedToDb.present
           ? data.syncedToDb.value
           : this.syncedToDb,
-      completed: data.completed.present ? data.completed.value : this.completed,
     );
   }
 
@@ -7759,15 +7998,19 @@ class Task extends DataClass implements Insertable<Task> {
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt, ')
           ..write('retryCount: $retryCount, ')
+          ..write('nextRetryAt: $nextRetryAt, ')
+          ..write('startedAt: $startedAt, ')
+          ..write('completedAt: $completedAt, ')
+          ..write('failedAt: $failedAt, ')
+          ..write('failure: $failure, ')
+          ..write('failureType: $failureType, ')
+          ..write('failureStackTrace: $failureStackTrace, ')
           ..write('serverId: $serverId, ')
           ..write('taskData: $taskData, ')
-          ..write('failure: $failure, ')
-          ..write('completedAt: $completedAt, ')
           ..write('syncedToState: $syncedToState, ')
           ..write('syncedToServer: $syncedToServer, ')
           ..write('syncedToClient: $syncedToClient, ')
-          ..write('syncedToDb: $syncedToDb, ')
-          ..write('completed: $completed')
+          ..write('syncedToDb: $syncedToDb')
           ..write(')'))
         .toString();
   }
@@ -7787,15 +8030,19 @@ class Task extends DataClass implements Insertable<Task> {
     createdAt,
     updatedAt,
     retryCount,
+    nextRetryAt,
+    startedAt,
+    completedAt,
+    failedAt,
+    failure,
+    failureType,
+    failureStackTrace,
     serverId,
     taskData,
-    failure,
-    completedAt,
     syncedToState,
     syncedToServer,
     syncedToClient,
     syncedToDb,
-    completed,
   ]);
   @override
   bool operator ==(Object other) =>
@@ -7814,15 +8061,19 @@ class Task extends DataClass implements Insertable<Task> {
           other.createdAt == this.createdAt &&
           other.updatedAt == this.updatedAt &&
           other.retryCount == this.retryCount &&
+          other.nextRetryAt == this.nextRetryAt &&
+          other.startedAt == this.startedAt &&
+          other.completedAt == this.completedAt &&
+          other.failedAt == this.failedAt &&
+          other.failure == this.failure &&
+          other.failureType == this.failureType &&
+          other.failureStackTrace == this.failureStackTrace &&
           other.serverId == this.serverId &&
           other.taskData == this.taskData &&
-          other.failure == this.failure &&
-          other.completedAt == this.completedAt &&
           other.syncedToState == this.syncedToState &&
           other.syncedToServer == this.syncedToServer &&
           other.syncedToClient == this.syncedToClient &&
-          other.syncedToDb == this.syncedToDb &&
-          other.completed == this.completed);
+          other.syncedToDb == this.syncedToDb);
 }
 
 class TasksCompanion extends UpdateCompanion<Task> {
@@ -7839,15 +8090,19 @@ class TasksCompanion extends UpdateCompanion<Task> {
   final Value<int> createdAt;
   final Value<int> updatedAt;
   final Value<int> retryCount;
+  final Value<int?> nextRetryAt;
+  final Value<int?> startedAt;
+  final Value<int?> completedAt;
+  final Value<int?> failedAt;
+  final Value<String?> failure;
+  final Value<String?> failureType;
+  final Value<String?> failureStackTrace;
   final Value<String?> serverId;
   final Value<String?> taskData;
-  final Value<String?> failure;
-  final Value<int?> completedAt;
   final Value<int> syncedToState;
   final Value<int> syncedToServer;
   final Value<int> syncedToClient;
   final Value<int> syncedToDb;
-  final Value<int> completed;
   final Value<int> rowid;
   const TasksCompanion({
     this.taskId = const Value.absent(),
@@ -7863,23 +8118,27 @@ class TasksCompanion extends UpdateCompanion<Task> {
     this.createdAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
     this.retryCount = const Value.absent(),
+    this.nextRetryAt = const Value.absent(),
+    this.startedAt = const Value.absent(),
+    this.completedAt = const Value.absent(),
+    this.failedAt = const Value.absent(),
+    this.failure = const Value.absent(),
+    this.failureType = const Value.absent(),
+    this.failureStackTrace = const Value.absent(),
     this.serverId = const Value.absent(),
     this.taskData = const Value.absent(),
-    this.failure = const Value.absent(),
-    this.completedAt = const Value.absent(),
     this.syncedToState = const Value.absent(),
     this.syncedToServer = const Value.absent(),
     this.syncedToClient = const Value.absent(),
     this.syncedToDb = const Value.absent(),
-    this.completed = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   TasksCompanion.insert({
     required String taskId,
     required int taskType,
-    required int taskStatus,
+    this.taskStatus = const Value.absent(),
     required String functionName,
-    required String functionArgs,
+    this.functionArgs = const Value.absent(),
     this.blobparam1 = const Value.absent(),
     this.blobparam2 = const Value.absent(),
     this.blobparam3 = const Value.absent(),
@@ -7888,21 +8147,23 @@ class TasksCompanion extends UpdateCompanion<Task> {
     required int createdAt,
     required int updatedAt,
     this.retryCount = const Value.absent(),
+    this.nextRetryAt = const Value.absent(),
+    this.startedAt = const Value.absent(),
+    this.completedAt = const Value.absent(),
+    this.failedAt = const Value.absent(),
+    this.failure = const Value.absent(),
+    this.failureType = const Value.absent(),
+    this.failureStackTrace = const Value.absent(),
     this.serverId = const Value.absent(),
     this.taskData = const Value.absent(),
-    this.failure = const Value.absent(),
-    this.completedAt = const Value.absent(),
     this.syncedToState = const Value.absent(),
     this.syncedToServer = const Value.absent(),
     this.syncedToClient = const Value.absent(),
     this.syncedToDb = const Value.absent(),
-    this.completed = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : taskId = Value(taskId),
        taskType = Value(taskType),
-       taskStatus = Value(taskStatus),
        functionName = Value(functionName),
-       functionArgs = Value(functionArgs),
        createdAt = Value(createdAt),
        updatedAt = Value(updatedAt);
   static Insertable<Task> custom({
@@ -7919,15 +8180,19 @@ class TasksCompanion extends UpdateCompanion<Task> {
     Expression<int>? createdAt,
     Expression<int>? updatedAt,
     Expression<int>? retryCount,
+    Expression<int>? nextRetryAt,
+    Expression<int>? startedAt,
+    Expression<int>? completedAt,
+    Expression<int>? failedAt,
+    Expression<String>? failure,
+    Expression<String>? failureType,
+    Expression<String>? failureStackTrace,
     Expression<String>? serverId,
     Expression<String>? taskData,
-    Expression<String>? failure,
-    Expression<int>? completedAt,
     Expression<int>? syncedToState,
     Expression<int>? syncedToServer,
     Expression<int>? syncedToClient,
     Expression<int>? syncedToDb,
-    Expression<int>? completed,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -7944,15 +8209,19 @@ class TasksCompanion extends UpdateCompanion<Task> {
       if (createdAt != null) 'created_at': createdAt,
       if (updatedAt != null) 'updated_at': updatedAt,
       if (retryCount != null) 'retrys': retryCount,
+      if (nextRetryAt != null) 'next_retry_at': nextRetryAt,
+      if (startedAt != null) 'started_at': startedAt,
+      if (completedAt != null) 'completed_at': completedAt,
+      if (failedAt != null) 'failed_at': failedAt,
+      if (failure != null) 'failure': failure,
+      if (failureType != null) 'failure_type': failureType,
+      if (failureStackTrace != null) 'failure_stack_trace': failureStackTrace,
       if (serverId != null) 'server_id': serverId,
       if (taskData != null) 'task_data': taskData,
-      if (failure != null) 'failure': failure,
-      if (completedAt != null) 'completed_at': completedAt,
       if (syncedToState != null) 'synced_to_state': syncedToState,
       if (syncedToServer != null) 'synced_to_server': syncedToServer,
       if (syncedToClient != null) 'synced_to_client': syncedToClient,
       if (syncedToDb != null) 'synced_to_db': syncedToDb,
-      if (completed != null) 'completed': completed,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -7971,15 +8240,19 @@ class TasksCompanion extends UpdateCompanion<Task> {
     Value<int>? createdAt,
     Value<int>? updatedAt,
     Value<int>? retryCount,
+    Value<int?>? nextRetryAt,
+    Value<int?>? startedAt,
+    Value<int?>? completedAt,
+    Value<int?>? failedAt,
+    Value<String?>? failure,
+    Value<String?>? failureType,
+    Value<String?>? failureStackTrace,
     Value<String?>? serverId,
     Value<String?>? taskData,
-    Value<String?>? failure,
-    Value<int?>? completedAt,
     Value<int>? syncedToState,
     Value<int>? syncedToServer,
     Value<int>? syncedToClient,
     Value<int>? syncedToDb,
-    Value<int>? completed,
     Value<int>? rowid,
   }) {
     return TasksCompanion(
@@ -7996,15 +8269,19 @@ class TasksCompanion extends UpdateCompanion<Task> {
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       retryCount: retryCount ?? this.retryCount,
+      nextRetryAt: nextRetryAt ?? this.nextRetryAt,
+      startedAt: startedAt ?? this.startedAt,
+      completedAt: completedAt ?? this.completedAt,
+      failedAt: failedAt ?? this.failedAt,
+      failure: failure ?? this.failure,
+      failureType: failureType ?? this.failureType,
+      failureStackTrace: failureStackTrace ?? this.failureStackTrace,
       serverId: serverId ?? this.serverId,
       taskData: taskData ?? this.taskData,
-      failure: failure ?? this.failure,
-      completedAt: completedAt ?? this.completedAt,
       syncedToState: syncedToState ?? this.syncedToState,
       syncedToServer: syncedToServer ?? this.syncedToServer,
       syncedToClient: syncedToClient ?? this.syncedToClient,
       syncedToDb: syncedToDb ?? this.syncedToDb,
-      completed: completed ?? this.completed,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -8051,17 +8328,32 @@ class TasksCompanion extends UpdateCompanion<Task> {
     if (retryCount.present) {
       map['retrys'] = Variable<int>(retryCount.value);
     }
+    if (nextRetryAt.present) {
+      map['next_retry_at'] = Variable<int>(nextRetryAt.value);
+    }
+    if (startedAt.present) {
+      map['started_at'] = Variable<int>(startedAt.value);
+    }
+    if (completedAt.present) {
+      map['completed_at'] = Variable<int>(completedAt.value);
+    }
+    if (failedAt.present) {
+      map['failed_at'] = Variable<int>(failedAt.value);
+    }
+    if (failure.present) {
+      map['failure'] = Variable<String>(failure.value);
+    }
+    if (failureType.present) {
+      map['failure_type'] = Variable<String>(failureType.value);
+    }
+    if (failureStackTrace.present) {
+      map['failure_stack_trace'] = Variable<String>(failureStackTrace.value);
+    }
     if (serverId.present) {
       map['server_id'] = Variable<String>(serverId.value);
     }
     if (taskData.present) {
       map['task_data'] = Variable<String>(taskData.value);
-    }
-    if (failure.present) {
-      map['failure'] = Variable<String>(failure.value);
-    }
-    if (completedAt.present) {
-      map['completed_at'] = Variable<int>(completedAt.value);
     }
     if (syncedToState.present) {
       map['synced_to_state'] = Variable<int>(syncedToState.value);
@@ -8074,9 +8366,6 @@ class TasksCompanion extends UpdateCompanion<Task> {
     }
     if (syncedToDb.present) {
       map['synced_to_db'] = Variable<int>(syncedToDb.value);
-    }
-    if (completed.present) {
-      map['completed'] = Variable<int>(completed.value);
     }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
@@ -8100,15 +8389,19 @@ class TasksCompanion extends UpdateCompanion<Task> {
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt, ')
           ..write('retryCount: $retryCount, ')
+          ..write('nextRetryAt: $nextRetryAt, ')
+          ..write('startedAt: $startedAt, ')
+          ..write('completedAt: $completedAt, ')
+          ..write('failedAt: $failedAt, ')
+          ..write('failure: $failure, ')
+          ..write('failureType: $failureType, ')
+          ..write('failureStackTrace: $failureStackTrace, ')
           ..write('serverId: $serverId, ')
           ..write('taskData: $taskData, ')
-          ..write('failure: $failure, ')
-          ..write('completedAt: $completedAt, ')
           ..write('syncedToState: $syncedToState, ')
           ..write('syncedToServer: $syncedToServer, ')
           ..write('syncedToClient: $syncedToClient, ')
           ..write('syncedToDb: $syncedToDb, ')
-          ..write('completed: $completed, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -15234,9 +15527,9 @@ typedef $$ConnectionRequestsTableProcessedTableManager =
 typedef $$TasksTableCreateCompanionBuilder = TasksCompanion Function({
   required String taskId,
   required int taskType,
-  required int taskStatus,
+  Value<int> taskStatus,
   required String functionName,
-  required String functionArgs,
+  Value<String> functionArgs,
   Value<Uint8List?> blobparam1,
   Value<Uint8List?> blobparam2,
   Value<Uint8List?> blobparam3,
@@ -15245,15 +15538,19 @@ typedef $$TasksTableCreateCompanionBuilder = TasksCompanion Function({
   required int createdAt,
   required int updatedAt,
   Value<int> retryCount,
+  Value<int?> nextRetryAt,
+  Value<int?> startedAt,
+  Value<int?> completedAt,
+  Value<int?> failedAt,
+  Value<String?> failure,
+  Value<String?> failureType,
+  Value<String?> failureStackTrace,
   Value<String?> serverId,
   Value<String?> taskData,
-  Value<String?> failure,
-  Value<int?> completedAt,
   Value<int> syncedToState,
   Value<int> syncedToServer,
   Value<int> syncedToClient,
   Value<int> syncedToDb,
-  Value<int> completed,
   Value<int> rowid,
 });
 typedef $$TasksTableUpdateCompanionBuilder = TasksCompanion Function({
@@ -15270,15 +15567,19 @@ typedef $$TasksTableUpdateCompanionBuilder = TasksCompanion Function({
   Value<int> createdAt,
   Value<int> updatedAt,
   Value<int> retryCount,
+  Value<int?> nextRetryAt,
+  Value<int?> startedAt,
+  Value<int?> completedAt,
+  Value<int?> failedAt,
+  Value<String?> failure,
+  Value<String?> failureType,
+  Value<String?> failureStackTrace,
   Value<String?> serverId,
   Value<String?> taskData,
-  Value<String?> failure,
-  Value<int?> completedAt,
   Value<int> syncedToState,
   Value<int> syncedToServer,
   Value<int> syncedToClient,
   Value<int> syncedToDb,
-  Value<int> completed,
   Value<int> rowid,
 });
 
@@ -15377,8 +15678,23 @@ class $$TasksTableFilterComposer extends Composer<_$AppDatabase, $TasksTable> {
     builder: (column) => ColumnFilters(column),
   );
 
-  ColumnFilters<String> get taskData => $composableBuilder(
-    column: $table.taskData,
+  ColumnFilters<int> get nextRetryAt => $composableBuilder(
+    column: $table.nextRetryAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get startedAt => $composableBuilder(
+    column: $table.startedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get completedAt => $composableBuilder(
+    column: $table.completedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get failedAt => $composableBuilder(
+    column: $table.failedAt,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -15387,8 +15703,18 @@ class $$TasksTableFilterComposer extends Composer<_$AppDatabase, $TasksTable> {
     builder: (column) => ColumnFilters(column),
   );
 
-  ColumnFilters<int> get completedAt => $composableBuilder(
-    column: $table.completedAt,
+  ColumnFilters<String> get failureType => $composableBuilder(
+    column: $table.failureType,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get failureStackTrace => $composableBuilder(
+    column: $table.failureStackTrace,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get taskData => $composableBuilder(
+    column: $table.taskData,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -15409,11 +15735,6 @@ class $$TasksTableFilterComposer extends Composer<_$AppDatabase, $TasksTable> {
 
   ColumnFilters<int> get syncedToDb => $composableBuilder(
     column: $table.syncedToDb,
-    builder: (column) => ColumnFilters(column),
-  );
-
-  ColumnFilters<int> get completed => $composableBuilder(
-    column: $table.completed,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -15515,8 +15836,23 @@ class $$TasksTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
-  ColumnOrderings<String> get taskData => $composableBuilder(
-    column: $table.taskData,
+  ColumnOrderings<int> get nextRetryAt => $composableBuilder(
+    column: $table.nextRetryAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get startedAt => $composableBuilder(
+    column: $table.startedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get completedAt => $composableBuilder(
+    column: $table.completedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get failedAt => $composableBuilder(
+    column: $table.failedAt,
     builder: (column) => ColumnOrderings(column),
   );
 
@@ -15525,8 +15861,18 @@ class $$TasksTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
-  ColumnOrderings<int> get completedAt => $composableBuilder(
-    column: $table.completedAt,
+  ColumnOrderings<String> get failureType => $composableBuilder(
+    column: $table.failureType,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get failureStackTrace => $composableBuilder(
+    column: $table.failureStackTrace,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get taskData => $composableBuilder(
+    column: $table.taskData,
     builder: (column) => ColumnOrderings(column),
   );
 
@@ -15547,11 +15893,6 @@ class $$TasksTableOrderingComposer
 
   ColumnOrderings<int> get syncedToDb => $composableBuilder(
     column: $table.syncedToDb,
-    builder: (column) => ColumnOrderings(column),
-  );
-
-  ColumnOrderings<int> get completed => $composableBuilder(
-    column: $table.completed,
     builder: (column) => ColumnOrderings(column),
   );
 
@@ -15645,16 +15986,37 @@ class $$TasksTableAnnotationComposer
     builder: (column) => column,
   );
 
-  GeneratedColumn<String> get taskData =>
-      $composableBuilder(column: $table.taskData, builder: (column) => column);
+  GeneratedColumn<int> get nextRetryAt => $composableBuilder(
+    column: $table.nextRetryAt,
+    builder: (column) => column,
+  );
 
-  GeneratedColumn<String> get failure =>
-      $composableBuilder(column: $table.failure, builder: (column) => column);
+  GeneratedColumn<int> get startedAt =>
+      $composableBuilder(column: $table.startedAt, builder: (column) => column);
 
   GeneratedColumn<int> get completedAt => $composableBuilder(
     column: $table.completedAt,
     builder: (column) => column,
   );
+
+  GeneratedColumn<int> get failedAt =>
+      $composableBuilder(column: $table.failedAt, builder: (column) => column);
+
+  GeneratedColumn<String> get failure =>
+      $composableBuilder(column: $table.failure, builder: (column) => column);
+
+  GeneratedColumn<String> get failureType => $composableBuilder(
+    column: $table.failureType,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get failureStackTrace => $composableBuilder(
+    column: $table.failureStackTrace,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get taskData =>
+      $composableBuilder(column: $table.taskData, builder: (column) => column);
 
   GeneratedColumn<int> get syncedToState => $composableBuilder(
     column: $table.syncedToState,
@@ -15675,9 +16037,6 @@ class $$TasksTableAnnotationComposer
     column: $table.syncedToDb,
     builder: (column) => column,
   );
-
-  GeneratedColumn<int> get completed =>
-      $composableBuilder(column: $table.completed, builder: (column) => column);
 
   $$ServersTableAnnotationComposer get serverId {
     final $$ServersTableAnnotationComposer composer = $composerBuilder(
@@ -15744,15 +16103,19 @@ class $$TasksTableTableManager
                 Value<int> createdAt = const Value.absent(),
                 Value<int> updatedAt = const Value.absent(),
                 Value<int> retryCount = const Value.absent(),
+                Value<int?> nextRetryAt = const Value.absent(),
+                Value<int?> startedAt = const Value.absent(),
+                Value<int?> completedAt = const Value.absent(),
+                Value<int?> failedAt = const Value.absent(),
+                Value<String?> failure = const Value.absent(),
+                Value<String?> failureType = const Value.absent(),
+                Value<String?> failureStackTrace = const Value.absent(),
                 Value<String?> serverId = const Value.absent(),
                 Value<String?> taskData = const Value.absent(),
-                Value<String?> failure = const Value.absent(),
-                Value<int?> completedAt = const Value.absent(),
                 Value<int> syncedToState = const Value.absent(),
                 Value<int> syncedToServer = const Value.absent(),
                 Value<int> syncedToClient = const Value.absent(),
                 Value<int> syncedToDb = const Value.absent(),
-                Value<int> completed = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => TasksCompanion(
                 taskId: taskId,
@@ -15768,24 +16131,28 @@ class $$TasksTableTableManager
                 createdAt: createdAt,
                 updatedAt: updatedAt,
                 retryCount: retryCount,
+                nextRetryAt: nextRetryAt,
+                startedAt: startedAt,
+                completedAt: completedAt,
+                failedAt: failedAt,
+                failure: failure,
+                failureType: failureType,
+                failureStackTrace: failureStackTrace,
                 serverId: serverId,
                 taskData: taskData,
-                failure: failure,
-                completedAt: completedAt,
                 syncedToState: syncedToState,
                 syncedToServer: syncedToServer,
                 syncedToClient: syncedToClient,
                 syncedToDb: syncedToDb,
-                completed: completed,
                 rowid: rowid,
               ),
           createCompanionCallback:
               ({
                 required String taskId,
                 required int taskType,
-                required int taskStatus,
+                Value<int> taskStatus = const Value.absent(),
                 required String functionName,
-                required String functionArgs,
+                Value<String> functionArgs = const Value.absent(),
                 Value<Uint8List?> blobparam1 = const Value.absent(),
                 Value<Uint8List?> blobparam2 = const Value.absent(),
                 Value<Uint8List?> blobparam3 = const Value.absent(),
@@ -15794,15 +16161,19 @@ class $$TasksTableTableManager
                 required int createdAt,
                 required int updatedAt,
                 Value<int> retryCount = const Value.absent(),
+                Value<int?> nextRetryAt = const Value.absent(),
+                Value<int?> startedAt = const Value.absent(),
+                Value<int?> completedAt = const Value.absent(),
+                Value<int?> failedAt = const Value.absent(),
+                Value<String?> failure = const Value.absent(),
+                Value<String?> failureType = const Value.absent(),
+                Value<String?> failureStackTrace = const Value.absent(),
                 Value<String?> serverId = const Value.absent(),
                 Value<String?> taskData = const Value.absent(),
-                Value<String?> failure = const Value.absent(),
-                Value<int?> completedAt = const Value.absent(),
                 Value<int> syncedToState = const Value.absent(),
                 Value<int> syncedToServer = const Value.absent(),
                 Value<int> syncedToClient = const Value.absent(),
                 Value<int> syncedToDb = const Value.absent(),
-                Value<int> completed = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => TasksCompanion.insert(
                 taskId: taskId,
@@ -15818,15 +16189,19 @@ class $$TasksTableTableManager
                 createdAt: createdAt,
                 updatedAt: updatedAt,
                 retryCount: retryCount,
+                nextRetryAt: nextRetryAt,
+                startedAt: startedAt,
+                completedAt: completedAt,
+                failedAt: failedAt,
+                failure: failure,
+                failureType: failureType,
+                failureStackTrace: failureStackTrace,
                 serverId: serverId,
                 taskData: taskData,
-                failure: failure,
-                completedAt: completedAt,
                 syncedToState: syncedToState,
                 syncedToServer: syncedToServer,
                 syncedToClient: syncedToClient,
                 syncedToDb: syncedToDb,
-                completed: completed,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0
