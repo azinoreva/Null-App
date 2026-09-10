@@ -63,6 +63,39 @@ class SyncStateDao extends DatabaseAccessor<AppDatabase>
     ));
   }
 
+
+  // ─────────────────────────────────────────────────────────────
+  // Draft
+  // ─────────────────────────────────────────────────────────────
+
+  // Get the draft for a single conversation.
+  Future<String?> getDraft(String conversationId) async {
+    final row = await (select(db.syncState)
+          ..where((t) => t.conversationId.equals(conversationId)))
+        .getSingleOrNull();
+    return row?.draft;
+  }
+
+  // Get every conversation that currently has a non-empty draft.
+  Future<List<SyncStateData>> getConversationsWithDrafts() =>
+      (select(db.syncState)
+            ..where((t) => t.draft.isNotNull() & t.draft.equals('').not()))
+          .get();
+
+  // Save (or overwrite) the draft text for a conversation.
+  // Passing null or an empty string clears the draft.
+  Future<void> updateDraft(String conversationId, String? draft) async {
+    await (update(db.syncState)
+          ..where((t) => t.conversationId.equals(conversationId)))
+        .write(SyncStateCompanion(
+      draft: Value((draft == null || draft.isEmpty) ? null : draft),
+      updatedAt: Value(DateTime.now().millisecondsSinceEpoch),
+    ));
+  }
+
+  // Clear the draft on a conversation.
+  Future<void> clearDraft(String conversationId) =>
+      updateDraft(conversationId, null);
   // Update the most recent message details.
   Future<void> updateLastMessage(
     String conversationId, {

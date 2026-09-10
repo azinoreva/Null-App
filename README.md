@@ -18,3 +18,8 @@ samples, guidance on mobile development, and a full API reference.
 
 
 The underlying primitives are established, but the protocol state machine needs serious tests—especially simultaneous sends, duplicate delivery, skipped-key limits, crash/rollback behavior, recovery, and authenticated session setup—before you trust real messages to it.
+
+
+
+# Sync State
+- This is where functions about the screen is written. The

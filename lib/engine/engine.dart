@@ -95,7 +95,6 @@
 
 import 'dart:async';
 import 'dart:convert';
-import 'dart:io';
 import 'dart:isolate';
 import 'dart:typed_data';
 
@@ -178,10 +177,9 @@ class TaskPayload {
 /// PUBLIC SIDE -- safe to hold onto and call from the main isolate.
 /// -----------------------------------------------------------------------
 class TaskEngine {
-  TaskEngine._(this._toEngine, this._isolate);
+  TaskEngine._(this._worker);
 
-  final SendPort _toEngine;
-  final Isolate _isolate;
+  final _EngineWorker _worker;
 
   /// Spawns the engine isolate, waits for it to come up, does an initial
   /// crash-recovery + ping so anything left undone from a previous run
@@ -193,21 +191,12 @@ class TaskEngine {
   /// before you've told it connectivity is actually confirmed -- call
   /// [updateNetworkState] as soon as you know better.
   static Future<TaskEngine> start({
-    required String dbPath,
+    required AppDatabase database,
     bool initiallyOnline = false,
   }) async {
-    final readyPort = ReceivePort();
-
-    final isolate = await Isolate.spawn(
-      _engineEntryPoint,
-      _EngineInit(readyPort.sendPort, dbPath, initiallyOnline),
-      debugName: 'task_engine',
+    final engine = TaskEngine._(
+      _EngineWorker(database: database, initiallyOnline: initiallyOnline),
     );
-
-    final toEngine = await readyPort.first as SendPort;
-    readyPort.close();
-
-    final engine = TaskEngine._(toEngine, isolate);
     engine.ping();
     return engine;
   }
@@ -216,71 +205,25 @@ class TaskEngine {
   /// be waiting. Cheap to call repeatedly -- pings that arrive while the
   /// engine is mid-run just get coalesced into "check again once done",
   /// they don't stack up or start parallel drains.
-  void ping() => _toEngine.send(const _Ping());
+  void ping() => _worker.ping();
 
   /// Tell the engine whether the network is currently reachable. Wire this
   /// up to your NetworkStateManager's stream (see the contract note at the
   /// top of this file) -- every call re-checks the queue, so a
   /// false -> true transition immediately unfreezes any waiting network
   /// tasks instead of waiting for the next unrelated ping.
-  void updateNetworkState(bool online) =>
-      _toEngine.send(_NetworkStateChanged(online));
+  void updateNetworkState(bool online) => _worker.setOnline(online);
 
-  void dispose() {
-    _toEngine.send(const _Shutdown());
-    _isolate.kill(priority: Isolate.immediate);
-  }
-}
-
-class _EngineInit {
-  const _EngineInit(this.readyPort, this.dbPath, this.initiallyOnline);
-  final SendPort readyPort;
-  final String dbPath;
-  final bool initiallyOnline;
-}
-
-class _Ping {
-  const _Ping();
-}
-
-class _Shutdown {
-  const _Shutdown();
-}
-
-class _NetworkStateChanged {
-  const _NetworkStateChanged(this.online);
-  final bool online;
+  void dispose() {}
 }
 
 /// -----------------------------------------------------------------------
 /// EVERYTHING BELOW RUNS INSIDE THE ENGINE ISOLATE.
 /// -----------------------------------------------------------------------
 
-void _engineEntryPoint(_EngineInit init) {
-  final controlPort = ReceivePort();
-  final worker = _EngineWorker(
-    dbPath: init.dbPath,
-    initiallyOnline: init.initiallyOnline,
-  );
-
-  init.readyPort.send(controlPort.sendPort);
-
-  controlPort.listen((message) {
-    if (message is _Ping) {
-      worker.ping();
-    } else if (message is _NetworkStateChanged) {
-      worker.setOnline(message.online);
-    } else if (message is _Shutdown) {
-      controlPort.close();
-      worker.dispose();
-    }
-  });
-}
-
 class _EngineWorker {
-  _EngineWorker({required String dbPath, required bool initiallyOnline})
-      : database = AppDatabase(NativeDatabase(File(dbPath))),
-        _isOnline = initiallyOnline {
+  _EngineWorker({required this.database, required bool initiallyOnline})
+    : _isOnline = initiallyOnline {
     // Anything left "inProgress" from a previous run (crash, force-quit,
     // etc.) couldn't possibly still be running -- put it back in the
     // pending pool before we do anything else.
@@ -323,7 +266,9 @@ class _EngineWorker {
   }
 
   Future<void> _recoverInterruptedTasks() async {
-    final stuck = await database.tasksDao.getTasksByStatus(TaskStatus.inProgress);
+    final stuck = await database.tasksDao.getTasksByStatus(
+      TaskStatus.inProgress,
+    );
     for (final task in stuck) {
       await database.tasksDao.updateTaskCompanion(
         task.taskId,
@@ -487,7 +432,9 @@ class _EngineWorker {
       return;
     }
 
-    final newRetryCount = await database.tasksDao.incrementRetryCount(worker.taskId);
+    final newRetryCount = await database.tasksDao.incrementRetryCount(
+      worker.taskId,
+    );
 
     if (newRetryCount >= kMaxRetries) {
       await database.tasksDao.markTaskFailed(
@@ -503,10 +450,6 @@ class _EngineWorker {
         result.error ?? 'Unknown error.',
       );
     }
-  }
-
-  void dispose() {
-    database.close();
   }
 }
 
@@ -560,7 +503,8 @@ class _WorkerRequest {
 class _WorkerResult {
   const _WorkerResult._(this.taskId, this.success, this.error);
 
-  factory _WorkerResult.success(String taskId) => _WorkerResult._(taskId, true, null);
+  factory _WorkerResult.success(String taskId) =>
+      _WorkerResult._(taskId, true, null);
 
   factory _WorkerResult.failure(String taskId, String error) =>
       _WorkerResult._(taskId, false, error);
@@ -578,10 +522,12 @@ void _workerEntryPoint(_WorkerRequest req) async {
     final definition = functions.functionRegistry[req.functionName];
 
     if (definition == null) {
-      req.replyPort.send(_WorkerResult.failure(
-        req.taskId,
-        'No executor registered for "${req.functionName}".',
-      ));
+      req.replyPort.send(
+        _WorkerResult.failure(
+          req.taskId,
+          'No executor registered for "${req.functionName}".',
+        ),
+      );
       return;
     }
 
@@ -597,6 +543,8 @@ void _workerEntryPoint(_WorkerRequest req) async {
     await definition.executor(payload);
     req.replyPort.send(_WorkerResult.success(req.taskId));
   } catch (error, stackTrace) {
-    req.replyPort.send(_WorkerResult.failure(req.taskId, '$error\n$stackTrace'));
+    req.replyPort.send(
+      _WorkerResult.failure(req.taskId, '$error\n$stackTrace'),
+    );
   }
 }

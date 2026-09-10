@@ -9278,6 +9278,15 @@ class $SyncStateTable extends SyncState
     type: DriftSqlType.string,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _draftMeta = const VerificationMeta('draft');
+  @override
+  late final GeneratedColumn<String> draft = GeneratedColumn<String>(
+    'draft',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _pinnedMeta = const VerificationMeta('pinned');
   @override
   late final GeneratedColumn<int> pinned = GeneratedColumn<int>(
@@ -9355,6 +9364,7 @@ class $SyncStateTable extends SyncState
     lastReadMessage,
     lastMessageId,
     lastMessage,
+    draft,
     pinned,
     pinnedPosition,
     updatedAt,
@@ -9464,6 +9474,12 @@ class $SyncStateTable extends SyncState
         ),
       );
     }
+    if (data.containsKey('draft')) {
+      context.handle(
+        _draftMeta,
+        draft.isAcceptableOrUnknown(data['draft']!, _draftMeta),
+      );
+    }
     if (data.containsKey('pinned')) {
       context.handle(
         _pinnedMeta,
@@ -9556,6 +9572,10 @@ class $SyncStateTable extends SyncState
         DriftSqlType.string,
         data['${effectivePrefix}last_message'],
       ),
+      draft: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}draft'],
+      ),
       pinned: attachedDatabase.typeMapping.read(
         DriftSqlType.int,
         data['${effectivePrefix}pinned'],
@@ -9600,6 +9620,7 @@ class SyncStateData extends DataClass implements Insertable<SyncStateData> {
   final String? lastReadMessage;
   final String? lastMessageId;
   final String? lastMessage;
+  final String? draft;
   final int pinned;
   final int? pinnedPosition;
   final int updatedAt;
@@ -9617,6 +9638,7 @@ class SyncStateData extends DataClass implements Insertable<SyncStateData> {
     this.lastReadMessage,
     this.lastMessageId,
     this.lastMessage,
+    this.draft,
     required this.pinned,
     this.pinnedPosition,
     required this.updatedAt,
@@ -9646,6 +9668,9 @@ class SyncStateData extends DataClass implements Insertable<SyncStateData> {
     }
     if (!nullToAbsent || lastMessage != null) {
       map['last_message'] = Variable<String>(lastMessage);
+    }
+    if (!nullToAbsent || draft != null) {
+      map['draft'] = Variable<String>(draft);
     }
     map['pinned'] = Variable<int>(pinned);
     if (!nullToAbsent || pinnedPosition != null) {
@@ -9680,6 +9705,9 @@ class SyncStateData extends DataClass implements Insertable<SyncStateData> {
       lastMessage: lastMessage == null && nullToAbsent
           ? const Value.absent()
           : Value(lastMessage),
+      draft: draft == null && nullToAbsent
+          ? const Value.absent()
+          : Value(draft),
       pinned: Value(pinned),
       pinnedPosition: pinnedPosition == null && nullToAbsent
           ? const Value.absent()
@@ -9709,6 +9737,7 @@ class SyncStateData extends DataClass implements Insertable<SyncStateData> {
       lastReadMessage: serializer.fromJson<String?>(json['lastReadMessage']),
       lastMessageId: serializer.fromJson<String?>(json['lastMessageId']),
       lastMessage: serializer.fromJson<String?>(json['lastMessage']),
+      draft: serializer.fromJson<String?>(json['draft']),
       pinned: serializer.fromJson<int>(json['pinned']),
       pinnedPosition: serializer.fromJson<int?>(json['pinnedPosition']),
       updatedAt: serializer.fromJson<int>(json['updatedAt']),
@@ -9731,6 +9760,7 @@ class SyncStateData extends DataClass implements Insertable<SyncStateData> {
       'lastReadMessage': serializer.toJson<String?>(lastReadMessage),
       'lastMessageId': serializer.toJson<String?>(lastMessageId),
       'lastMessage': serializer.toJson<String?>(lastMessage),
+      'draft': serializer.toJson<String?>(draft),
       'pinned': serializer.toJson<int>(pinned),
       'pinnedPosition': serializer.toJson<int?>(pinnedPosition),
       'updatedAt': serializer.toJson<int>(updatedAt),
@@ -9751,6 +9781,7 @@ class SyncStateData extends DataClass implements Insertable<SyncStateData> {
     Value<String?> lastReadMessage = const Value.absent(),
     Value<String?> lastMessageId = const Value.absent(),
     Value<String?> lastMessage = const Value.absent(),
+    Value<String?> draft = const Value.absent(),
     int? pinned,
     Value<int?> pinnedPosition = const Value.absent(),
     int? updatedAt,
@@ -9774,6 +9805,7 @@ class SyncStateData extends DataClass implements Insertable<SyncStateData> {
         ? lastMessageId.value
         : this.lastMessageId,
     lastMessage: lastMessage.present ? lastMessage.value : this.lastMessage,
+    draft: draft.present ? draft.value : this.draft,
     pinned: pinned ?? this.pinned,
     pinnedPosition: pinnedPosition.present
         ? pinnedPosition.value
@@ -9811,6 +9843,7 @@ class SyncStateData extends DataClass implements Insertable<SyncStateData> {
       lastMessage: data.lastMessage.present
           ? data.lastMessage.value
           : this.lastMessage,
+      draft: data.draft.present ? data.draft.value : this.draft,
       pinned: data.pinned.present ? data.pinned.value : this.pinned,
       pinnedPosition: data.pinnedPosition.present
           ? data.pinnedPosition.value
@@ -9835,6 +9868,7 @@ class SyncStateData extends DataClass implements Insertable<SyncStateData> {
           ..write('lastReadMessage: $lastReadMessage, ')
           ..write('lastMessageId: $lastMessageId, ')
           ..write('lastMessage: $lastMessage, ')
+          ..write('draft: $draft, ')
           ..write('pinned: $pinned, ')
           ..write('pinnedPosition: $pinnedPosition, ')
           ..write('updatedAt: $updatedAt, ')
@@ -9857,6 +9891,7 @@ class SyncStateData extends DataClass implements Insertable<SyncStateData> {
     lastReadMessage,
     lastMessageId,
     lastMessage,
+    draft,
     pinned,
     pinnedPosition,
     updatedAt,
@@ -9878,6 +9913,7 @@ class SyncStateData extends DataClass implements Insertable<SyncStateData> {
           other.lastReadMessage == this.lastReadMessage &&
           other.lastMessageId == this.lastMessageId &&
           other.lastMessage == this.lastMessage &&
+          other.draft == this.draft &&
           other.pinned == this.pinned &&
           other.pinnedPosition == this.pinnedPosition &&
           other.updatedAt == this.updatedAt &&
@@ -9897,6 +9933,7 @@ class SyncStateCompanion extends UpdateCompanion<SyncStateData> {
   final Value<String?> lastReadMessage;
   final Value<String?> lastMessageId;
   final Value<String?> lastMessage;
+  final Value<String?> draft;
   final Value<int> pinned;
   final Value<int?> pinnedPosition;
   final Value<int> updatedAt;
@@ -9915,6 +9952,7 @@ class SyncStateCompanion extends UpdateCompanion<SyncStateData> {
     this.lastReadMessage = const Value.absent(),
     this.lastMessageId = const Value.absent(),
     this.lastMessage = const Value.absent(),
+    this.draft = const Value.absent(),
     this.pinned = const Value.absent(),
     this.pinnedPosition = const Value.absent(),
     this.updatedAt = const Value.absent(),
@@ -9934,6 +9972,7 @@ class SyncStateCompanion extends UpdateCompanion<SyncStateData> {
     this.lastReadMessage = const Value.absent(),
     this.lastMessageId = const Value.absent(),
     this.lastMessage = const Value.absent(),
+    this.draft = const Value.absent(),
     this.pinned = const Value.absent(),
     this.pinnedPosition = const Value.absent(),
     required int updatedAt,
@@ -9957,6 +9996,7 @@ class SyncStateCompanion extends UpdateCompanion<SyncStateData> {
     Expression<String>? lastReadMessage,
     Expression<String>? lastMessageId,
     Expression<String>? lastMessage,
+    Expression<String>? draft,
     Expression<int>? pinned,
     Expression<int>? pinnedPosition,
     Expression<int>? updatedAt,
@@ -9976,6 +10016,7 @@ class SyncStateCompanion extends UpdateCompanion<SyncStateData> {
       if (lastReadMessage != null) 'last_read_message': lastReadMessage,
       if (lastMessageId != null) 'last_message_id': lastMessageId,
       if (lastMessage != null) 'last_message': lastMessage,
+      if (draft != null) 'draft': draft,
       if (pinned != null) 'pinned': pinned,
       if (pinnedPosition != null) 'pinned_position': pinnedPosition,
       if (updatedAt != null) 'updated_at': updatedAt,
@@ -9997,6 +10038,7 @@ class SyncStateCompanion extends UpdateCompanion<SyncStateData> {
     Value<String?>? lastReadMessage,
     Value<String?>? lastMessageId,
     Value<String?>? lastMessage,
+    Value<String?>? draft,
     Value<int>? pinned,
     Value<int?>? pinnedPosition,
     Value<int>? updatedAt,
@@ -10016,6 +10058,7 @@ class SyncStateCompanion extends UpdateCompanion<SyncStateData> {
       lastReadMessage: lastReadMessage ?? this.lastReadMessage,
       lastMessageId: lastMessageId ?? this.lastMessageId,
       lastMessage: lastMessage ?? this.lastMessage,
+      draft: draft ?? this.draft,
       pinned: pinned ?? this.pinned,
       pinnedPosition: pinnedPosition ?? this.pinnedPosition,
       updatedAt: updatedAt ?? this.updatedAt,
@@ -10059,6 +10102,9 @@ class SyncStateCompanion extends UpdateCompanion<SyncStateData> {
     if (lastMessage.present) {
       map['last_message'] = Variable<String>(lastMessage.value);
     }
+    if (draft.present) {
+      map['draft'] = Variable<String>(draft.value);
+    }
     if (pinned.present) {
       map['pinned'] = Variable<int>(pinned.value);
     }
@@ -10096,6 +10142,7 @@ class SyncStateCompanion extends UpdateCompanion<SyncStateData> {
           ..write('lastReadMessage: $lastReadMessage, ')
           ..write('lastMessageId: $lastMessageId, ')
           ..write('lastMessage: $lastMessage, ')
+          ..write('draft: $draft, ')
           ..write('pinned: $pinned, ')
           ..write('pinnedPosition: $pinnedPosition, ')
           ..write('updatedAt: $updatedAt, ')
@@ -16907,6 +16954,7 @@ typedef $$SyncStateTableCreateCompanionBuilder = SyncStateCompanion Function({
   Value<String?> lastReadMessage,
   Value<String?> lastMessageId,
   Value<String?> lastMessage,
+  Value<String?> draft,
   Value<int> pinned,
   Value<int?> pinnedPosition,
   required int updatedAt,
@@ -16926,6 +16974,7 @@ typedef $$SyncStateTableUpdateCompanionBuilder = SyncStateCompanion Function({
   Value<String?> lastReadMessage,
   Value<String?> lastMessageId,
   Value<String?> lastMessage,
+  Value<String?> draft,
   Value<int> pinned,
   Value<int?> pinnedPosition,
   Value<int> updatedAt,
@@ -16991,6 +17040,11 @@ class $$SyncStateTableFilterComposer
 
   ColumnFilters<String> get lastMessage => $composableBuilder(
     column: $table.lastMessage,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get draft => $composableBuilder(
+    column: $table.draft,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -17084,6 +17138,11 @@ class $$SyncStateTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get draft => $composableBuilder(
+    column: $table.draft,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<int> get pinned => $composableBuilder(
     column: $table.pinned,
     builder: (column) => ColumnOrderings(column),
@@ -17170,6 +17229,9 @@ class $$SyncStateTableAnnotationComposer
     builder: (column) => column,
   );
 
+  GeneratedColumn<String> get draft =>
+      $composableBuilder(column: $table.draft, builder: (column) => column);
+
   GeneratedColumn<int> get pinned =>
       $composableBuilder(column: $table.pinned, builder: (column) => column);
 
@@ -17232,6 +17294,7 @@ class $$SyncStateTableTableManager
                 Value<String?> lastReadMessage = const Value.absent(),
                 Value<String?> lastMessageId = const Value.absent(),
                 Value<String?> lastMessage = const Value.absent(),
+                Value<String?> draft = const Value.absent(),
                 Value<int> pinned = const Value.absent(),
                 Value<int?> pinnedPosition = const Value.absent(),
                 Value<int> updatedAt = const Value.absent(),
@@ -17250,6 +17313,7 @@ class $$SyncStateTableTableManager
                 lastReadMessage: lastReadMessage,
                 lastMessageId: lastMessageId,
                 lastMessage: lastMessage,
+                draft: draft,
                 pinned: pinned,
                 pinnedPosition: pinnedPosition,
                 updatedAt: updatedAt,
@@ -17270,6 +17334,7 @@ class $$SyncStateTableTableManager
                 Value<String?> lastReadMessage = const Value.absent(),
                 Value<String?> lastMessageId = const Value.absent(),
                 Value<String?> lastMessage = const Value.absent(),
+                Value<String?> draft = const Value.absent(),
                 Value<int> pinned = const Value.absent(),
                 Value<int?> pinnedPosition = const Value.absent(),
                 required int updatedAt,
@@ -17288,6 +17353,7 @@ class $$SyncStateTableTableManager
                 lastReadMessage: lastReadMessage,
                 lastMessageId: lastMessageId,
                 lastMessage: lastMessage,
+                draft: draft,
                 pinned: pinned,
                 pinnedPosition: pinnedPosition,
                 updatedAt: updatedAt,

@@ -21,7 +21,7 @@ class SyncState extends Table {
 
   TextColumn get lastMessageId => text().nullable()();
   TextColumn get lastMessage => text().nullable()();
-
+  TextColumn get draft => text().nullable()();
   IntColumn get pinned =>
       integer().withDefault(const Constant(0)).check(pinned.isIn([0, 1]))();
   IntColumn get pinnedPosition => integer().nullable()();

@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'screens/splash_screen.dart';   // your splash screen
-import 'screens/chat_screen.dart';     // placeholder
-import 'screens/signup_screen.dart';   // placeholder
-import 'screens/login_screen.dart';    // placeholder
+
+import 'screens/splash_screen.dart'; // your splash screen
+import 'screens/chat_screen.dart'; // placeholder
+import 'screens/signup_screen.dart'; // placeholder
+import 'screens/login_screen.dart'; // placeholder
 import 'widgets/app_theme.dart';
+
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+
 import 'engine/network/main_server_client.dart';
 import 'engine/database/init_db.dart';
 import '/engine/engine.dart';
@@ -14,8 +17,8 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await dotenv.load();
   MainServerClient.init();
-  await DatabaseInitializer.initialize();
-  await TaskEngine.start( );
+  final database = await DatabaseInitializer.initialize();
+  await TaskEngine.start(database: database);
   runApp(const MyApp());
 }
 
@@ -45,9 +48,7 @@ class _MyAppState extends State<MyApp> {
   Widget build(BuildContext context) {
     if (_isLoading) {
       return MaterialApp(
-        home: Scaffold(
-          body: Center(child: CircularProgressIndicator()),
-        ),
+        home: Scaffold(body: Center(child: CircularProgressIndicator())),
       );
     }
 
@@ -65,7 +66,7 @@ class _MyAppState extends State<MyApp> {
       ),
       debugShowCheckedModeBanner: false,
       home: isLaunched
-          ? DecisionScreen(prefs: _prefs!)      // skip splash
+          ? DecisionScreen(prefs: _prefs!) // skip splash
           : SplashScreen(
               prefs: _prefs!,
               destination: DecisionScreen(prefs: _prefs!),
