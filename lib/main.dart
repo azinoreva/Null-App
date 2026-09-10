@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'screens/splash_screen.dart'; // your splash screen
@@ -12,6 +13,7 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'engine/network/main_server_client.dart';
 import 'engine/database/init_db.dart';
 import '/engine/engine.dart';
+import 'state/providers.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -19,7 +21,15 @@ void main() async {
   MainServerClient.init();
   final database = await DatabaseInitializer.initialize();
   await TaskEngine.start(database: database);
-  runApp(const MyApp());
+  runApp(
+    ProviderScope(
+      overrides: [
+        // Make the initialized database available to every Riverpod provider.
+        appDatabaseProvider.overrideWithValue(database),
+      ],
+      child: const MyApp(),
+    ),
+  );
 }
 
 class MyApp extends StatefulWidget {

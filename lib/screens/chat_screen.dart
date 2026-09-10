@@ -1,18 +1,20 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 //  AppColorScheme, AppTypography, AppColors, and ConversationListItem 
 import '../widgets/app_theme.dart';
 import '../widgets/display/conversation_card.dart';
 import '../widgets/display/navigation.dart';
+import '../state/providers.dart';
 import 'contacts_screen.dart';
 
-class ChatScreen extends StatefulWidget {
+class ChatScreen extends ConsumerStatefulWidget {
   const ChatScreen({super.key});
 
   @override
-  State<ChatScreen> createState() => _ChatScreenState();
+  ConsumerState<ChatScreen> createState() => _ChatScreenState();
 }
 
-class _ChatScreenState extends State<ChatScreen> {
+class _ChatScreenState extends ConsumerState<ChatScreen> {
   NavigationTab _currentTab = NavigationTab.chats;
 
   @override
@@ -168,7 +170,9 @@ class _ChatScreenState extends State<ChatScreen> {
                   ),
                 ),
                 GestureDetector(
-                  onTap: () {},
+                  onTap: () => ref
+                      .read(syncStatesProvider.notifier)
+                      .markAllRead(),
                   child: const Text(
                     'Mark all read',
                     style: TextStyle(
@@ -184,81 +188,7 @@ class _ChatScreenState extends State<ChatScreen> {
         ],
 
         // Chat List
-        Expanded(
-          child: ListView(
-            padding: EdgeInsets.zero,
-            children: [
-              const ConversationListItem(
-                displayName: 'Sarah Jenkins',
-                lastMessage: 'Are we still on for the meeting at 3 PM',
-                time: '10:45 AM',
-                avatarUrl: 'https://i.pravatar.cc/150?img=32',
-                colour: Color(0xFFC47C4D), // Orange/Brown ring
-                unreadCount: 2,
-                isPinned: true,
-                status: 1, // Online
-              ),
-              Divider(color: themeExtension.border, height: 1, indent: 90),
-              const ConversationListItem(
-                displayName: 'Design Team 🎨',
-                lastMessage: 'Alex: The new prototypes are looking',
-                time: '9:30 AM',
-                avatarUrl: 'https://i.pravatar.cc/150?img=47',
-                colour: Color(0xFF9B6A9C), // Purple ring
-                unreadCount: 2,
-                isMuted: true,
-                mentions: 2,
-                status: 0, // Offline
-              ),
-              Divider(color: themeExtension.border, height: 1, indent: 90),
-              const ConversationListItem(
-                displayName: 'Michael Chen',
-                lastMessage: '✓ Thanks for the feedback on the',
-                time: 'Yesterday',
-                avatarUrl: 'https://i.pravatar.cc/150?img=11',
-                colour: Colors.transparent,
-                status: 0,
-              ),
-              Divider(color: themeExtension.border, height: 1, indent: 90),
-              const ConversationListItem(
-                displayName: 'Project Nexus',
-                lastMessage: 'Update: Backend deployment',
-                time: 'Yesterday',
-                avatarUrl: 'https://i.pravatar.cc/150?img=60',
-                colour: Colors.transparent,
-                unreadCount: 5,
-                status: 1,
-              ),
-              Divider(color: themeExtension.border, height: 1, indent: 90),
-              const ConversationListItem(
-                displayName: 'Elena Rodriguez',
-                lastMessage: '✓ Can you send me the address again?',
-                time: 'Monday',
-                avatarUrl: 'https://i.pravatar.cc/150?img=5',
-                colour: Colors.transparent,
-                status: 1,
-              ),
-              Divider(color: themeExtension.border, height: 1, indent: 90),
-              const ConversationListItem(
-                displayName: 'David Wilson',
-                lastMessage: 'I will be a bit late to the party.',
-                time: 'Sunday',
-                avatarUrl: 'https://i.pravatar.cc/150?img=68',
-                colour: Colors.transparent,
-                status: 0,
-              ),
-              Divider(color: themeExtension.border, height: 1, indent: 90),
-              const ConversationListItem(
-                displayName: 'Family Chat 🏠',
-                lastMessage: 'Mom: Don\'t forget dinner on Saturday!',
-                time: 'Oct 24',
-                avatarUrl: 'https://i.pravatar.cc/150?img=16',
-                colour: Colors.transparent,
-                status: 0,
-              ),
-            ],
-          ),
-        ),
+        Expanded(child: _buildConversationList(themeExtension)),
 
         // Desktop Bottom "Mark all read" Action
         if (isDesktop) ...[
@@ -268,7 +198,8 @@ class _ChatScreenState extends State<ChatScreen> {
             child: Align(
               alignment: Alignment.centerRight,
               child: GestureDetector(
-                onTap: () {},
+                onTap: () =>
+                    ref.read(syncStatesProvider.notifier).markAllRead(),
                 child: const Text(
                   'Mark all read',
                   style: TextStyle(
@@ -347,5 +278,90 @@ class _ChatScreenState extends State<ChatScreen> {
         ),
       ),
     );
+  }
+
+  Widget _buildConversationList(AppColorScheme themeExtension) {
+    final syncStates = ref.watch(syncStatesProvider);
+
+    return syncStates.when(
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (error, stackTrace) => Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24.0),
+          child: Text(
+            'Could not load conversations.',
+            textAlign: TextAlign.center,
+            style: TextStyle(color: themeExtension.textInputColor),
+          ),
+        ),
+      ),
+      data: (rows) {
+        if (rows.isEmpty) {
+          return Center(
+            child: Text(
+              'No conversations yet',
+              style: TextStyle(color: themeExtension.textInputColor),
+            ),
+          );
+        }
+
+        return ListView(
+          padding: EdgeInsets.zero,
+          children: [
+            for (final row in rows) ...[
+              ConversationListItem(
+                displayName: row.displayName,
+                lastMessage: row.lastMessage ?? '',
+                time: _formatTime(row.updatedAt),
+                avatarUrl: row.avatar ?? '',
+                colour: _parseColour(row.colour),
+                unreadCount: row.unreadCount,
+                mentions: row.mentions,
+                isMuted: row.muted == 1,
+                isPinned: row.pinned == 1,
+                status: row.status,
+              ),
+              Divider(color: themeExtension.border, height: 1, indent: 90),
+            ],
+          ],
+        );
+      },
+    );
+  }
+
+  /// Parses a colour stored as "0xRRGGBB" or "#RRGGBB" into a [Color].
+  Color _parseColour(String value) {
+    var hex = value.trim().replaceAll('#', '').replaceAll('0x', '');
+    if (hex.length == 6) hex = 'FF$hex';
+    final parsed = int.tryParse(hex, radix: 16);
+    return parsed == null ? Colors.transparent : Color(parsed);
+  }
+
+  /// Formats an epoch-millis timestamp for the conversation list.
+  String _formatTime(int updatedAtMillis) {
+    final date = DateTime.fromMillisecondsSinceEpoch(updatedAtMillis);
+    final now = DateTime.now();
+    final startOfToday = DateTime(now.year, now.month, now.day);
+    final startOfDay = DateTime(date.year, date.month, date.day);
+    final daysAgo = startOfToday.difference(startOfDay).inDays;
+
+    if (daysAgo == 0) {
+      final hour = date.hour % 12 == 0 ? 12 : date.hour % 12;
+      final minute = date.minute.toString().padLeft(2, '0');
+      final period = date.hour >= 12 ? 'PM' : 'AM';
+      return '$hour:$minute $period';
+    }
+    if (daysAgo == 1) {
+      return 'Yesterday';
+    }
+    if (daysAgo < 7) {
+      const weekdays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+      return weekdays[date.weekday - 1];
+    }
+    const months = [
+      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+    ];
+    return '${months[date.month - 1]} ${date.day}';
   }
 }

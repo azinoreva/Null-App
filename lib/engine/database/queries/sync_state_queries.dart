@@ -23,6 +23,24 @@ class SyncStateDao extends DatabaseAccessor<AppDatabase>
         ]))
       .get();
 
+  // Watch every sync state row, ordered by pinned first, then updated_at
+  // descending. The stream re-emits whenever any row in `sync_state` is
+  // created, updated, or deleted, so UI state stays in sync with the table.
+  Stream<List<SyncStateData>> watchAllSyncStates() => (select(db.syncState)
+        ..orderBy([
+          (t) => OrderingTerm(expression: t.pinned, mode: OrderingMode.desc),
+          (t) => OrderingTerm(expression: t.updatedAt, mode: OrderingMode.desc),
+        ]))
+      .watch();
+
+  // Zero out the unread count for every conversation.
+  Future<void> markAllRead() async {
+    await (update(db.syncState)).write(SyncStateCompanion(
+      unreadCount: Value(0),
+      updatedAt: Value(DateTime.now().millisecondsSinceEpoch),
+    ));
+  }
+
   // Get sync states for a given conversation type.
   Future<List<SyncStateData>> getSyncStatesByType(int conversationType) =>
       (select(db.syncState)
