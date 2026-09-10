@@ -15,6 +15,13 @@ class SyncStateDao extends DatabaseAccessor<AppDatabase>
       (select(db.syncState)..where((t) => t.conversationId.equals(conversationId)))
           .getSingleOrNull();
 
+  // Watch a single sync state row. The stream re-emits whenever the row is
+  // inserted, updated, or deleted, so callers can react to `lastMessageId`
+  // and `draft` changes live.
+  Stream<SyncStateData?> watchSyncStateById(String conversationId) =>
+      (select(db.syncState)..where((t) => t.conversationId.equals(conversationId)))
+          .watchSingleOrNull();
+
   // Get all sync states, ordered by pinned first, then updated_at descending.
   Future<List<SyncStateData>> getAllSyncStates() => (select(db.syncState)
         ..orderBy([

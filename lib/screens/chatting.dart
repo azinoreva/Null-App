@@ -1,248 +1,251 @@
 import 'package:flutter/material.dart';
-import '../widgets/display/contact_menu.dart';
-import '../widgets/chats/chat_input_component.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../state/providers.dart';
 import '../widgets/chats/chat_bubble_component.dart';
+import '../widgets/chats/chat_input_component.dart';
 
+class Chatting extends ConsumerStatefulWidget {
+  final String conversationId;
+  final String displayName;
+  final String avatarUrl;
+  final int status;
+  final int conversationType;
 
-class ChatScreen extends StatefulWidget {
-  const ChatScreen({super.key});
+  const Chatting({
+    super.key,
+    required this.conversationId,
+    required this.displayName,
+    this.avatarUrl = '',
+    this.status = 0,
+    this.conversationType = 0,
+  });
 
   @override
-  State<ChatScreen> createState() => _ChatScreenState();
+  ConsumerState<Chatting> createState() => _ChattingState();
 }
 
-class _ChatScreenState extends State<ChatScreen> {
-  bool _isContactMenuVisible = false;
+class _ChattingState extends ConsumerState<Chatting> {
+  final ScrollController _scrollController = ScrollController();
+  int _lastItemCount = 0;
 
-  void _toggleContactMenu() {
-    setState(() {
-      _isContactMenuVisible = !_isContactMenuVisible;
-    });
+  bool get _isGroup => widget.conversationType == 1;
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  void _maybeScrollToBottom(int itemCount) {
+    if (_scrollController.hasClients && itemCount > _lastItemCount) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (_scrollController.hasClients) {
+          _scrollController.animateTo(
+            _scrollController.position.maxScrollExtent,
+            duration: const Duration(milliseconds: 250),
+            curve: Curves.easeOut,
+          );
+        }
+      });
+    }
+    _lastItemCount = itemCount;
+  }
+
+  Color _statusColor() {
+    switch (widget.status) {
+      case 1:
+        return const Color(0xFF2EB82E);
+      case 2:
+        return const Color(0xFFFFC107);
+      case 3:
+        return const Color(0xFFF44336);
+      case 0:
+      default:
+        return const Color(0xFFDEE1E6);
+    }
+  }
+
+  String _statusLabel() {
+    switch (widget.status) {
+      case 1:
+        return 'ACTIVE NOW';
+      case 2:
+        return 'AWAY';
+      case 3:
+        return 'BUSY';
+      case 0:
+      default:
+        return 'OFFLINE';
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
+    final colorScheme = Theme.of(context).colorScheme;
 
-    const senderAlex = SenderPresentation(
-      userId: 'alex_rivera',
-      displayName: 'Alex Rivera',
-    );
+    final messagesAsync = ref.watch(chatMessagesProvider(widget.conversationId));
+    final syncState =
+        ref.watch(conversationSyncStateProvider(widget.conversationId));
+    final draft = syncState.value?.draft ?? '';
 
     return Scaffold(
       backgroundColor: colorScheme.surface,
-      body: Stack(
+      body: Column(
         children: [
-          // Main Chat Interface Layout
-          Column(
-            children: [
-              // Header / App Bar
-              Container(
-                color: theme.appBarTheme.backgroundColor ?? colorScheme.surface,
-                padding: EdgeInsets.only(
-                  top: MediaQuery.paddingOf(context).top + 8,
-                  bottom: 12,
-                  left: 8,
-                  right: 8,
-                ),
-                child: Row(
-                  children: [
-                    IconButton(
-                      icon: Icon(Icons.arrow_back_ios_new_rounded, color: colorScheme.onSurface, size: 20),
-                      onPressed: () => Navigator.maybePop(context),
-                    ),
-                    const SizedBox(width: 4),
-                    Stack(
-                      children: [
-                        CircleAvatar(
-                          radius: 20,
-                          backgroundColor: colorScheme.primaryContainer,
-                          child: Text(
-                            'AR',
-                            style: TextStyle(
-                              color: colorScheme.onPrimaryContainer,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
-                        Positioned(
-                          right: 0,
-                          bottom: 0,
-                          child: Container(
-                            width: 10,
-                            height: 10,
-                            decoration: BoxDecoration(
-                              color: Colors.green,
-                              shape: BoxShape.circle,
-                              border: Border.all(color: colorScheme.surface, width: 2),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            senderAlex.displayName!,
-                            style: TextStyle(
-                              color: colorScheme.onSurface,
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          const SizedBox(height: 2),
-                          const Row(
-                            children: [
-                              Icon(Icons.circle, color: Colors.green, size: 6),
-                              SizedBox(width: 4),
-                              Text(
-                                'ACTIVE NOW',
-                                style: TextStyle(
-                                  color: Colors.green,
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w600,
-                                  letterSpacing: 0.5,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.notifications_none_rounded, color: Colors.green),
-                      onPressed: () {},
-                    ),
-                    // Ellipsis button triggers ContactMenu modal overlay
-                    IconButton(
-                      icon: Icon(Icons.more_vert_rounded, color: colorScheme.onSurface),
-                      onPressed: _toggleContactMenu,
-                    ),
-                  ],
-                ),
-              ),
-
-              // Chat Messages Feed
-              Expanded(
-                child: ListView(
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                  children: [
-                    Center(
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-                        decoration: BoxDecoration(
-                          color: colorScheme.surfaceContainerHigh,
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Text(
-                          'Today',
-                          style: TextStyle(
-                            color: colorScheme.onSurfaceVariant,
-                            fontSize: 12,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-
-                    ChatBubbleComponent(
-                      message: ChatMessageItem(
-                        id: 'msg_1',
-                        isMe: false,
-                        chatType: ChatType.individual,
-                        sender: senderAlex,
-                        content: 'Hey! Did you check out that new design resource I mentioned earlier? 🎨',
-                        timestamp: '10:24 AM',
-                      ),
-                    ),
-
-                    const ChatBubbleComponent(
-                      message: ChatMessageItem(
-                        id: 'msg_2',
-                        isMe: true,
-                        chatType: ChatType.individual,
-                        content: "Not yet, but send me the link! I'm actually looking for some inspiration for the new project.",
-                        timestamp: '10:26 AM',
-                        deliveryStatus: DeliveryStatus.read,
-                      ),
-                    ),
-
-                    ChatBubbleComponent(
-                      message: ChatMessageItem(
-                        id: 'msg_3',
-                        isMe: false,
-                        chatType: ChatType.individual,
-                        sender: senderAlex,
-                        content: 'Here it is! Their component library is absolutely stunning. Let me know what you think about the dark mode implementation.',
-                        timestamp: '10:27 AM',
-                      ),
-                    ),
-
-                    const ChatBubbleComponent(
-                      message: ChatMessageItem(
-                        id: 'msg_4',
-                        isMe: true,
-                        chatType: ChatType.individual,
-                        content: 'Wow, this is exactly what we need. The typography hierarchy is spot on! Thanks for sharing this mate. 🙌',
-                        timestamp: '10:30 AM',
-                        deliveryStatus: DeliveryStatus.read,
-                      ),
-                    ),
-
-                    Padding(
-                      padding: const EdgeInsets.only(left: 16, top: 4),
-                      child: Text(
-                        '•••  Alex is typing...',
-                        style: TextStyle(
-                          color: colorScheme.onSurfaceVariant,
-                          fontSize: 12,
-                          fontStyle: FontStyle.italic,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-
-              // Chat Input Component
-              ChatInput(
-                groupMembers: const [senderAlex],
-                onSendMessage: (text, mediaType, {mediaUrl}) {},
-              ),
-            ],
+          _buildHeader(context, colorScheme),
+          Expanded(child: _buildMessages(context, colorScheme, messagesAsync)),
+          ChatInput(
+            initialText: draft,
+            onTextChanged: (text) => ref
+                .read(syncStateDaoProvider)
+                .updateDraft(widget.conversationId, text),
+            groupMembers: const [],
+            onSendMessage: (text, mediaType, {mediaUrl}) {},
           ),
-
-          // Contact Menu Overlay Modal
-          if (_isContactMenuVisible) ...[
-            Positioned.fill(
-              child: GestureDetector(
-                onTap: _toggleContactMenu,
-                behavior: HitTestBehavior.opaque,
-                child: Container(
-                  color: Colors.black38,
-                ),
-              ),
-            ),
-            Positioned(
-              top: MediaQuery.paddingOf(context).top + 56,
-              right: 16,
-              child: ContactMenu(
-                onPhoneTap: _toggleContactMenu,
-                onVideoTap: _toggleContactMenu,
-                onLocationTap: _toggleContactMenu,
-                onMediaTap: _toggleContactMenu,
-                onSearchTap: _toggleContactMenu,
-              ),
-            ),
-          ],
         ],
       ),
+    );
+  }
+
+  Widget _buildHeader(BuildContext context, ColorScheme colorScheme) {
+    final initials = widget.displayName.isNotEmpty
+        ? widget.displayName
+            .trim()
+            .split(' ')
+            .where((w) => w.isNotEmpty)
+            .map((w) => w[0])
+            .take(2)
+            .join()
+            .toUpperCase()
+        : (_isGroup ? 'G' : 'U');
+
+    return Container(
+      color: colorScheme.surface,
+      padding: const EdgeInsets.only(top: 8, bottom: 12, left: 8, right: 8),
+      child: Row(
+        children: [
+          IconButton(
+            icon: Icon(Icons.arrow_back_ios_new_rounded,
+                color: colorScheme.onSurface, size: 20),
+            onPressed: () => Navigator.maybePop(context),
+          ),
+          const SizedBox(width: 4),
+          Stack(
+            children: [
+              CircleAvatar(
+                radius: 20,
+                backgroundColor: colorScheme.primaryContainer,
+                backgroundImage: widget.avatarUrl.isNotEmpty
+                    ? NetworkImage(widget.avatarUrl)
+                    : null,
+                child: Text(
+                  initials,
+                  style: TextStyle(
+                    color: colorScheme.onPrimaryContainer,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+              if (!_isGroup)
+                Positioned(
+                  right: 0,
+                  bottom: 0,
+                  child: Container(
+                    width: 10,
+                    height: 10,
+                    decoration: BoxDecoration(
+                      color: _statusColor(),
+                      shape: BoxShape.circle,
+                      border:
+                          Border.all(color: colorScheme.surface, width: 2),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  widget.displayName,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: colorScheme.onSurface,
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Row(
+                  children: [
+                    Icon(Icons.circle, color: _statusColor(), size: 6),
+                    const SizedBox(width: 4),
+                    Text(
+                      _statusLabel(),
+                      style: TextStyle(
+                        color: _statusColor(),
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          IconButton(
+            icon: const Icon(Icons.notifications_none_rounded,
+                color: Colors.green),
+            onPressed: () {},
+          ),
+          IconButton(
+            icon: Icon(Icons.more_vert_rounded, color: colorScheme.onSurface),
+            onPressed: () {},
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMessages(
+    BuildContext context,
+    ColorScheme colorScheme,
+    AsyncValue<List<ChatMessageItem>> messagesAsync,
+  ) {
+    return messagesAsync.when(
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (error, stackTrace) => Center(
+        child: Text(
+          'Could not load messages.',
+          style: TextStyle(color: colorScheme.onSurfaceVariant),
+        ),
+      ),
+      data: (items) {
+        if (items.isEmpty) {
+          return Center(
+            child: Text(
+              'No messages yet',
+              style: TextStyle(color: colorScheme.onSurfaceVariant),
+            ),
+          );
+        }
+
+        _maybeScrollToBottom(items.length);
+
+        return ListView.builder(
+          controller: _scrollController,
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          itemCount: items.length,
+          itemBuilder: (context, index) =>
+              ChatBubbleComponent(message: items[index]),
+        );
+      },
     );
   }
 }

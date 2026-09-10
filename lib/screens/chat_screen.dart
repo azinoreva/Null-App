@@ -5,6 +5,8 @@ import '../widgets/app_theme.dart';
 import '../widgets/display/conversation_card.dart';
 import '../widgets/display/navigation.dart';
 import '../state/providers.dart';
+import '../utils/formatting.dart';
+import 'chatting.dart';
 import 'contacts_screen.dart';
 
 class ChatScreen extends ConsumerStatefulWidget {
@@ -309,17 +311,32 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
           padding: EdgeInsets.zero,
           children: [
             for (final row in rows) ...[
-              ConversationListItem(
-                displayName: row.displayName,
-                lastMessage: row.lastMessage ?? '',
-                time: _formatTime(row.updatedAt),
-                avatarUrl: row.avatar ?? '',
-                colour: _parseColour(row.colour),
-                unreadCount: row.unreadCount,
-                mentions: row.mentions,
-                isMuted: row.muted == 1,
-                isPinned: row.pinned == 1,
-                status: row.status,
+              GestureDetector(
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => Chatting(
+                        conversationId: row.conversationId,
+                        displayName: row.displayName,
+                        avatarUrl: row.avatar ?? '',
+                        status: row.status,
+                        conversationType: row.conversationType,
+                      ),
+                    ),
+                  );
+                },
+                child: ConversationListItem(
+                  displayName: row.displayName,
+                  lastMessage: row.lastMessage ?? '',
+                  time: formatChatTime(row.updatedAt),
+                  avatarUrl: row.avatar ?? '',
+                  colour: parseHexColour(row.colour),
+                  unreadCount: row.unreadCount,
+                  mentions: row.mentions,
+                  isMuted: row.muted == 1,
+                  isPinned: row.pinned == 1,
+                  status: row.status,
+                ),
               ),
               Divider(color: themeExtension.border, height: 1, indent: 90),
             ],
@@ -327,41 +344,5 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         );
       },
     );
-  }
-
-  /// Parses a colour stored as "0xRRGGBB" or "#RRGGBB" into a [Color].
-  Color _parseColour(String value) {
-    var hex = value.trim().replaceAll('#', '').replaceAll('0x', '');
-    if (hex.length == 6) hex = 'FF$hex';
-    final parsed = int.tryParse(hex, radix: 16);
-    return parsed == null ? Colors.transparent : Color(parsed);
-  }
-
-  /// Formats an epoch-millis timestamp for the conversation list.
-  String _formatTime(int updatedAtMillis) {
-    final date = DateTime.fromMillisecondsSinceEpoch(updatedAtMillis);
-    final now = DateTime.now();
-    final startOfToday = DateTime(now.year, now.month, now.day);
-    final startOfDay = DateTime(date.year, date.month, date.day);
-    final daysAgo = startOfToday.difference(startOfDay).inDays;
-
-    if (daysAgo == 0) {
-      final hour = date.hour % 12 == 0 ? 12 : date.hour % 12;
-      final minute = date.minute.toString().padLeft(2, '0');
-      final period = date.hour >= 12 ? 'PM' : 'AM';
-      return '$hour:$minute $period';
-    }
-    if (daysAgo == 1) {
-      return 'Yesterday';
-    }
-    if (daysAgo < 7) {
-      const weekdays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-      return weekdays[date.weekday - 1];
-    }
-    const months = [
-      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
-    ];
-    return '${months[date.month - 1]} ${date.day}';
   }
 }

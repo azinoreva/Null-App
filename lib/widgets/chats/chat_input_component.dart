@@ -9,6 +9,8 @@ class ChatInput extends StatefulWidget {
   final VoidCallback? onAttachmentTap;
   final VoidCallback? onEmojiTap;
   final bool isDisabled;
+  final String initialText;
+  final ValueChanged<String>? onTextChanged;
 
   const ChatInput({
     super.key,
@@ -19,6 +21,8 @@ class ChatInput extends StatefulWidget {
     this.onAttachmentTap,
     this.onEmojiTap,
     this.isDisabled = false,
+    this.initialText = '',
+    this.onTextChanged,
   });
 
   @override
@@ -36,12 +40,27 @@ class _ChatInputState extends State<ChatInput> {
   @override
   void initState() {
     super.initState();
+    if (widget.initialText.isNotEmpty) {
+      _controller.text = widget.initialText;
+    }
     _controller.addListener(_handleTextChange);
+  }
+
+  @override
+  void didUpdateWidget(ChatInput oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Only adopt an externally supplied draft while the user isn't actively
+    // typing, so we never fight the cursor while they edit.
+    if (widget.initialText != oldWidget.initialText && !_focusNode.hasFocus) {
+      _controller.text = widget.initialText;
+    }
   }
 
   void _handleTextChange() {
     final text = _controller.text;
     final selection = _controller.selection;
+
+    widget.onTextChanged?.call(text);
 
     if (selection.baseOffset < 0) return;
 
@@ -126,7 +145,7 @@ class _ChatInputState extends State<ChatInput> {
                 border: Border.all(color: borderColor),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.3),
+                    color: Colors.black.withValues(alpha: 0.3),
                     blurRadius: 8.0,
                     offset: const Offset(0, -2),
                   ),
@@ -202,7 +221,7 @@ class _ChatInputState extends State<ChatInput> {
 
           // Container Bar (71px height from CSS spec)
           Container(
-            minHeight: 71.0,
+            constraints: const BoxConstraints(minHeight: 71.0),
             padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 13.0),
             decoration: const BoxDecoration(
               color: containerBg,

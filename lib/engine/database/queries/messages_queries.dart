@@ -83,6 +83,60 @@ class MessagesDao extends DatabaseAccessor<AppDatabase>
             ..limit(1))
           .getSingleOrNull();
 
+  // Get the last [limit] messages of a conversation, highest message_order
+  // first. Used as a fallback when there is no last message id to anchor on.
+  Future<List<Message>> getLastMessages(
+    String conversationId, {
+    int limit = 20,
+  }) =>
+      (select(db.messages)
+            ..where((t) => t.conversationId.equals(conversationId))
+            ..orderBy([
+              (t) => OrderingTerm(
+                expression: t.messageOrder,
+                mode: OrderingMode.desc,
+              ),
+            ])
+            ..limit(limit))
+          .get();
+
+  // Get up to [limit] messages with message_order <= [maxOrder], highest
+  // message_order first. Returns descending; callers reverse for display.
+  Future<List<Message>> getMessagesBeforeOrder(
+    String conversationId,
+    int maxOrder, {
+    int limit = 20,
+  }) =>
+      (select(db.messages)
+            ..where(
+              (t) =>
+                  t.conversationId.equals(conversationId) &
+                  t.messageOrder.isSmallerOrEqualValue(maxOrder),
+            )
+            ..orderBy([
+              (t) => OrderingTerm(
+                expression: t.messageOrder,
+                mode: OrderingMode.desc,
+              ),
+            ])
+            ..limit(limit))
+          .get();
+
+  // Get every message with message_order > [minOrder], ascending. Used to
+  // append only the new messages after the last one already loaded.
+  Future<List<Message>> getMessagesAfterOrder(
+    String conversationId,
+    int minOrder,
+  ) =>
+      (select(db.messages)
+            ..where(
+              (t) =>
+                  t.conversationId.equals(conversationId) &
+                  t.messageOrder.isBiggerThanValue(minOrder),
+            )
+            ..orderBy([(t) => OrderingTerm(expression: t.messageOrder)]))
+          .get();
+
   // Find messages with a specific status (useful for sync).
   Future<List<Message>> getMessagesByStatus(
     String conversationId,
