@@ -23,14 +23,16 @@
 // ---------------------------------------------------------------------
 // Each task-executing worker isolate is a fresh isolate, so it can only
 // call TOP-LEVEL or STATIC functions -- no closures, no instance methods
-// bound to some object that only exists on the main isolate. Your
-// functions_list.dart should expose something like:
+// bound to some object that only exists on the main isolate.
+// `IsolateTaskExecutor` and `TaskDefinition` are defined below in this
+// file; functions_list.dart imports them and provides the map:
 //
-//   typedef IsolateTaskExecutor = Future<void> Function(TaskPayload payload);
+//   import 'task_engine.dart';
 //
-//   final Map<String, IsolateTaskExecutor> functionRegistry = {
-//     'sendMessage': _sendMessage,
-//     'uploadFile': _uploadFile,
+//   final Map<String, TaskDefinition> functionRegistry = {
+//     'sendMessage': TaskDefinition(kind: TaskKind.network, executor: _sendMessage),
+//     'uploadFile':  TaskDefinition(kind: TaskKind.network, executor: _uploadFile),
+//     'cleanupCache': TaskDefinition(kind: TaskKind.nonNetwork, executor: _cleanupCache),
 //     // ...
 //   };
 //
@@ -40,10 +42,37 @@
 //     ...
 //   }
 //
+// The function declares its own kind right there at registration -- that's
+// the single source of truth. TaskQueue.queueTask looks this up at enqueue
+// time and stamps it onto the row's `taskType` column, so the engine's
+// claim query never has to consult the registry at runtime.
+//
 // `TaskPayload` (defined below) is the isolate-safe replacement for the
 // old `TaskArguments` -- same `get<T>()` / `getBlob()` idea, just without
 // a dependency on the drift row type, since that has to cross an isolate
 // boundary as plain data.
+//
+// ---------------------------------------------------------------------
+// Network state
+// ---------------------------------------------------------------------
+// The engine isolate does NOT run its own NetworkStateManager -- that
+// class talks to connectivity_plus and SharedPreferences, both of which
+// need platform channels that aren't available on a background isolate
+// without extra setup (BackgroundIsolateBinaryMessenger + a
+// RootIsolateToken). Simpler: keep the one NetworkStateManager you
+// already have on the main isolate, and relay its state into the engine:
+//
+//   final networkManager = NetworkStateManager(preferences: prefs);
+//   await networkManager.start();
+//
+//   final engine = await TaskEngine.start(
+//     dbPath: dbPath,
+//     initiallyOnline: networkManager.isOnline,
+//   );
+//
+//   networkManager.stateChanges.listen(
+//     (state) => engine.updateNetworkState(state == NetworkState.online),
+//   );
 //
 // ---------------------------------------------------------------------
 // A couple of things worth double-checking against your actual project
@@ -81,6 +110,22 @@ const int kMaxConcurrentIsolates = 3;
 const Duration kSlowTaskThreshold = Duration(seconds: 2);
 const Duration kHardIsolateTimeout = Duration(seconds: 10);
 const int kMaxRetries = 10000;
+
+/// Shared contract type: what every entry in functions_list.dart's
+/// `functionRegistry` map looks like.
+typedef IsolateTaskExecutor = Future<void> Function(TaskPayload payload);
+
+/// Pairs an executor with the network kind it was registered under. The
+/// kind is read once, at enqueue time (see TaskQueue.queueTask), and
+/// stamped onto the row -- the engine's claim query never re-derives it.
+class TaskDefinition {
+  const TaskDefinition({required this.kind, required this.executor});
+
+  /// One of [TaskKind.network] / [TaskKind.nonNetwork] (from
+  /// tasks_queries.dart).
+  final int kind;
+  final IsolateTaskExecutor executor;
+}
 
 /// What an executor function in functions_list.dart actually receives.
 /// Deliberately plain data -- no drift row objects, no closures -- since
@@ -141,12 +186,21 @@ class TaskEngine {
   /// Spawns the engine isolate, waits for it to come up, does an initial
   /// crash-recovery + ping so anything left undone from a previous run
   /// gets picked up immediately.
-  static Future<TaskEngine> start({required String dbPath}) async {
+  ///
+  /// [initiallyOnline] should reflect whatever your NetworkStateManager
+  /// already knows at this point in app startup. It defaults to false
+  /// (network tasks frozen) so the engine never fires off network work
+  /// before you've told it connectivity is actually confirmed -- call
+  /// [updateNetworkState] as soon as you know better.
+  static Future<TaskEngine> start({
+    required String dbPath,
+    bool initiallyOnline = false,
+  }) async {
     final readyPort = ReceivePort();
 
     final isolate = await Isolate.spawn(
       _engineEntryPoint,
-      _EngineInit(readyPort.sendPort, dbPath),
+      _EngineInit(readyPort.sendPort, dbPath, initiallyOnline),
       debugName: 'task_engine',
     );
 
@@ -164,6 +218,14 @@ class TaskEngine {
   /// they don't stack up or start parallel drains.
   void ping() => _toEngine.send(const _Ping());
 
+  /// Tell the engine whether the network is currently reachable. Wire this
+  /// up to your NetworkStateManager's stream (see the contract note at the
+  /// top of this file) -- every call re-checks the queue, so a
+  /// false -> true transition immediately unfreezes any waiting network
+  /// tasks instead of waiting for the next unrelated ping.
+  void updateNetworkState(bool online) =>
+      _toEngine.send(_NetworkStateChanged(online));
+
   void dispose() {
     _toEngine.send(const _Shutdown());
     _isolate.kill(priority: Isolate.immediate);
@@ -171,9 +233,10 @@ class TaskEngine {
 }
 
 class _EngineInit {
-  const _EngineInit(this.readyPort, this.dbPath);
+  const _EngineInit(this.readyPort, this.dbPath, this.initiallyOnline);
   final SendPort readyPort;
   final String dbPath;
+  final bool initiallyOnline;
 }
 
 class _Ping {
@@ -184,19 +247,29 @@ class _Shutdown {
   const _Shutdown();
 }
 
+class _NetworkStateChanged {
+  const _NetworkStateChanged(this.online);
+  final bool online;
+}
+
 /// -----------------------------------------------------------------------
 /// EVERYTHING BELOW RUNS INSIDE THE ENGINE ISOLATE.
 /// -----------------------------------------------------------------------
 
 void _engineEntryPoint(_EngineInit init) {
   final controlPort = ReceivePort();
-  final worker = _EngineWorker(dbPath: init.dbPath);
+  final worker = _EngineWorker(
+    dbPath: init.dbPath,
+    initiallyOnline: init.initiallyOnline,
+  );
 
   init.readyPort.send(controlPort.sendPort);
 
   controlPort.listen((message) {
     if (message is _Ping) {
       worker.ping();
+    } else if (message is _NetworkStateChanged) {
+      worker.setOnline(message.online);
     } else if (message is _Shutdown) {
       controlPort.close();
       worker.dispose();
@@ -205,8 +278,9 @@ void _engineEntryPoint(_EngineInit init) {
 }
 
 class _EngineWorker {
-  _EngineWorker({required String dbPath})
-      : database = AppDatabase(NativeDatabase(File(dbPath))) {
+  _EngineWorker({required String dbPath, required bool initiallyOnline})
+      : database = AppDatabase(NativeDatabase(File(dbPath))),
+        _isOnline = initiallyOnline {
     // Anything left "inProgress" from a previous run (crash, force-quit,
     // etc.) couldn't possibly still be running -- put it back in the
     // pending pool before we do anything else.
@@ -217,6 +291,16 @@ class _EngineWorker {
 
   bool _processing = false;
   bool _pingedAgain = false;
+  bool _isOnline;
+
+  /// Updates the connectivity flag the claim query gates on, then re-pings
+  /// so a false -> true flip immediately picks up any network tasks that
+  /// were sitting frozen. A true -> false flip doesn't touch anything
+  /// already running -- see the file header note on in-flight tasks.
+  void setOnline(bool online) {
+    _isOnline = online;
+    ping();
+  }
 
   void ping() {
     if (_processing) {
@@ -294,10 +378,14 @@ class _EngineWorker {
 
   Future<_TaskClaim?> _claimNextTask() async {
     // getNextPendingTask() orders fresh work (retrys = 0) ahead of any
-    // retries, and only returns a retry when no fresh task exists -- see
-    // tasks_queries.dart. That ordering is what enforces "retries always
-    // go to the back of the queue".
-    final row = await database.tasksDao.getNextPendingTask();
+    // retries, and network tasks ahead of non-network within each of
+    // those tiers -- see tasks_queries.dart. Passing _isOnline is what
+    // freezes network tasks out of the candidate set entirely while
+    // offline; it's re-read on every call, so a mid-drain state flip
+    // takes effect on the very next claim.
+    final row = await database.tasksDao.getNextPendingTask(
+      networkAvailable: _isOnline,
+    );
     if (row == null) return null;
 
     final claimed = await database.tasksDao.claimTask(row.taskId);
@@ -487,9 +575,9 @@ class _WorkerResult {
 /// reports success/failure back to the engine isolate.
 void _workerEntryPoint(_WorkerRequest req) async {
   try {
-    final executor = functions.functionRegistry[req.functionName];
+    final definition = functions.functionRegistry[req.functionName];
 
-    if (executor == null) {
+    if (definition == null) {
       req.replyPort.send(_WorkerResult.failure(
         req.taskId,
         'No executor registered for "${req.functionName}".',
@@ -506,7 +594,7 @@ void _workerEntryPoint(_WorkerRequest req) async {
       taskData: req.taskData,
     );
 
-    await executor(payload);
+    await definition.executor(payload);
     req.replyPort.send(_WorkerResult.success(req.taskId));
   } catch (error, stackTrace) {
     req.replyPort.send(_WorkerResult.failure(req.taskId, '$error\n$stackTrace'));

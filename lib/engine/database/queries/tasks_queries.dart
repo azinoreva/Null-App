@@ -13,6 +13,15 @@ class TaskStatus {
   static const int cancelled = 4;
 }
 
+/// What `taskType` on a row means. Set once at enqueue time (see
+/// TaskQueue.queueTask) by looking up the function's declared kind in
+/// functions_list.dart -- the function defines what it is, callers don't
+/// choose it per-call.
+class TaskKind {
+  static const int nonNetwork = 0;
+  static const int network = 1;
+}
+
 /// Data Access Object for the `Tasks` table.
 @DriftAccessor(tables: [Tasks])
 class TasksDao extends DatabaseAccessor<AppDatabase> with _$TasksDaoMixin {
@@ -60,22 +69,34 @@ class TasksDao extends DatabaseAccessor<AppDatabase> with _$TasksDaoMixin {
 
   /// The single next task the engine should work on.
   ///
-  /// This is the piece that implements "retries always go to the back of
-  /// the queue, fresh tasks always go first": pending tasks are ordered by
-  /// retry count ascending, then by creation time. A task with retrys = 0
-  /// will always be returned before ANY task with retrys > 0, no matter
-  /// how long that retrying task has been waiting. Only once every fresh
-  /// (retrys = 0) task is gone does this start returning retries, oldest
-  /// (i.e. least-retried, then longest-waiting) first.
-  Future<Task?> getNextPendingTask() {
-    return (select(db.tasks)
-          ..where((t) => t.taskStatus.equals(TaskStatus.pending))
-          ..orderBy([
-            (t) => OrderingTerm(expression: t.retryCount),
-            (t) => OrderingTerm(expression: t.createdAt),
-          ])
-          ..limit(1))
-        .getSingleOrNull();
+  /// Two rules stack here:
+  ///
+  /// 1. Fresh before retry, always: pending tasks are ordered by retry
+  ///    count ascending first. A task with retrys = 0 is always returned
+  ///    before ANY task with retrys > 0, no matter how long that retrying
+  ///    task has been waiting.
+  /// 2. Network before non-network, as a tiebreaker within each of those
+  ///    retry tiers: among equally-fresh (or equally-retried) tasks, the
+  ///    network one goes first.
+  ///
+  /// [networkAvailable] gates rule 2 entirely: when false, network tasks
+  /// are excluded from the candidate set altogether ("frozen") and only
+  /// non-network work is returned, regardless of retry count.
+  Future<Task?> getNextPendingTask({required bool networkAvailable}) {
+    final query = select(db.tasks)
+      ..where((t) {
+        final isPending = t.taskStatus.equals(TaskStatus.pending);
+        if (networkAvailable) return isPending;
+        return isPending & t.taskType.equals(TaskKind.nonNetwork);
+      })
+      ..orderBy([
+        (t) => OrderingTerm(expression: t.retryCount),
+        (t) => OrderingTerm(expression: t.taskType, mode: OrderingMode.desc),
+        (t) => OrderingTerm(expression: t.createdAt),
+      ])
+      ..limit(1);
+
+    return query.getSingleOrNull();
   }
 
   // ---------------------------------------------------------------------
