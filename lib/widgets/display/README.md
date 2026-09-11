@@ -1,0 +1,9 @@
+# `lib/widgets/display` — Display / Container Components
+
+| File | Purpose |
+|---|---|
+| `icon.dart` | `AppLogoIcon` — wraps `Image.asset` to show the themed app logo: `assets/images/dark_image_trans_icon.png` in dark mode, `light_image_trans_icon.png` in light mode. Honors width/height/`BoxFit` (`Image.asset` params). |
+| `navigation.dart` | App navigation. `NavigationTab` enum lists all destinations (`alerts`, `chats`, `contacts`, `groups`, `updates`, `settings`, `profile`). `AdaptiveNavigationShell` wraps a child and renders either a desktop `_DesktopSideNav` (80px left rail with all tabs + profile avatar) or the mobile `_MobileBottomNav` (72px bar: Chats / Contacts / Updates), switching at width ≥600px or landscape. Active tab uses the brand-green `haloRing` colour. Used by `ChatScreen` and `ContactsScreen`. |
+| `conversation_card.dart` | `ConversationListItem` — the chat-list row (85px): 64px avatar with a coloured outer ring, status dot (online/away/busy/offline), display name with inline status icons (pinned push-pin, muted bell, mentions counter), one-line last-message preview, and trailing time label + green unread badge (caps at "99+"). Used in `ChatScreen` for every conversation from `syncStatesProvider`. |
+| `contact_card.dart` | `ContactCard` — bordered list-tile-style card: 44px avatar with online/offline status dot, bold name, optional subtitle. Parses the `"Name - Title"` convention from its display name. Rendered by `ContactsListScreen`. |
+| `contact_menu.dart` | `ContactMenu` — slim vertical floating action menu (48×275px, dark `#23272F` with shadow) with five green icon buttons: call, video call, location, media, and search — each with a tooltip and optional tap callback (defaults to `debugPrint` stub). |
