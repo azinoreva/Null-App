@@ -1,4 +1,6 @@
 import 'package:uuid/uuid.dart';
+import 'package:drift/drift.dart';
+import '../../database/app_database.dart';
 import '../../database/queries/connection_requests_queries.dart';
 
 const _uuid = Uuid();
@@ -48,12 +50,5 @@ Future<void> rejectConnectionRequest(
   await dao.rejectRequest(requestId);
 
   final now = DateTime.now().millisecondsSinceEpoch;
-  final allRequests = await dao.db.select(dao.db.connectionRequests).get();
-
-  for (final request in allRequests) {
-    final expiresAt = request.expiresAt;
-    if (expiresAt != null && now - expiresAt > _thirtyDaysMs) {
-      await dao.deleteRequest(request.requestId);
-    }
-  }
+  await dao.rejectExpiredRequests(currentTime: now - _thirtyDaysMs);
 }

@@ -59,7 +59,7 @@ class GroupKeyEnvelopeCrypto {
 
   static final AesGcm _aes = AesGcm.with256bits();
 
-  static const List<int> _info = [
+  static final List<int> _info = [
     ...utf8.encode('NULL-GROUP-KEY-WRAP-v1'),
   ];
 

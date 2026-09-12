@@ -74,9 +74,9 @@ class TaskQueue {
       TasksCompanion.insert(
         taskId: taskId,
         taskType: definition.kind, // TaskKind.network / TaskKind.nonNetwork
-        taskStatus: TaskStatus.pending,
+        taskStatus: Value(TaskStatus.pending),
         functionName: functionName,
-        functionArgs: jsonEncode(encodedArguments),
+        functionArgs: Value(jsonEncode(encodedArguments)),
         blobparam1: Value(blobs[0]),
         blobparam2: Value(blobs[1]),
         blobparam3: Value(blobs[2]),

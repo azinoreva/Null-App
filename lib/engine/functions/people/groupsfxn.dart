@@ -4,6 +4,7 @@ import 'dart:typed_data';
 import 'package:drift/drift.dart';
 import 'package:uuid/uuid.dart';
 
+import '../../database/app_database.dart';
 import '../../database/queries/groups_queries.dart';
 import '../../database/queries/identity_queries.dart';
 import '../../crypto/groups/group_key.dart';
@@ -22,7 +23,7 @@ const _uuid = Uuid();
 /// - Public groups are rejected, since only the server owner can create them.
 /// - Avatar: pass [avatarFileUrl] to compress a real image, or omit it to
 ///   generate a Dicebear avatar seeded with the new groupId.
-Future<Groups> createGroup(
+Future<Group> createGroup(
   GroupsDao groupsDao,
   IdentityDao identityDao, {
   required String groupName,

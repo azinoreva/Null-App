@@ -2,6 +2,7 @@
 
 import 'package:drift/drift.dart';
 
+import '../../database/app_database.dart';
 import '../../database/queries/servers_queries.dart';
 import 'server_colour.dart';
 import '../../network/servers/servers.dart'; // ServerDirectoryService, ServerInfo, ServerListResponse
@@ -33,7 +34,7 @@ Future<void> createServer(
     maxPayload: Value(maxPayload),
     capabilities: Value(capabilities),
     colour: Value(colour),
-    mediaLastReset: Value(DateTime.now()),
+    mediaLastReset: DateTime.now(),
     totalMediaSent: const Value(0),
   );
 

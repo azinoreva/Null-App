@@ -76,18 +76,8 @@ class ContactImageCompressor {
         targetBytes = (allowedBase64Chars * 3 / 4).floor();
       }
 
-      // 4. Compress using WebP with progressive quality reduction
-      int quality = 85; // WebP quality range: 0–100 (higher = better)
-      List<int> compressedBytes = [];
-
-      while (quality > 0) {
-        compressedBytes = img.encodeWebP(resizedImage, quality: quality);
-
-        if (compressedBytes.length <= targetBytes) {
-          break; // Fits budget
-        }
-        quality -= 5; // Reduce quality step by step
-      }
+      // 4. Compress using WebP.
+      final compressedBytes = img.encodeWebP(resizedImage);
 
       // 5. If even the lowest quality does not fit, fail gracefully
       if (compressedBytes.length > targetBytes) {

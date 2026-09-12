@@ -2,7 +2,6 @@
 
 import 'package:drift/drift.dart';
 import '../app_database.dart';
-import 'dart:typed_data';
 
 import '../tables/sessions.dart';
 
@@ -14,15 +13,15 @@ class SessionsDao extends DatabaseAccessor<AppDatabase>
     with _$SessionsDaoMixin {
   SessionsDao(super.db);
 
-  Future<Sessions?> getSessionByConversationId(String conversationId) =>
+  Future<Session?> getSessionByConversationId(String conversationId) =>
       (select(db.sessions)
             ..where((t) => t.conversationId.equals(conversationId)))
           .getSingleOrNull();
 
-  Future<int> insertSession(Insertable<Sessions> session) =>
+  Future<int> insertSession(Insertable<Session> session) =>
       into(db.sessions).insert(session);
 
-  Future<void> upsertSession(Sessions session) =>
+  Future<void> upsertSession(Insertable<Session> session) =>
       into(db.sessions).insertOnConflictUpdate(session);
 
   Future<int> deleteSession(String conversationId) =>
@@ -48,9 +47,7 @@ class SessionsDao extends DatabaseAccessor<AppDatabase>
         status: const Value(0),
         createdAt: now,
         updatedAt: now,
-      ).toCompanion(true).copyWith(
-            conversationId: Value(conversationId),
-          ) as SessionsCompanion,
+      ),
     );
   }
 

@@ -14,7 +14,7 @@ import 'tables/tasks.dart';
 import 'tables/shamirs_secret.dart';
 import 'tables/secret_share.dart';
 import 'tables/sync_state.dart';
-
+import 'tables/sessions.dart';
 // Import all DAO files
 import 'queries/identity_queries.dart';
 import 'queries/servers_queries.dart';
@@ -29,6 +29,7 @@ import 'queries/tasks_queries.dart';
 import 'queries/shamirs_secret_queries.dart';
 import 'queries/secret_share_queries.dart';
 import 'queries/sync_state_queries.dart';
+import 'queries/sessions_queries.dart';
 
 part 'app_database.g.dart';
 
@@ -48,6 +49,7 @@ part 'app_database.g.dart';
     ShamirsSecret,
     SecretShare,
     SyncState,
+    Sessions,
   ],
   daos: [
     IdentityDao,
@@ -64,13 +66,14 @@ part 'app_database.g.dart';
     ShamirsSecretDao,
     SecretShareDao,
     SyncStateDao,
+    SessionsDao,
   ],
 )
 class AppDatabase extends _$AppDatabase {
   AppDatabase(super.executor);
 
   @override
-  int get schemaVersion => 3;
+  int get schemaVersion => 4;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -88,6 +91,9 @@ class AppDatabase extends _$AppDatabase {
           }
           if (from < 3) {
             await m.addColumn(messages, messages.decryptedMessage);
+          }
+          if (from < 4) {
+            await m.createTable(sessions);
           }
         },
 
@@ -243,6 +249,12 @@ class AppDatabase extends _$AppDatabase {
     await customStatement(
       'CREATE INDEX IF NOT EXISTS idx_group_members_identity '
       'ON group_members(identity_id);',
+    );
+
+    // Sessions: pending/confirming handshake lookups.
+    await customStatement(
+      'CREATE INDEX IF NOT EXISTS idx_sessions_status '
+      'ON sessions(status);',
     );
   }
 }

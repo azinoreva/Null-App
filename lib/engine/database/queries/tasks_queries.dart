@@ -150,7 +150,6 @@ class TasksDao extends DatabaseAccessor<AppDatabase> with _$TasksDaoMixin {
         .write(TasksCompanion(
       taskStatus: const Value(TaskStatus.completed),
       completedAt: Value(now),
-      completed: const Value(1),
       updatedAt: Value(now),
     ));
   }

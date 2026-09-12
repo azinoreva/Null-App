@@ -10155,6 +10155,566 @@ class SyncStateCompanion extends UpdateCompanion<SyncStateData> {
   }
 }
 
+class $SessionsTable extends Sessions with TableInfo<$SessionsTable, Session> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $SessionsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _conversationIdMeta = const VerificationMeta(
+    'conversationId',
+  );
+  @override
+  late final GeneratedColumn<String> conversationId = GeneratedColumn<String>(
+    'conversation_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'REFERENCES conversations (conversation_id) ON DELETE CASCADE',
+    ),
+  );
+  static const VerificationMeta _ephemeralPrivateKeyMeta =
+      const VerificationMeta('ephemeralPrivateKey');
+  @override
+  late final GeneratedColumn<Uint8List> ephemeralPrivateKey =
+      GeneratedColumn<Uint8List>(
+        'ephemeral_private_key',
+        aliasedName,
+        true,
+        type: DriftSqlType.blob,
+        requiredDuringInsert: false,
+      );
+  static const VerificationMeta _ephemeralPublicKeyMeta =
+      const VerificationMeta('ephemeralPublicKey');
+  @override
+  late final GeneratedColumn<Uint8List> ephemeralPublicKey =
+      GeneratedColumn<Uint8List>(
+        'ephemeral_public_key',
+        aliasedName,
+        true,
+        type: DriftSqlType.blob,
+        requiredDuringInsert: false,
+      );
+  static const VerificationMeta _symmetricKeyMeta = const VerificationMeta(
+    'symmetricKey',
+  );
+  @override
+  late final GeneratedColumn<Uint8List> symmetricKey =
+      GeneratedColumn<Uint8List>(
+        'symmetric_key',
+        aliasedName,
+        true,
+        type: DriftSqlType.blob,
+        requiredDuringInsert: false,
+      );
+  static const VerificationMeta _keyVersionMeta = const VerificationMeta(
+    'keyVersion',
+  );
+  @override
+  late final GeneratedColumn<int> keyVersion = GeneratedColumn<int>(
+    'key_version',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(1),
+  );
+  static const VerificationMeta _statusMeta = const VerificationMeta('status');
+  @override
+  late final GeneratedColumn<int> status = GeneratedColumn<int>(
+    'status',
+    aliasedName,
+    false,
+    check: () => status.isIn([0, 1, 2]),
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  static const VerificationMeta _createdAtMeta = const VerificationMeta(
+    'createdAt',
+  );
+  @override
+  late final GeneratedColumn<int> createdAt = GeneratedColumn<int>(
+    'created_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
+    'updatedAt',
+  );
+  @override
+  late final GeneratedColumn<int> updatedAt = GeneratedColumn<int>(
+    'updated_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    conversationId,
+    ephemeralPrivateKey,
+    ephemeralPublicKey,
+    symmetricKey,
+    keyVersion,
+    status,
+    createdAt,
+    updatedAt,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'sessions';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<Session> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('conversation_id')) {
+      context.handle(
+        _conversationIdMeta,
+        conversationId.isAcceptableOrUnknown(
+          data['conversation_id']!,
+          _conversationIdMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_conversationIdMeta);
+    }
+    if (data.containsKey('ephemeral_private_key')) {
+      context.handle(
+        _ephemeralPrivateKeyMeta,
+        ephemeralPrivateKey.isAcceptableOrUnknown(
+          data['ephemeral_private_key']!,
+          _ephemeralPrivateKeyMeta,
+        ),
+      );
+    }
+    if (data.containsKey('ephemeral_public_key')) {
+      context.handle(
+        _ephemeralPublicKeyMeta,
+        ephemeralPublicKey.isAcceptableOrUnknown(
+          data['ephemeral_public_key']!,
+          _ephemeralPublicKeyMeta,
+        ),
+      );
+    }
+    if (data.containsKey('symmetric_key')) {
+      context.handle(
+        _symmetricKeyMeta,
+        symmetricKey.isAcceptableOrUnknown(
+          data['symmetric_key']!,
+          _symmetricKeyMeta,
+        ),
+      );
+    }
+    if (data.containsKey('key_version')) {
+      context.handle(
+        _keyVersionMeta,
+        keyVersion.isAcceptableOrUnknown(data['key_version']!, _keyVersionMeta),
+      );
+    }
+    if (data.containsKey('status')) {
+      context.handle(
+        _statusMeta,
+        status.isAcceptableOrUnknown(data['status']!, _statusMeta),
+      );
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(
+        _createdAtMeta,
+        createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_createdAtMeta);
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(
+        _updatedAtMeta,
+        updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_updatedAtMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {conversationId};
+  @override
+  Session map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return Session(
+      conversationId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}conversation_id'],
+      )!,
+      ephemeralPrivateKey: attachedDatabase.typeMapping.read(
+        DriftSqlType.blob,
+        data['${effectivePrefix}ephemeral_private_key'],
+      ),
+      ephemeralPublicKey: attachedDatabase.typeMapping.read(
+        DriftSqlType.blob,
+        data['${effectivePrefix}ephemeral_public_key'],
+      ),
+      symmetricKey: attachedDatabase.typeMapping.read(
+        DriftSqlType.blob,
+        data['${effectivePrefix}symmetric_key'],
+      ),
+      keyVersion: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}key_version'],
+      )!,
+      status: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}status'],
+      )!,
+      createdAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}created_at'],
+      )!,
+      updatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}updated_at'],
+      )!,
+    );
+  }
+
+  @override
+  $SessionsTable createAlias(String alias) {
+    return $SessionsTable(attachedDatabase, alias);
+  }
+}
+
+class Session extends DataClass implements Insertable<Session> {
+  final String conversationId;
+  final Uint8List? ephemeralPrivateKey;
+  final Uint8List? ephemeralPublicKey;
+  final Uint8List? symmetricKey;
+  final int keyVersion;
+  final int status;
+  final int createdAt;
+  final int updatedAt;
+  const Session({
+    required this.conversationId,
+    this.ephemeralPrivateKey,
+    this.ephemeralPublicKey,
+    this.symmetricKey,
+    required this.keyVersion,
+    required this.status,
+    required this.createdAt,
+    required this.updatedAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['conversation_id'] = Variable<String>(conversationId);
+    if (!nullToAbsent || ephemeralPrivateKey != null) {
+      map['ephemeral_private_key'] = Variable<Uint8List>(ephemeralPrivateKey);
+    }
+    if (!nullToAbsent || ephemeralPublicKey != null) {
+      map['ephemeral_public_key'] = Variable<Uint8List>(ephemeralPublicKey);
+    }
+    if (!nullToAbsent || symmetricKey != null) {
+      map['symmetric_key'] = Variable<Uint8List>(symmetricKey);
+    }
+    map['key_version'] = Variable<int>(keyVersion);
+    map['status'] = Variable<int>(status);
+    map['created_at'] = Variable<int>(createdAt);
+    map['updated_at'] = Variable<int>(updatedAt);
+    return map;
+  }
+
+  SessionsCompanion toCompanion(bool nullToAbsent) {
+    return SessionsCompanion(
+      conversationId: Value(conversationId),
+      ephemeralPrivateKey: ephemeralPrivateKey == null && nullToAbsent
+          ? const Value.absent()
+          : Value(ephemeralPrivateKey),
+      ephemeralPublicKey: ephemeralPublicKey == null && nullToAbsent
+          ? const Value.absent()
+          : Value(ephemeralPublicKey),
+      symmetricKey: symmetricKey == null && nullToAbsent
+          ? const Value.absent()
+          : Value(symmetricKey),
+      keyVersion: Value(keyVersion),
+      status: Value(status),
+      createdAt: Value(createdAt),
+      updatedAt: Value(updatedAt),
+    );
+  }
+
+  factory Session.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return Session(
+      conversationId: serializer.fromJson<String>(json['conversationId']),
+      ephemeralPrivateKey: serializer.fromJson<Uint8List?>(
+        json['ephemeralPrivateKey'],
+      ),
+      ephemeralPublicKey: serializer.fromJson<Uint8List?>(
+        json['ephemeralPublicKey'],
+      ),
+      symmetricKey: serializer.fromJson<Uint8List?>(json['symmetricKey']),
+      keyVersion: serializer.fromJson<int>(json['keyVersion']),
+      status: serializer.fromJson<int>(json['status']),
+      createdAt: serializer.fromJson<int>(json['createdAt']),
+      updatedAt: serializer.fromJson<int>(json['updatedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'conversationId': serializer.toJson<String>(conversationId),
+      'ephemeralPrivateKey': serializer.toJson<Uint8List?>(ephemeralPrivateKey),
+      'ephemeralPublicKey': serializer.toJson<Uint8List?>(ephemeralPublicKey),
+      'symmetricKey': serializer.toJson<Uint8List?>(symmetricKey),
+      'keyVersion': serializer.toJson<int>(keyVersion),
+      'status': serializer.toJson<int>(status),
+      'createdAt': serializer.toJson<int>(createdAt),
+      'updatedAt': serializer.toJson<int>(updatedAt),
+    };
+  }
+
+  Session copyWith({
+    String? conversationId,
+    Value<Uint8List?> ephemeralPrivateKey = const Value.absent(),
+    Value<Uint8List?> ephemeralPublicKey = const Value.absent(),
+    Value<Uint8List?> symmetricKey = const Value.absent(),
+    int? keyVersion,
+    int? status,
+    int? createdAt,
+    int? updatedAt,
+  }) => Session(
+    conversationId: conversationId ?? this.conversationId,
+    ephemeralPrivateKey: ephemeralPrivateKey.present
+        ? ephemeralPrivateKey.value
+        : this.ephemeralPrivateKey,
+    ephemeralPublicKey: ephemeralPublicKey.present
+        ? ephemeralPublicKey.value
+        : this.ephemeralPublicKey,
+    symmetricKey: symmetricKey.present ? symmetricKey.value : this.symmetricKey,
+    keyVersion: keyVersion ?? this.keyVersion,
+    status: status ?? this.status,
+    createdAt: createdAt ?? this.createdAt,
+    updatedAt: updatedAt ?? this.updatedAt,
+  );
+  Session copyWithCompanion(SessionsCompanion data) {
+    return Session(
+      conversationId: data.conversationId.present
+          ? data.conversationId.value
+          : this.conversationId,
+      ephemeralPrivateKey: data.ephemeralPrivateKey.present
+          ? data.ephemeralPrivateKey.value
+          : this.ephemeralPrivateKey,
+      ephemeralPublicKey: data.ephemeralPublicKey.present
+          ? data.ephemeralPublicKey.value
+          : this.ephemeralPublicKey,
+      symmetricKey: data.symmetricKey.present
+          ? data.symmetricKey.value
+          : this.symmetricKey,
+      keyVersion: data.keyVersion.present
+          ? data.keyVersion.value
+          : this.keyVersion,
+      status: data.status.present ? data.status.value : this.status,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('Session(')
+          ..write('conversationId: $conversationId, ')
+          ..write('ephemeralPrivateKey: $ephemeralPrivateKey, ')
+          ..write('ephemeralPublicKey: $ephemeralPublicKey, ')
+          ..write('symmetricKey: $symmetricKey, ')
+          ..write('keyVersion: $keyVersion, ')
+          ..write('status: $status, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    conversationId,
+    $driftBlobEquality.hash(ephemeralPrivateKey),
+    $driftBlobEquality.hash(ephemeralPublicKey),
+    $driftBlobEquality.hash(symmetricKey),
+    keyVersion,
+    status,
+    createdAt,
+    updatedAt,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is Session &&
+          other.conversationId == this.conversationId &&
+          $driftBlobEquality.equals(
+            other.ephemeralPrivateKey,
+            this.ephemeralPrivateKey,
+          ) &&
+          $driftBlobEquality.equals(
+            other.ephemeralPublicKey,
+            this.ephemeralPublicKey,
+          ) &&
+          $driftBlobEquality.equals(other.symmetricKey, this.symmetricKey) &&
+          other.keyVersion == this.keyVersion &&
+          other.status == this.status &&
+          other.createdAt == this.createdAt &&
+          other.updatedAt == this.updatedAt);
+}
+
+class SessionsCompanion extends UpdateCompanion<Session> {
+  final Value<String> conversationId;
+  final Value<Uint8List?> ephemeralPrivateKey;
+  final Value<Uint8List?> ephemeralPublicKey;
+  final Value<Uint8List?> symmetricKey;
+  final Value<int> keyVersion;
+  final Value<int> status;
+  final Value<int> createdAt;
+  final Value<int> updatedAt;
+  final Value<int> rowid;
+  const SessionsCompanion({
+    this.conversationId = const Value.absent(),
+    this.ephemeralPrivateKey = const Value.absent(),
+    this.ephemeralPublicKey = const Value.absent(),
+    this.symmetricKey = const Value.absent(),
+    this.keyVersion = const Value.absent(),
+    this.status = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  SessionsCompanion.insert({
+    required String conversationId,
+    this.ephemeralPrivateKey = const Value.absent(),
+    this.ephemeralPublicKey = const Value.absent(),
+    this.symmetricKey = const Value.absent(),
+    this.keyVersion = const Value.absent(),
+    this.status = const Value.absent(),
+    required int createdAt,
+    required int updatedAt,
+    this.rowid = const Value.absent(),
+  }) : conversationId = Value(conversationId),
+       createdAt = Value(createdAt),
+       updatedAt = Value(updatedAt);
+  static Insertable<Session> custom({
+    Expression<String>? conversationId,
+    Expression<Uint8List>? ephemeralPrivateKey,
+    Expression<Uint8List>? ephemeralPublicKey,
+    Expression<Uint8List>? symmetricKey,
+    Expression<int>? keyVersion,
+    Expression<int>? status,
+    Expression<int>? createdAt,
+    Expression<int>? updatedAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (conversationId != null) 'conversation_id': conversationId,
+      if (ephemeralPrivateKey != null)
+        'ephemeral_private_key': ephemeralPrivateKey,
+      if (ephemeralPublicKey != null)
+        'ephemeral_public_key': ephemeralPublicKey,
+      if (symmetricKey != null) 'symmetric_key': symmetricKey,
+      if (keyVersion != null) 'key_version': keyVersion,
+      if (status != null) 'status': status,
+      if (createdAt != null) 'created_at': createdAt,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  SessionsCompanion copyWith({
+    Value<String>? conversationId,
+    Value<Uint8List?>? ephemeralPrivateKey,
+    Value<Uint8List?>? ephemeralPublicKey,
+    Value<Uint8List?>? symmetricKey,
+    Value<int>? keyVersion,
+    Value<int>? status,
+    Value<int>? createdAt,
+    Value<int>? updatedAt,
+    Value<int>? rowid,
+  }) {
+    return SessionsCompanion(
+      conversationId: conversationId ?? this.conversationId,
+      ephemeralPrivateKey: ephemeralPrivateKey ?? this.ephemeralPrivateKey,
+      ephemeralPublicKey: ephemeralPublicKey ?? this.ephemeralPublicKey,
+      symmetricKey: symmetricKey ?? this.symmetricKey,
+      keyVersion: keyVersion ?? this.keyVersion,
+      status: status ?? this.status,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (conversationId.present) {
+      map['conversation_id'] = Variable<String>(conversationId.value);
+    }
+    if (ephemeralPrivateKey.present) {
+      map['ephemeral_private_key'] = Variable<Uint8List>(
+        ephemeralPrivateKey.value,
+      );
+    }
+    if (ephemeralPublicKey.present) {
+      map['ephemeral_public_key'] = Variable<Uint8List>(
+        ephemeralPublicKey.value,
+      );
+    }
+    if (symmetricKey.present) {
+      map['symmetric_key'] = Variable<Uint8List>(symmetricKey.value);
+    }
+    if (keyVersion.present) {
+      map['key_version'] = Variable<int>(keyVersion.value);
+    }
+    if (status.present) {
+      map['status'] = Variable<int>(status.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<int>(createdAt.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<int>(updatedAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('SessionsCompanion(')
+          ..write('conversationId: $conversationId, ')
+          ..write('ephemeralPrivateKey: $ephemeralPrivateKey, ')
+          ..write('ephemeralPublicKey: $ephemeralPublicKey, ')
+          ..write('symmetricKey: $symmetricKey, ')
+          ..write('keyVersion: $keyVersion, ')
+          ..write('status: $status, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
@@ -10176,6 +10736,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final $ShamirsSecretTable shamirsSecret = $ShamirsSecretTable(this);
   late final $SecretShareTable secretShare = $SecretShareTable(this);
   late final $SyncStateTable syncState = $SyncStateTable(this);
+  late final $SessionsTable sessions = $SessionsTable(this);
   late final IdentityDao identityDao = IdentityDao(this as AppDatabase);
   late final ServersDao serversDao = ServersDao(this as AppDatabase);
   late final ConversationsDao conversationsDao = ConversationsDao(
@@ -10202,6 +10763,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     this as AppDatabase,
   );
   late final SyncStateDao syncStateDao = SyncStateDao(this as AppDatabase);
+  late final SessionsDao sessionsDao = SessionsDao(this as AppDatabase);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -10221,6 +10783,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     shamirsSecret,
     secretShare,
     syncState,
+    sessions,
   ];
   @override
   StreamQueryUpdateRules get streamUpdateRules => const StreamQueryUpdateRules([
@@ -10307,6 +10870,13 @@ abstract class _$AppDatabase extends GeneratedDatabase {
         limitUpdateKind: UpdateKind.delete,
       ),
       result: [TableUpdate('secret_share', kind: UpdateKind.delete)],
+    ),
+    WritePropagation(
+      on: TableUpdateQuery.onTableName(
+        'conversations',
+        limitUpdateKind: UpdateKind.delete,
+      ),
+      result: [TableUpdate('sessions', kind: UpdateKind.delete)],
     ),
   ]);
 }
@@ -11491,6 +12061,26 @@ final class $$ConversationsTableReferences
       manager.$state.copyWith(prefetchedData: cache),
     );
   }
+
+  static MultiTypedResultKey<$SessionsTable, List<Session>> _sessionsRefsTable(
+    _$AppDatabase db,
+  ) => MultiTypedResultKey.fromTable(
+    db.sessions,
+    aliasName: 'conversations__conversation_id__sessions__conversation_id',
+  );
+
+  $$SessionsTableProcessedTableManager get sessionsRefs {
+    final manager = $$SessionsTableTableManager($_db, $_db.sessions).filter(
+      (f) => f.conversationId.conversationId.sqlEquals(
+        $_itemColumn<String>('conversation_id')!,
+      ),
+    );
+
+    final cache = $_typedResult.readTableOrNull(_sessionsRefsTable($_db));
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
+    );
+  }
 }
 
 class $$ConversationsTableFilterComposer
@@ -11618,6 +12208,31 @@ class $$ConversationsTableFilterComposer
           }) => $$ContactsTableFilterComposer(
             $db: $db,
             $table: $db.contacts,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+
+  Expression<bool> sessionsRefs(
+    Expression<bool> Function($$SessionsTableFilterComposer f) f,
+  ) {
+    final $$SessionsTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.conversationId,
+      referencedTable: $db.sessions,
+      getReferencedColumn: (t) => t.conversationId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$SessionsTableFilterComposer(
+            $db: $db,
+            $table: $db.sessions,
             $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
             joinBuilder: joinBuilder,
             $removeJoinBuilderFromRootComposer:
@@ -11826,6 +12441,31 @@ class $$ConversationsTableAnnotationComposer
     );
     return f(composer);
   }
+
+  Expression<T> sessionsRefs<T extends Object>(
+    Expression<T> Function($$SessionsTableAnnotationComposer a) f,
+  ) {
+    final $$SessionsTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.conversationId,
+      referencedTable: $db.sessions,
+      getReferencedColumn: (t) => t.conversationId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$SessionsTableAnnotationComposer(
+            $db: $db,
+            $table: $db.sessions,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
 }
 
 class $$ConversationsTableTableManager
@@ -11841,7 +12481,11 @@ class $$ConversationsTableTableManager
           $$ConversationsTableUpdateCompanionBuilder,
           (Conversation, $$ConversationsTableReferences),
           Conversation,
-          PrefetchHooks Function({bool messagesRefs, bool contactsRefs})
+          PrefetchHooks Function({
+            bool messagesRefs,
+            bool contactsRefs,
+            bool sessionsRefs,
+          })
         > {
   $$ConversationsTableTableManager(_$AppDatabase db, $ConversationsTable table)
     : super(
@@ -11935,12 +12579,17 @@ class $$ConversationsTableTableManager
               )
               .toList(),
           prefetchHooksCallback:
-              ({messagesRefs = false, contactsRefs = false}) {
+              ({
+                messagesRefs = false,
+                contactsRefs = false,
+                sessionsRefs = false,
+              }) {
                 return PrefetchHooks(
                   db: db,
                   explicitlyWatchedTables: [
                     if (messagesRefs) db.messages,
                     if (contactsRefs) db.contacts,
+                    if (sessionsRefs) db.sessions,
                   ],
                   addJoins: null,
                   getPrefetchedDataCallback: (items) async {
@@ -11987,6 +12636,27 @@ class $$ConversationsTableTableManager
                               ),
                           typedResults: items,
                         ),
+                      if (sessionsRefs)
+                        await $_getPrefetchedData<
+                          Conversation,
+                          $ConversationsTable,
+                          Session
+                        >(
+                          currentTable: table,
+                          referencedTable: $$ConversationsTableReferences
+                              ._sessionsRefsTable(db),
+                          managerFromTypedResult: (p0) =>
+                              $$ConversationsTableReferences(
+                                db,
+                                table,
+                                p0,
+                              ).sessionsRefs,
+                          referencedItemsForCurrentItem:
+                              (item, referencedItems) => referencedItems.where(
+                                (e) => e.conversationId == item.conversationId,
+                              ),
+                          typedResults: items,
+                        ),
                     ];
                   },
                 );
@@ -12007,7 +12677,11 @@ typedef $$ConversationsTableProcessedTableManager =
       $$ConversationsTableUpdateCompanionBuilder,
       (Conversation, $$ConversationsTableReferences),
       Conversation,
-      PrefetchHooks Function({bool messagesRefs, bool contactsRefs})
+      PrefetchHooks Function({
+        bool messagesRefs,
+        bool contactsRefs,
+        bool sessionsRefs,
+      })
     >;
 typedef $$MessagesTableCreateCompanionBuilder = MessagesCompanion Function({
   required String messageId,
@@ -17387,6 +18061,385 @@ typedef $$SyncStateTableProcessedTableManager =
       SyncStateData,
       PrefetchHooks Function()
     >;
+typedef $$SessionsTableCreateCompanionBuilder = SessionsCompanion Function({
+  required String conversationId,
+  Value<Uint8List?> ephemeralPrivateKey,
+  Value<Uint8List?> ephemeralPublicKey,
+  Value<Uint8List?> symmetricKey,
+  Value<int> keyVersion,
+  Value<int> status,
+  required int createdAt,
+  required int updatedAt,
+  Value<int> rowid,
+});
+typedef $$SessionsTableUpdateCompanionBuilder = SessionsCompanion Function({
+  Value<String> conversationId,
+  Value<Uint8List?> ephemeralPrivateKey,
+  Value<Uint8List?> ephemeralPublicKey,
+  Value<Uint8List?> symmetricKey,
+  Value<int> keyVersion,
+  Value<int> status,
+  Value<int> createdAt,
+  Value<int> updatedAt,
+  Value<int> rowid,
+});
+
+final class $$SessionsTableReferences
+    extends BaseReferences<_$AppDatabase, $SessionsTable, Session> {
+  $$SessionsTableReferences(super.$_db, super.$_table, super.$_typedResult);
+
+  static $ConversationsTable _conversationIdTable(_$AppDatabase db) => db
+      .conversations
+      .createAlias('sessions__conversation_id__conversations__conversation_id');
+
+  $$ConversationsTableProcessedTableManager get conversationId {
+    final $_column = $_itemColumn<String>('conversation_id')!;
+
+    final manager = $$ConversationsTableTableManager(
+      $_db,
+      $_db.conversations,
+    ).filter((f) => f.conversationId.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_conversationIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+}
+
+class $$SessionsTableFilterComposer
+    extends Composer<_$AppDatabase, $SessionsTable> {
+  $$SessionsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<Uint8List> get ephemeralPrivateKey => $composableBuilder(
+    column: $table.ephemeralPrivateKey,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<Uint8List> get ephemeralPublicKey => $composableBuilder(
+    column: $table.ephemeralPublicKey,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<Uint8List> get symmetricKey => $composableBuilder(
+    column: $table.symmetricKey,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get keyVersion => $composableBuilder(
+    column: $table.keyVersion,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get status => $composableBuilder(
+    column: $table.status,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  $$ConversationsTableFilterComposer get conversationId {
+    final $$ConversationsTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.conversationId,
+      referencedTable: $db.conversations,
+      getReferencedColumn: (t) => t.conversationId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$ConversationsTableFilterComposer(
+            $db: $db,
+            $table: $db.conversations,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$SessionsTableOrderingComposer
+    extends Composer<_$AppDatabase, $SessionsTable> {
+  $$SessionsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<Uint8List> get ephemeralPrivateKey => $composableBuilder(
+    column: $table.ephemeralPrivateKey,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<Uint8List> get ephemeralPublicKey => $composableBuilder(
+    column: $table.ephemeralPublicKey,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<Uint8List> get symmetricKey => $composableBuilder(
+    column: $table.symmetricKey,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get keyVersion => $composableBuilder(
+    column: $table.keyVersion,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get status => $composableBuilder(
+    column: $table.status,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  $$ConversationsTableOrderingComposer get conversationId {
+    final $$ConversationsTableOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.conversationId,
+      referencedTable: $db.conversations,
+      getReferencedColumn: (t) => t.conversationId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$ConversationsTableOrderingComposer(
+            $db: $db,
+            $table: $db.conversations,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$SessionsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $SessionsTable> {
+  $$SessionsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<Uint8List> get ephemeralPrivateKey => $composableBuilder(
+    column: $table.ephemeralPrivateKey,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<Uint8List> get ephemeralPublicKey => $composableBuilder(
+    column: $table.ephemeralPublicKey,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<Uint8List> get symmetricKey => $composableBuilder(
+    column: $table.symmetricKey,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get keyVersion => $composableBuilder(
+    column: $table.keyVersion,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get status =>
+      $composableBuilder(column: $table.status, builder: (column) => column);
+
+  GeneratedColumn<int> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  GeneratedColumn<int> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+
+  $$ConversationsTableAnnotationComposer get conversationId {
+    final $$ConversationsTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.conversationId,
+      referencedTable: $db.conversations,
+      getReferencedColumn: (t) => t.conversationId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$ConversationsTableAnnotationComposer(
+            $db: $db,
+            $table: $db.conversations,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$SessionsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $SessionsTable,
+          Session,
+          $$SessionsTableFilterComposer,
+          $$SessionsTableOrderingComposer,
+          $$SessionsTableAnnotationComposer,
+          $$SessionsTableCreateCompanionBuilder,
+          $$SessionsTableUpdateCompanionBuilder,
+          (Session, $$SessionsTableReferences),
+          Session,
+          PrefetchHooks Function({bool conversationId})
+        > {
+  $$SessionsTableTableManager(_$AppDatabase db, $SessionsTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$SessionsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$SessionsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$SessionsTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> conversationId = const Value.absent(),
+                Value<Uint8List?> ephemeralPrivateKey = const Value.absent(),
+                Value<Uint8List?> ephemeralPublicKey = const Value.absent(),
+                Value<Uint8List?> symmetricKey = const Value.absent(),
+                Value<int> keyVersion = const Value.absent(),
+                Value<int> status = const Value.absent(),
+                Value<int> createdAt = const Value.absent(),
+                Value<int> updatedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => SessionsCompanion(
+                conversationId: conversationId,
+                ephemeralPrivateKey: ephemeralPrivateKey,
+                ephemeralPublicKey: ephemeralPublicKey,
+                symmetricKey: symmetricKey,
+                keyVersion: keyVersion,
+                status: status,
+                createdAt: createdAt,
+                updatedAt: updatedAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String conversationId,
+                Value<Uint8List?> ephemeralPrivateKey = const Value.absent(),
+                Value<Uint8List?> ephemeralPublicKey = const Value.absent(),
+                Value<Uint8List?> symmetricKey = const Value.absent(),
+                Value<int> keyVersion = const Value.absent(),
+                Value<int> status = const Value.absent(),
+                required int createdAt,
+                required int updatedAt,
+                Value<int> rowid = const Value.absent(),
+              }) => SessionsCompanion.insert(
+                conversationId: conversationId,
+                ephemeralPrivateKey: ephemeralPrivateKey,
+                ephemeralPublicKey: ephemeralPublicKey,
+                symmetricKey: symmetricKey,
+                keyVersion: keyVersion,
+                status: status,
+                createdAt: createdAt,
+                updatedAt: updatedAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable(table),
+                  $$SessionsTableReferences(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: ({conversationId = false}) {
+            return PrefetchHooks(
+              db: db,
+              explicitlyWatchedTables: [],
+              addJoins:
+                  <
+                    T extends TableManagerState<
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic
+                    >
+                  >(state) {
+                    if (conversationId) {
+                      state = state.withJoin(
+                        currentTable: table,
+                        currentColumn: table.conversationId,
+                        referencedTable: $$SessionsTableReferences
+                            ._conversationIdTable(db),
+                        referencedColumn: $$SessionsTableReferences
+                            ._conversationIdTable(db)
+                            .conversationId,
+                      ) as T;
+                    }
+
+                    return state;
+                  },
+              getPrefetchedDataCallback: (items) async {
+                return [];
+              },
+            );
+          },
+        ),
+      );
+}
+
+typedef $$SessionsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $SessionsTable,
+      Session,
+      $$SessionsTableFilterComposer,
+      $$SessionsTableOrderingComposer,
+      $$SessionsTableAnnotationComposer,
+      $$SessionsTableCreateCompanionBuilder,
+      $$SessionsTableUpdateCompanionBuilder,
+      (Session, $$SessionsTableReferences),
+      Session,
+      PrefetchHooks Function({bool conversationId})
+    >;
 
 class $AppDatabaseManager {
   final _$AppDatabase _db;
@@ -17419,4 +18472,6 @@ class $AppDatabaseManager {
       $$SecretShareTableTableManager(_db, _db.secretShare);
   $$SyncStateTableTableManager get syncState =>
       $$SyncStateTableTableManager(_db, _db.syncState);
+  $$SessionsTableTableManager get sessions =>
+      $$SessionsTableTableManager(_db, _db.sessions);
 }

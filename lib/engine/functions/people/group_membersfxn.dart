@@ -2,6 +2,7 @@
 
 import 'package:drift/drift.dart';
 import 'dart:typed_data';
+import '../../database/app_database.dart';
 import '../../database/queries/group_members_queries.dart';
 
 /// Adds a new member to a group.

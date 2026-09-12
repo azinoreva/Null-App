@@ -100,7 +100,7 @@ Future<void> _handleDhExchange(
     );
   }
 
-  final verified = KeyExchange.verifyExchange(
+  final verified = await KeyExchange.verifyExchange(
     conversationId: senderContactId,
     localIdentityId: identity.identityId,
     peerIdentityId: senderContactId,

@@ -36,6 +36,8 @@ import 'functions/people/sendmycontact.dart' as contact_details;
 import 'functions/security/share_secret.dart' as secret;
 import 'functions/servers/serverfxn.dart' as server;
 
+final Map<String, dynamic> functionRegistry = {};
+
 class FunctionsList {
   //auth
   static Future<dynamic> login({

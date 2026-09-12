@@ -64,10 +64,7 @@ class IdentityCrypto {
       );
     }
 
-    final pair = SimpleKeyPairData(
-      privateKey,
-      type: KeyPairType.ed25519,
-    );
+    final pair = await _ed25519.newKeyPairFromSeed(privateKey);
 
     final publicKey = await pair.extractPublicKey();
 

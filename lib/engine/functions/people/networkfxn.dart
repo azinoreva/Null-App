@@ -3,6 +3,7 @@
 import 'package:drift/drift.dart';
 import 'package:uuid/uuid.dart';
 
+import '../../database/app_database.dart';
 import '../../database/queries/network_queries.dart';
 
 const _uuid = Uuid();

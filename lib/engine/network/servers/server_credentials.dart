@@ -77,8 +77,6 @@ class CredentialResponse {
 }
 
 class UserCredentialsService {
-  final Dio _dio = ApiClient.instance;
-
   /// Requests a signed credential for [serverId] using [userPublicKey].
   ///
   /// Auth (Bearer access token) and refresh-on-401 are handled automatically
@@ -87,7 +85,7 @@ class UserCredentialsService {
     required String serverId,
     required String userPublicKey,
   }) async {
-    final response = await _dio.post(
+    final response = await ApiClient.instance(serverId).post(
       '/api/users/credentials',
       options: Options(
         headers: {

@@ -104,7 +104,7 @@ Future<ReverseShareResult> reverseShareSecretForUser({
 }) async {
   try {
     // 1. Look up what was dispensed to this identity.
-    final ShamirsSecret? dispensed;
+    final ShamirsSecretData? dispensed;
     try {
       dispensed =
           await database.shamirsSecretDao.getShamirsSecretByIdentityId(

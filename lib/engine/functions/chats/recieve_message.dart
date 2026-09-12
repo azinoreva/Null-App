@@ -3,6 +3,7 @@
 import 'dart:convert';
 import 'package:drift/drift.dart';
 
+import '../../database/app_database.dart';
 import '../../database/queries/contacts_queries.dart';
 import '../../database/queries/identity_queries.dart';
 import '../../database/queries/messages_queries.dart';
