@@ -11,6 +11,7 @@ import '../engine/media_handling/dicebear.dart';
 import '../engine/media_handling/media_storage.dart';
 import '../state/providers.dart';
 import 'modals/automatic_messages.dart';
+import 'modals/change_password.dart';
 import 'modals/choose_interests.dart';
 
 /// Settings screen, driven entirely by [AppSettings].
@@ -65,7 +66,18 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
   // ---- Stub functions for rows with no backing AppSettings field ----
   void _openChangePassword() {
-    // TODO: navigate to the change-password flow.
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => ChangePasswordModal(
+        onSave: (currentPassword, newPassword) async {
+          // The account API also requires a re-encrypted vault payload,
+          // which is not available from the settings screen yet.
+          return 'Password change service is not configured yet.';
+        },
+      ),
+    );
   }
 
   void _openAutomaticMessageEditor() {
