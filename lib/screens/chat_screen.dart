@@ -8,6 +8,8 @@ import '../state/providers.dart';
 import '../utils/formatting.dart';
 import 'chatting.dart';
 import 'contacts_screen.dart';
+import 'settings_screen.dart';
+import 'updates_screen.dart';
 
 class ChatScreen extends ConsumerStatefulWidget {
   const ChatScreen({super.key});
@@ -30,6 +32,20 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         if (tab == NavigationTab.contacts) {
           Navigator.of(context).pushReplacement(
             MaterialPageRoute(builder: (_) => const ContactsScreen()),
+          );
+          return;
+        }
+
+        if (tab == NavigationTab.updates) {
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(builder: (_) => const UpdatesScreen()),
+          );
+          return;
+        }
+
+        if (tab == NavigationTab.settings) {
+          Navigator.of(context).push(
+            MaterialPageRoute(builder: (_) => const SettingsScreen()),
           );
           return;
         }
@@ -102,9 +118,13 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                   ),
                 ),
                 const Spacer(),
-                Icon(Icons.people_outline, color: themeExtension.textInputColor, size: 24.0),
-                const SizedBox(width: 16.0),
-                Icon(Icons.settings_outlined, color: themeExtension.textInputColor, size: 24.0),
+                IconButton(
+                  onPressed: () => Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => const SettingsScreen()),
+                  ),
+                  icon: Icon(Icons.settings_outlined, color: themeExtension.textInputColor),
+                  tooltip: 'Settings',
+                ),
               ],
             ),
           ),

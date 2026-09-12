@@ -1,8 +1,10 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../engine/database/app_database.dart';
+import '../engine/network/updates/check_updates.dart';
 import '../engine/database/queries/contacts_queries.dart';
 import '../engine/database/queries/group_members_queries.dart';
 import '../engine/database/queries/groups_queries.dart';
@@ -11,6 +13,53 @@ import '../engine/database/queries/messages_queries.dart';
 import '../engine/database/queries/sync_state_queries.dart';
 import '../utils/formatting.dart';
 import '../widgets/chats/chat_bubble_component.dart';
+
+/// Data needed to render one post in the updates feed (see [UpdateComponent]).
+class PostData {
+  final String avatarUrl;
+  final String nickname;
+  final String timeText;
+  final String text;
+  final String? mediaUrl;
+  final bool isLiked;
+  final bool isDisliked;
+  final bool isShared;
+  final bool isSubscribed;
+
+  const PostData({
+    required this.avatarUrl,
+    required this.nickname,
+    required this.timeText,
+    required this.text,
+    this.mediaUrl,
+    this.isLiked = false,
+    this.isDisliked = false,
+    this.isShared = false,
+    this.isSubscribed = false,
+  });
+}
+
+/// Simple data holder for one contact entry shown in the contacts screen.
+///
+/// [displayName] follows the same "Name - Title" convention used by
+/// [ContactCard] (e.g. "Alice Johnson - Product Designer").
+class ContactData {
+  final String avatarUrl;
+  final String displayName;
+  final int isOnline;
+
+  const ContactData({
+    required this.avatarUrl,
+    required this.displayName,
+    required this.isOnline,
+  });
+
+  /// Just the name portion, used for sorting / grouping by letter.
+  String get name {
+    final dashIndex = displayName.indexOf('-');
+    return dashIndex == -1 ? displayName.trim() : displayName.substring(0, dashIndex).trim();
+  }
+}
 
 /// The app's single [AppDatabase] instance.
 ///
@@ -383,5 +432,194 @@ class ChatMessagesNotifier extends AsyncNotifier<List<ChatMessageItem>> {
     if (status == 2) return DeliveryStatus.delivered;
     if (status == 1) return DeliveryStatus.sent;
     return DeliveryStatus.sending;
+  }
+}
+
+/// API client used to fetch the updates feed. Every request is scoped to a
+/// single server; the app's main server id is `server_1`.
+final updatesServiceProvider = Provider<UpdatesService>((ref) {
+  return const UpdatesService(serverId: 'server_1');
+});
+
+/// The state of the updates feed screen: the rendered posts plus its
+/// pagination bookkeeping.
+class UpdatesFeedState {
+  final List<PostData> posts;
+  final int page;
+  final bool hasMore;
+  final bool isLoadingMore;
+
+  const UpdatesFeedState({
+    this.posts = const [],
+    this.page = 0,
+    this.hasMore = true,
+    this.isLoadingMore = false,
+  });
+
+  UpdatesFeedState copyWith({
+    List<PostData>? posts,
+    int? page,
+    bool? hasMore,
+    bool? isLoadingMore,
+  }) {
+    return UpdatesFeedState(
+      posts: posts ?? this.posts,
+      page: page ?? this.page,
+      hasMore: hasMore ?? this.hasMore,
+      isLoadingMore: isLoadingMore ?? this.isLoadingMore,
+    );
+  }
+}
+
+/// Owns the updates feed screen's state.
+///
+/// Intentionally NOT autoDisposed: the notifier (and its loaded pages) is
+/// kept alive for the lifetime of the ProviderScope, so navigating away and
+/// back renders the cached feed instantly instead of refetching.
+final updatesFeedProvider =
+    AsyncNotifierProvider<UpdatesFeedNotifier, UpdatesFeedState>(
+  UpdatesFeedNotifier.new,
+);
+
+class UpdatesFeedNotifier extends AsyncNotifier<UpdatesFeedState> {
+  static const int _pageSize = 20;
+
+  /// Hard cap on a feed request so the screen never hangs on the network.
+  static const Duration _fetchTimeout = Duration(seconds: 4);
+
+  UpdatesService get _service => ref.read(updatesServiceProvider);
+
+  @override
+  Future<UpdatesFeedState> build() async {
+    // Non-blocking first load: return an empty feed immediately and fetch in
+    // the background, so the screen always renders instead of freezing on a
+    // full-screen spinner.
+    _scheduleBackgroundRefresh();
+    return const UpdatesFeedState();
+  }
+
+  void _scheduleBackgroundRefresh() {
+    // Defer to after this build so state updates never happen mid-build.
+    Future<void>.delayed(Duration.zero, () async {
+      await refresh();
+    });
+  }
+
+  /// Reloads the feed from the first page. Used by the background loader and
+  /// the inline retry.
+  Future<void> refresh() async {
+    state = const AsyncLoading();
+    try {
+      state = AsyncData(await _loadFirstPage());
+    } catch (error, stackTrace) {
+      state = AsyncError(error, stackTrace);
+    }
+  }
+
+  Future<UpdatesFeedState> _loadFirstPage() async {
+    final updates =
+        await _service.getUpdates(limit: _pageSize).timeout(_fetchTimeout);
+    return UpdatesFeedState(
+      posts: updates.map(_toPostData).toList(),
+      page: 1,
+      hasMore: updates.length == _pageSize,
+    );
+  }
+
+  /// Appends the next page of posts. No-op while a page is already loading
+  /// or when there's nothing left to fetch.
+  Future<void> loadMore() async {
+    final current = state.value;
+    if (current == null || current.isLoadingMore || !current.hasMore) return;
+
+    state = AsyncData(current.copyWith(isLoadingMore: true));
+
+    try {
+      final updates = await _service
+          .getUpdates(limit: _pageSize, before: current.posts.length)
+          .timeout(_fetchTimeout);
+      if (updates.isEmpty) {
+        state = AsyncData(
+          current.copyWith(isLoadingMore: false, hasMore: false),
+        );
+        return;
+      }
+
+      state = AsyncData(
+        UpdatesFeedState(
+          posts: [...current.posts, ...updates.map(_toPostData)],
+          page: current.page + 1,
+          hasMore: updates.length == _pageSize,
+        ),
+      );
+    } catch (_) {
+      // Keep the already-loaded posts; surface the failure by clearing the
+      // loading flag so the footer returns to its normal state.
+      state = AsyncData(current.copyWith(isLoadingMore: false));
+    }
+  }
+
+  PostData _toPostData(Update update) {
+    return PostData(
+      avatarUrl:
+          'https://api.dicebear.com/7.x/avataaars/png?seed='
+          '${Uri.encodeComponent(update.nickname)}&size=128',
+      nickname: update.nickname,
+      timeText: '',
+      text: update.text,
+      mediaUrl: update.media?.mediaUrl,
+    );
+  }
+}
+
+/// Owns the contacts screen's state (connected contacts only).
+///
+/// Intentionally NOT autoDisposed: the loaded list is kept alive for the
+/// lifetime of the ProviderScope, so re-entering the screen renders from
+/// cache instead of hitting the database again.
+final contactsProvider =
+    AsyncNotifierProvider<ContactsNotifier, List<ContactData>>(
+  ContactsNotifier.new,
+);
+
+class ContactsNotifier extends AsyncNotifier<List<ContactData>> {
+  ContactsDao get _dao => ref.read(contactsDaoProvider);
+
+  @override
+  Future<List<ContactData>> build() async {
+    final rows = await _dao.getConnectedContacts();
+    return rows.map(_toContactData).toList();
+  }
+
+  /// Reloads the contact list from the database. Call after any contact
+  /// save/change so the cached list stays in sync.
+  Future<void> refresh() async {
+    state = const AsyncLoading();
+    state = await AsyncValue.guard(() async {
+      final rows = await _dao.getConnectedContacts();
+      return rows.map(_toContactData).toList();
+    });
+  }
+
+  ContactData _toContactData(Contact contact) {
+    return ContactData(
+      avatarUrl: _avatarUrlFor(contact),
+      displayName: (contact.nickname?.trim().isNotEmpty ?? false)
+          ? contact.nickname!.trim()
+          : contact.contactId,
+      isOnline: contact.isOnline,
+    );
+  }
+
+  /// Stored avatars are PNG blobs; expose them as data URIs so the existing
+  /// `NetworkImage(avatarUrl)` widgets keep working. Falls back to a
+  /// deterministic Dicebear avatar when the contact has no stored image.
+  String _avatarUrlFor(Contact contact) {
+    final avatar = contact.avatar;
+    if (avatar != null && avatar.isNotEmpty) {
+      return 'data:image/png;base64,${base64Encode(avatar)}';
+    }
+    return 'https://api.dicebear.com/7.x/avataaars/png?seed='
+        '${Uri.encodeComponent(contact.contactId)}&size=128';
   }
 }

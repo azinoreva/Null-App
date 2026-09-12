@@ -1,68 +1,32 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../state/providers.dart';
 import '../widgets/app_theme.dart';
 import '../widgets/display/updates_card.dart';
 import '../widgets/display/navigation.dart';
 import 'chat_screen.dart';
-
-/// Data needed to render one post via [UpdateComponent].
-class PostData {
-  final String avatarUrl;
-  final String nickname;
-  final String timeText;
-  final String text;
-  final String? mediaUrl;
-  final bool isLiked;
-  final bool isDisliked;
-  final bool isShared;
-  final bool isSubscribed;
-
-  const PostData({
-    required this.avatarUrl,
-    required this.nickname,
-    required this.timeText,
-    required this.text,
-    this.mediaUrl,
-    this.isLiked = false,
-    this.isDisliked = false,
-    this.isShared = false,
-    this.isSubscribed = false,
-  });
-}
-
-/// Called to fetch the next page of posts. Return an empty list once
-/// there's nothing left to paginate.
-typedef PostPageLoader = Future<List<PostData>> Function(int nextPage);
+import 'contacts_screen.dart';
+import 'settings_screen.dart';
 
 /// Updates feed screen: header, an infinite-scrolling list of posts built
-/// from [initialPosts] (auto-paginated via [onLoadMore] as the user
-/// scrolls), and a floating "+" button for creating a new post.
-class UpdatesScreen extends StatefulWidget {
-  final List<PostData> initialPosts;
-  final PostPageLoader onLoadMore;
-  final VoidCallback? onCreatePost;
-
-  const UpdatesScreen({
-    super.key,
-    required this.initialPosts,
-    required this.onLoadMore,
-    this.onCreatePost,
-  });
+/// from [updatesFeedProvider] (auto-paginated as the user scrolls), and a
+/// floating "+" button for creating a new post.
+///
+/// The feed's state (posts + pagination) is owned by Riverpod and kept alive,
+/// so leaving the screen and returning renders the cached feed instantly.
+class UpdatesScreen extends ConsumerStatefulWidget {
+  const UpdatesScreen({super.key});
 
   @override
-  State<UpdatesScreen> createState() => _UpdatesScreenState();
+  ConsumerState<UpdatesScreen> createState() => _UpdatesScreenState();
 }
 
-class _UpdatesScreenState extends State<UpdatesScreen> {
-  late List<PostData> _posts;
+class _UpdatesScreenState extends ConsumerState<UpdatesScreen> {
   final ScrollController _scrollController = ScrollController();
-  int _page = 1;
-  bool _isLoadingMore = false;
-  bool _hasMore = true;
 
   @override
   void initState() {
     super.initState();
-    _posts = List<PostData>.from(widget.initialPosts);
     _scrollController.addListener(_handleScroll);
   }
 
@@ -78,31 +42,7 @@ class _UpdatesScreenState extends State<UpdatesScreen> {
     const threshold = 300.0;
     final position = _scrollController.position;
     if (position.pixels >= position.maxScrollExtent - threshold) {
-      _loadMore();
-    }
-  }
-
-  Future<void> _loadMore() async {
-    if (_isLoadingMore || !_hasMore) return;
-    setState(() => _isLoadingMore = true);
-
-    final nextPage = _page + 1;
-    try {
-      final newPosts = await widget.onLoadMore(nextPage);
-      if (!mounted) return;
-      setState(() {
-        if (newPosts.isEmpty) {
-          _hasMore = false;
-        } else {
-          _posts.addAll(newPosts);
-          _page = nextPage;
-        }
-        _isLoadingMore = false;
-      });
-    } catch (e) {
-      if (!mounted) return;
-      setState(() => _isLoadingMore = false);
-      // TODO: surface a retry / error state if loading a page fails.
+      ref.read(updatesFeedProvider.notifier).loadMore();
     }
   }
 
@@ -114,26 +54,39 @@ class _UpdatesScreenState extends State<UpdatesScreen> {
 
   void _handleCreatePost() {
     _createPost();
-    widget.onCreatePost?.call();
+  }
+
+  void _openTab(NavigationTab tab) {
+    if (tab == NavigationTab.updates) return;
+
+    final Widget screen = switch (tab) {
+      NavigationTab.chats => const ChatScreen(),
+      NavigationTab.contacts => const ContactsScreen(),
+      NavigationTab.settings => const SettingsScreen(),
+      _ => const ChatScreen(),
+    };
+
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute(builder: (_) => screen),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
+    final feed = ref.watch(updatesFeedProvider);
+
     return AdaptiveNavigationShell(
       currentTab: NavigationTab.updates,
-      onTabSelected: (tab) {
-        if (tab == NavigationTab.chats) {
-          Navigator.of(context).pushReplacement(
-            MaterialPageRoute(builder: (_) => const ChatScreen()),
-          );
-        }
-      },
-      child: _buildContent(context),
+      onTabSelected: _openTab,
+      child: _buildContent(context, feed),
     );
   }
 
-  Widget _buildContent(BuildContext context) {
+  Widget _buildContent(BuildContext context, AsyncValue<UpdatesFeedState> feed) {
     final theme = Theme.of(context).extension<AppColorScheme>() ?? AppColorScheme.dark;
+    // Feed content is always rendered; while the first page is still being
+    // fetched (or failed), empty state + an inline banner carry the UI.
+    final state = feed.value ?? const UpdatesFeedState();
 
     return Container(
       color: theme.background,
@@ -163,9 +116,13 @@ class _UpdatesScreenState extends State<UpdatesScreen> {
                 ),
               ),
 
+              // Inline error banner (only when there's nothing else to show).
+              if (feed.hasError && state.posts.isEmpty)
+                _buildErrorBanner(context, theme),
+
               // Feed
               Expanded(
-                child: _posts.isEmpty
+                child: state.posts.isEmpty
                     ? Center(
                         child: Text(
                           'No updates yet',
@@ -179,10 +136,10 @@ class _UpdatesScreenState extends State<UpdatesScreen> {
                     : ListView.builder(
                         controller: _scrollController,
                         padding: const EdgeInsets.fromLTRB(16.0, 8.0, 16.0, 100.0),
-                        itemCount: _posts.length + 1,
+                        itemCount: state.posts.length + 1,
                         itemBuilder: (context, index) {
-                          if (index < _posts.length) {
-                            final post = _posts[index];
+                          if (index < state.posts.length) {
+                            final post = state.posts[index];
                             return Padding(
                               padding: const EdgeInsets.only(bottom: 16.0),
                               child: UpdateComponent(
@@ -200,7 +157,7 @@ class _UpdatesScreenState extends State<UpdatesScreen> {
                           }
 
                           // Footer: loading spinner, "caught up" message, or nothing.
-                          if (_isLoadingMore) {
+                          if (state.isLoadingMore) {
                             return Padding(
                               padding: const EdgeInsets.symmetric(vertical: 24.0),
                               child: Center(
@@ -215,7 +172,7 @@ class _UpdatesScreenState extends State<UpdatesScreen> {
                               ),
                             );
                           }
-                          if (!_hasMore) {
+                          if (!state.hasMore) {
                             return Padding(
                               padding: const EdgeInsets.symmetric(vertical: 24.0),
                               child: Center(
@@ -246,6 +203,37 @@ class _UpdatesScreenState extends State<UpdatesScreen> {
               backgroundColor: theme.primaryGreen,
               child: Icon(Icons.add, color: theme.buttonContentColor),
             ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildErrorBanner(BuildContext context, AppColorScheme theme) {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16.0, 0, 16.0, 8.0),
+      padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 4.0),
+      decoration: BoxDecoration(
+        color: theme.border.withAlpha(90),
+        borderRadius: BorderRadius.circular(8.0),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.cloud_off_outlined, color: AppColors.mutedSlate, size: 18.0),
+          const SizedBox(width: 8.0),
+          Expanded(
+            child: Text(
+              "Couldn't load updates.",
+              style: AppTypography.getTextStyle(
+                context,
+                AppTextType.tiny,
+                color: AppColors.mutedSlate,
+              ),
+            ),
+          ),
+          TextButton(
+            onPressed: () => ref.read(updatesFeedProvider.notifier).refresh(),
+            child: const Text('Retry'),
           ),
         ],
       ),

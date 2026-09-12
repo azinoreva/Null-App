@@ -1,56 +1,71 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../state/providers.dart';
 import '../widgets/app_theme.dart';
 import '../widgets/display/contact_card.dart';
 import '../widgets/display/navigation.dart';
 import 'chat_screen.dart';
+import 'settings_screen.dart';
+import 'updates_screen.dart';
 
-class ContactsScreen extends StatelessWidget {
-  final List<ContactData> contacts;
-
-  const ContactsScreen({
-    super.key,
-    this.contacts = const [],
-  });
+/// Contacts screen: contact list owned by Riverpod ([contactsProvider]) and
+/// kept alive, so leaving the screen and returning renders the cached
+/// contacts instantly.
+class ContactsScreen extends ConsumerWidget {
+  const ContactsScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final contacts = ref.watch(contactsProvider);
+
     return AdaptiveNavigationShell(
       currentTab: NavigationTab.contacts,
       onTabSelected: (tab) {
+        if (tab == NavigationTab.contacts) return;
         if (tab == NavigationTab.chats) {
           Navigator.of(context).pushReplacement(
             MaterialPageRoute(builder: (_) => const ChatScreen()),
           );
+          return;
+        }
+        if (tab == NavigationTab.updates) {
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(builder: (_) => const UpdatesScreen()),
+          );
+          return;
+        }
+        if (tab == NavigationTab.settings) {
+          Navigator.of(context).push(
+            MaterialPageRoute(builder: (_) => const SettingsScreen()),
+          );
         }
       },
-      child: ContactsListScreen(contacts: contacts),
+      child: contacts.when(
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (error, stackTrace) => Center(
+          child: Text(
+            'Could not load contacts.',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: Theme.of(context)
+                      .extension<AppColorScheme>()
+                      ?.textInputColor ??
+                  AppColorScheme.dark.textInputColor,
+            ),
+          ),
+        ),
+        data: (rows) => ContactsListScreen(
+          contacts: rows,
+          onOpenSettings: () => Navigator.of(context).push(
+            MaterialPageRoute(builder: (_) => const SettingsScreen()),
+          ),
+        ),
+      ),
     );
   }
 }
 
-/// Simple data holder for one contact entry.
-///
-/// [displayName] follows the same "Name - Title" convention used by
-/// [ContactCard] (e.g. "Alice Johnson - Product Designer").
-class ContactData {
-  final String avatarUrl;
-  final String displayName;
-  final int isOnline;
-
-  const ContactData({
-    required this.avatarUrl,
-    required this.displayName,
-    required this.isOnline,
-  });
-
-  /// Just the name portion, used for sorting / grouping by letter.
-  String get name {
-    final dashIndex = displayName.indexOf('-');
-    return dashIndex == -1 ? displayName.trim() : displayName.substring(0, dashIndex).trim();
-  }
-}
-
-/// Contacts list screen: title row, search field, "Add New Contact" button,
+/// Contacts list screen: title row, search field, and a floating add-contact button,
 /// and an alphabetically-grouped contact list built entirely from [contacts].
 ///
 /// This screen does NOT include the bottom navbar - it's meant to be wrapped
@@ -58,11 +73,13 @@ class ContactData {
 class ContactsListScreen extends StatefulWidget {
   final List<ContactData> contacts;
   final VoidCallback? onAddContact;
+  final VoidCallback? onOpenSettings;
 
   const ContactsListScreen({
     super.key,
     required this.contacts,
     this.onAddContact,
+    this.onOpenSettings,
   });
 
   @override
@@ -134,12 +151,14 @@ class _ContactsListScreenState extends State<ContactsListScreen> {
       );
     }
 
-    return Container(
-      color: theme.background,
-      padding: const EdgeInsets.symmetric(horizontal: 16.0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
+    return Stack(
+      children: [
+        Container(
+          color: theme.background,
+          padding: const EdgeInsets.symmetric(horizontal: 16.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
           const SizedBox(height: 16.0),
 
           // Title row
@@ -158,9 +177,9 @@ class _ContactsListScreenState extends State<ContactsListScreen> {
                 ),
               ),
               IconButton(
-                onPressed: _handleAddContact,
-                icon: Icon(Icons.person_add_alt_outlined, color: theme.textInputColor),
-                tooltip: 'Add contact',
+                onPressed: widget.onOpenSettings,
+                icon: Icon(Icons.settings_outlined, color: theme.textInputColor),
+                tooltip: 'Settings',
               ),
             ],
           ),
@@ -193,13 +212,6 @@ class _ContactsListScreenState extends State<ContactsListScreen> {
           ),
           const SizedBox(height: 12.0),
 
-          // Add New Contact button (dashed outline)
-          _DashedButton(
-            onTap: _handleAddContact,
-            theme: theme,
-          ),
-          const SizedBox(height: 12.0),
-
           // Contact list
           Expanded(
             child: listItems.isEmpty
@@ -218,8 +230,20 @@ class _ContactsListScreenState extends State<ContactsListScreen> {
                     children: listItems,
                   ),
           ),
-        ],
-      ),
+            ],
+          ),
+        ),
+        Positioned(
+          right: 16.0,
+          bottom: 16.0,
+          child: FloatingActionButton(
+            onPressed: _handleAddContact,
+            backgroundColor: theme.primaryGreen,
+            tooltip: 'Add contact',
+            child: Icon(Icons.person_add_alt_outlined, color: theme.buttonContentColor),
+          ),
+        ),
+      ],
     );
   }
 }
@@ -252,85 +276,3 @@ class _SectionHeader extends StatelessWidget {
   }
 }
 
-class _DashedButton extends StatelessWidget {
-  final VoidCallback onTap;
-  final AppColorScheme theme;
-
-  const _DashedButton({required this.onTap, required this.theme});
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(30.0),
-      child: CustomPaint(
-        painter: _DashedRRectPainter(color: AppColors.mutedSlate, radius: 30.0),
-        child: Container(
-          width: double.infinity,
-          padding: const EdgeInsets.symmetric(vertical: 12.0),
-          alignment: Alignment.center,
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(Icons.person_add_alt_outlined, size: 18.0, color: AppColors.mutedSlate),
-              const SizedBox(width: 8.0),
-              Text(
-                'Add New Contact',
-                style: AppTypography.getTextStyle(
-                  context,
-                  AppTextType.body,
-                  color: AppColors.mutedSlate,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _DashedRRectPainter extends CustomPainter {
-  final Color color;
-  final double radius;
-  final double dashWidth;
-  final double dashSpace;
-
-  _DashedRRectPainter({
-    required this.color,
-    required this.radius,
-    this.dashWidth = 6.0,
-    this.dashSpace = 4.0,
-  });
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = color
-      ..strokeWidth = 1.5
-      ..style = PaintingStyle.stroke;
-
-    final rrect = RRect.fromRectAndRadius(
-      Rect.fromLTWH(0, 0, size.width, size.height),
-      Radius.circular(radius),
-    );
-    final path = Path()..addRRect(rrect);
-    final dashedPath = Path();
-
-    for (final metric in path.computeMetrics()) {
-      double distance = 0.0;
-      while (distance < metric.length) {
-        final next = distance + dashWidth;
-        dashedPath.addPath(
-          metric.extractPath(distance, next.clamp(0, metric.length)),
-          Offset.zero,
-        );
-        distance = next + dashSpace;
-      }
-    }
-    canvas.drawPath(dashedPath, paint);
-  }
-
-  @override
-  bool shouldRepaint(covariant _DashedRRectPainter oldDelegate) => false;
-}

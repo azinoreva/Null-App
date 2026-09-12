@@ -8,7 +8,7 @@ import 'package:drift/drift.dart';
 import '../../database/app_database.dart';
 import '../../database/queries/contacts_queries.dart';
 import '../../crypto/chat/asymetric_encryption.dart'; // decryptMessage
-import '../../image_handling/string_to_blob.dart';
+import '../../media_handling/string_to_blob.dart';
 
 /// Takes an incoming encrypted identity-card message, decrypts it with
 /// the current user's private key, parses the resulting JSON, and saves

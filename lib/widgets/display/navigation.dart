@@ -173,16 +173,23 @@ class _DesktopSideNav extends StatelessWidget {
       child: Column(
         children: [
           const SizedBox(height: 24.0),
-          _buildNavItem(context, tab: NavigationTab.alerts, icon: Icons.notifications_none, label: 'Alerts'),
-          const SizedBox(height: 8.0),
-          _buildNavItem(context, tab: NavigationTab.chats, icon: Icons.chat_bubble_outline, label: 'Chats'),
-          const SizedBox(height: 8.0),
-          _buildNavItem(context, tab: NavigationTab.contacts, icon: Icons.person_outline, label: 'Contacts'),
-          const SizedBox(height: 8.0),
-          _buildNavItem(context, tab: NavigationTab.groups, icon: Icons.people_outline, label: 'Groups'),
-          
-          const Spacer(),
-          
+          // Top destinations scroll if the window gets too short, so the
+          // bottom block (Updates / Settings / profile) is always on screen.
+          Expanded(
+            child: SingleChildScrollView(
+              child: Column(
+                children: [
+                  _buildNavItem(context, tab: NavigationTab.alerts, icon: Icons.notifications_none, label: 'Alerts'),
+                  const SizedBox(height: 8.0),
+                  _buildNavItem(context, tab: NavigationTab.chats, icon: Icons.chat_bubble_outline, label: 'Chats'),
+                  const SizedBox(height: 8.0),
+                  _buildNavItem(context, tab: NavigationTab.contacts, icon: Icons.person_outline, label: 'Contacts'),
+                  const SizedBox(height: 8.0),
+                  _buildNavItem(context, tab: NavigationTab.groups, icon: Icons.people_outline, label: 'Groups'),
+                ],
+              ),
+            ),
+          ),
           _buildNavItem(context, tab: NavigationTab.updates, icon: Icons.campaign_outlined, label: 'Updates'),
           const SizedBox(height: 8.0),
           _buildNavItem(context, tab: NavigationTab.settings, icon: Icons.settings_outlined, label: 'Settings'),
@@ -208,30 +215,35 @@ class _DesktopSideNav extends StatelessWidget {
         ? const Color(0xFF2C3239) 
         : AppColors.neutralGray.withOpacity(0.5);
 
-    return InkWell(
-      onTap: () => onTabSelected(tab),
-      borderRadius: BorderRadius.circular(16.0),
-      child: Container(
-        width: 64.0,
-        padding: const EdgeInsets.symmetric(vertical: 12.0),
-        decoration: BoxDecoration(
-          color: isActive ? activeBgColor : Colors.transparent,
-          borderRadius: BorderRadius.circular(16.0),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, color: color, size: 24.0),
-            const SizedBox(height: 4.0),
-            Text(
-              label,
-              style: AppTypography.getTextStyle(
-                context,
-                AppTextType.tiny,
-                color: color,
-              ).copyWith(fontSize: 10.0),
+    return SizedBox(
+      width: double.infinity,
+      height: 72.0,
+      child: InkWell(
+        onTap: () => onTabSelected(tab),
+        child: Center(
+          child: Container(
+            width: 64.0,
+            padding: const EdgeInsets.symmetric(vertical: 12.0),
+            decoration: BoxDecoration(
+              color: isActive ? activeBgColor : Colors.transparent,
+              borderRadius: BorderRadius.circular(16.0),
             ),
-          ],
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(icon, color: color, size: 24.0),
+                const SizedBox(height: 4.0),
+                Text(
+                  label,
+                  style: AppTypography.getTextStyle(
+                    context,
+                    AppTextType.tiny,
+                    color: color,
+                  ).copyWith(fontSize: 10.0),
+                ),
+              ],
+            ),
+          ),
         ),
       ),
     );

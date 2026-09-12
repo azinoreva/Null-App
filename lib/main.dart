@@ -14,11 +14,13 @@ import 'engine/network/main_server_client.dart';
 import 'engine/database/init_db.dart';
 import '/engine/engine.dart';
 import 'state/providers.dart';
+import 'engine/functions/settings/settings.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await dotenv.load();
   MainServerClient.init();
+  await AppSettings.init();
   final database = await DatabaseInitializer.initialize();
   await TaskEngine.start(database: database);
   runApp(
@@ -64,23 +66,38 @@ class _MyAppState extends State<MyApp> {
 
     final bool isLaunched = _prefs!.getBool('is_launched') ?? false;
 
-    return MaterialApp(
-      title: 'Null App',
-      theme: ThemeData(
-        brightness: Brightness.dark,
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: AppColors.darkGreen,
-          brightness: Brightness.dark,
-        ),
-        extensions: const [AppColorScheme.dark],
-      ),
-      debugShowCheckedModeBanner: false,
-      home: isLaunched
-          ? DecisionScreen(prefs: _prefs!) // skip splash
-          : SplashScreen(
-              prefs: _prefs!,
-              destination: DecisionScreen(prefs: _prefs!),
+    return ListenableBuilder(
+      listenable: AppSettings.instance,
+      builder: (context, _) {
+        final bool isDark = AppSettings.instance.isDarkMode;
+        return MaterialApp(
+          title: 'Null App',
+          themeMode: isDark ? ThemeMode.dark : ThemeMode.light,
+          theme: ThemeData(
+            brightness: Brightness.light,
+            colorScheme: ColorScheme.fromSeed(
+              seedColor: AppColors.lightGreen,
+              brightness: Brightness.light,
             ),
+            extensions: const [AppColorScheme.light],
+          ),
+          darkTheme: ThemeData(
+            brightness: Brightness.dark,
+            colorScheme: ColorScheme.fromSeed(
+              seedColor: AppColors.darkGreen,
+              brightness: Brightness.dark,
+            ),
+            extensions: const [AppColorScheme.dark],
+          ),
+          debugShowCheckedModeBanner: false,
+          home: isLaunched
+              ? DecisionScreen(prefs: _prefs!) // skip splash
+              : SplashScreen(
+                  prefs: _prefs!,
+                  destination: DecisionScreen(prefs: _prefs!),
+                ),
+        );
+      },
     );
   }
 }

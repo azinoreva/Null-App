@@ -8,9 +8,9 @@ import '../../database/app_database.dart';
 import '../../database/queries/groups_queries.dart';
 import '../../database/queries/identity_queries.dart';
 import '../../crypto/groups/group_key.dart';
-import '../../image_handling/shrink_image.dart';
-import '../../image_handling/string_to_blob.dart';
-import '../../image_handling/dicebear.dart'; // wherever DicebearService lives
+import '../../media_handling/shrink_image.dart';
+import '../../media_handling/string_to_blob.dart';
+import '../../media_handling/dicebear.dart'; // wherever DicebearService lives
 
 const _uuid = Uuid();
 
