@@ -1,5 +1,6 @@
 // lib/services/media_storage_service.dart
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:path_provider/path_provider.dart';
 
@@ -42,6 +43,23 @@ class MediaStorageService {
       await sourceFile.copy(destinationPath);
     }
 
+    return destinationPath;
+  }
+
+  /// Saves downloaded media bytes into the app's internal media folder.
+  static Future<String> saveBytesToInternalStorage(
+    Uint8List bytes, {
+    String extension = '.bin',
+  }) async {
+    final appDir = await getApplicationDocumentsDirectory();
+    final mediaDir = Directory('${appDir.path}/media');
+    if (!await mediaDir.exists()) {
+      await mediaDir.create(recursive: true);
+    }
+
+    final destinationPath =
+        '${mediaDir.path}/${DateTime.now().microsecondsSinceEpoch}$extension';
+    await File(destinationPath).writeAsBytes(bytes);
     return destinationPath;
   }
 

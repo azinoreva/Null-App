@@ -1,6 +1,15 @@
+import 'dart:io';
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:file_picker/file_picker.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../widgets/app_theme.dart';
 import '../engine/functions/settings/settings.dart';
+import '../engine/database/queries/identity_queries.dart';
+import '../engine/media_handling/dicebear.dart';
+import '../engine/media_handling/media_storage.dart';
+import '../state/providers.dart';
 import 'modals/automatic_messages.dart';
 import 'modals/choose_interests.dart';
 
@@ -21,16 +30,16 @@ import 'modals/choose_interests.dart';
 /// Storage, Backup, Set Automatic Message, Updates Preferences) are wired
 /// to empty stub functions with `// TODO` markers so you can hook up
 /// navigation later.
-class SettingsScreen extends StatefulWidget {
+class SettingsScreen extends ConsumerStatefulWidget {
   final VoidCallback? onBack;
 
   const SettingsScreen({super.key, this.onBack});
 
   @override
-  State<SettingsScreen> createState() => _SettingsScreenState();
+  ConsumerState<SettingsScreen> createState() => _SettingsScreenState();
 }
 
-class _SettingsScreenState extends State<SettingsScreen> {
+class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   late final AppSettings _settings;
   late final TextEditingController _nicknameController;
   late final TextEditingController _titleController;
@@ -43,6 +52,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     _nicknameController = TextEditingController(text: _settings.nickname);
     _titleController = TextEditingController(text: _settings.title ?? '');
     _bioController = TextEditingController(text: _settings.bio ?? '');
+    unawaited(_ensureProfilePicture());
   }
 
   @override
@@ -123,9 +133,64 @@ class _SettingsScreenState extends State<SettingsScreen> {
     // TODO: navigate to the backup flow.
   }
 
-  void _pickProfilePicture() {
-    // TODO: open an image picker, then call
-    // `_settings.setProfilePicture(path)`.
+  Future<void> _pickProfilePicture() async {
+    try {
+      final result = await FilePicker.pickFiles(type: FileType.image);
+      final identityDao = ref.read(appDatabaseProvider).identityDao;
+      final identity = await identityDao.getCurrentIdentityOrNull();
+      if (identity == null) return;
+
+      if (result.isEmpty || result.single.path == null) {
+        await _ensureProfilePicture();
+        return;
+      }
+
+      final avatarPath = await MediaStorageService.copyMediaToInternalStorage(
+        result.single.path!,
+      );
+      await _persistProfilePicture(identityDao, avatarPath);
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not save profile picture: $error')),
+      );
+    }
+  }
+
+  Future<void> _ensureProfilePicture() async {
+    try {
+      final identityDao = ref.read(appDatabaseProvider).identityDao;
+      final identity = await identityDao.getCurrentIdentityOrNull();
+      if (identity == null) return;
+
+      final existing = _settings.profilePicture ?? identity.avatar;
+      if (existing != null && existing.isNotEmpty) {
+        if (_settings.profilePicture != existing) {
+          await _settings.setProfilePicture(existing);
+        }
+        return;
+      }
+
+      final avatar = await DicebearService().getAvatarData(identity.identityId);
+      final avatarPath = await MediaStorageService.saveBytesToInternalStorage(
+        avatar.bytes,
+        extension: '.png',
+      );
+      await _persistProfilePicture(identityDao, avatarPath);
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not create profile picture: $error')),
+      );
+    }
+  }
+
+  Future<void> _persistProfilePicture(
+    IdentityDao identityDao,
+    String avatarPath,
+  ) async {
+    await identityDao.setAvatar(avatarPath);
+    await _settings.setProfilePicture(avatarPath);
   }
   // ---------------------------------------------------------------------
 
@@ -843,9 +908,12 @@ class _ProfileEditor extends StatelessWidget {
                 CircleAvatar(
                   radius: 44.0,
                   backgroundColor: AppColors.neutralGray,
-                  backgroundImage: (profilePicture != null && profilePicture!.isNotEmpty)
+                  backgroundImage: profilePicture == null || profilePicture!.isEmpty
+                    ? null
+                    : (profilePicture!.startsWith('http://') ||
+                        profilePicture!.startsWith('https://')
                       ? NetworkImage(profilePicture!)
-                      : null,
+                      : FileImage(File(profilePicture!)) as ImageProvider),
                   child: (profilePicture == null || profilePicture!.isEmpty)
                       ? const Icon(Icons.person, size: 40.0, color: AppColors.pureWhite)
                       : null,

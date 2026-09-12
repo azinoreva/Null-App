@@ -1,7 +1,6 @@
 // lib/settings/app_settings.dart
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-
 import 'categories.dart';
 
 /// Theme options for the app.
@@ -358,6 +357,7 @@ class AppSettings extends ChangeNotifier {
       _kMessageSound,
       _kVibration,
       _kAutomaticMessage,
+      _kAutomaticMedia,
       _kAllowFriendRequests,
       _kFeedControl,
       _kProfilePicture,
@@ -384,6 +384,7 @@ class AppSettings extends ChangeNotifier {
         'messageSound': messageSound,
         'vibration': vibration,
         'automaticMessage': automaticMessage,
+        'automaticMedia': automaticMedia,
         'allowFriendRequests': allowFriendRequests,
         'feedControl': feedControl.map((c) => c.id).toList(),
         'profilePicture': profilePicture,
