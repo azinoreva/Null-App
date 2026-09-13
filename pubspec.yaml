@@ -57,6 +57,7 @@ dependencies:
   flutter_riverpod: ^3.4.3
   dice_bear: ^1.0.4
   disk_space_plus: ^0.2.6
+  audioplayers: ^6.8.1
 
 dev_dependencies:
   flutter_test:
