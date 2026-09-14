@@ -4,8 +4,11 @@ import 'dart:convert';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../engine/database/app_database.dart';
+import '../engine/engine.dart';
+import '../engine/task_queue.dart';
 import '../engine/network/updates/check_updates.dart';
 import '../engine/database/queries/contacts_queries.dart';
+import '../engine/database/queries/conversations_queries.dart';
 import '../engine/database/queries/group_members_queries.dart';
 import '../engine/database/queries/groups_queries.dart';
 import '../engine/database/queries/identity_queries.dart';
@@ -70,6 +73,23 @@ final appDatabaseProvider = Provider<AppDatabase>((ref) {
     'appDatabaseProvider must be overridden in ProviderScope '
     'with the initialized AppDatabase instance.',
   );
+});
+
+final taskEngineProvider = Provider<TaskEngine>((ref) {
+  throw UnimplementedError(
+    'taskEngineProvider must be overridden in ProviderScope.',
+  );
+});
+
+final taskQueueProvider = Provider<TaskQueue>((ref) {
+  return TaskQueue(
+    database: ref.watch(appDatabaseProvider),
+    engine: ref.watch(taskEngineProvider),
+  );
+});
+
+final conversationsDaoProvider = Provider<ConversationsDao>((ref) {
+  return ref.watch(appDatabaseProvider).conversationsDao;
 });
 
 /// Data access object for the `sync_state` table.

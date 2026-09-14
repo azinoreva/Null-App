@@ -83,6 +83,21 @@ class MessagesDao extends DatabaseAccessor<AppDatabase>
             ..limit(1))
           .getSingleOrNull();
 
+  Future<int> getLastSenderSequence({
+    required String conversationId,
+    required String senderId,
+  }) async {
+    final sequence = db.messages.senderSequence;
+    final query = selectOnly(db.messages)
+      ..addColumns([sequence.max()])
+      ..where(
+        db.messages.conversationId.equals(conversationId) &
+            db.messages.senderId.equals(senderId),
+      );
+    final row = await query.getSingle();
+    return row.read(sequence.max()) ?? 0;
+  }
+
   // Get the last [limit] messages of a conversation, highest message_order
   // first. Used as a fallback when there is no last message id to anchor on.
   Future<List<Message>> getLastMessages(

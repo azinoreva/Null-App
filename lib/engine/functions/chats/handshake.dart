@@ -2,7 +2,6 @@
 
 import 'dart:async';
 import 'dart:convert';
-import 'dart:typed_data';
 import 'package:cryptography/cryptography.dart';
 import 'package:drift/drift.dart';
 import 'package:uuid/uuid.dart';
@@ -14,10 +13,96 @@ import '../../database/queries/identity_queries.dart';
 import '../../database/queries/sessions_queries.dart';
 import '../../crypto/chat/key_exchange.dart'; // KeyExchange
 import '../../crypto/chat/identity_crypto.dart'; // IdentityCrypto
+import '../../network/api_client.dart';
 import '../../network/chats/send_message.dart';
 import 'handshake_registry.dart.dart';
 
 const _uuid = Uuid();
+
+Future<void> sendDhHandshakeTask(
+  List<dynamic> args,
+  AppDatabase database,
+) async {
+  final contactId = args[0] as String;
+  final serverId = args[1] as String;
+  await _ensureServerRegistered(database, serverId);
+  final contact = await database.contactsDao.getContactById(contactId);
+  if (contact == null || contact.publicKey == null) {
+    throw StateError('Contact $contactId has no identity key.');
+  }
+
+  final session = await database.sessionsDao.getSessionByConversationId(
+    contactId,
+  );
+  if (session?.status == 2 || session?.status == 1) return;
+
+  final identity = await database.identityDao.getCurrentIdentityOrNull();
+  if (identity?.publicKey == null) {
+    throw StateError('Local identity has no public key.');
+  }
+
+  final ephemeral = session?.ephemeralPrivateKey == null ||
+          session?.ephemeralPublicKey == null
+      ? await KeyExchange.generateEphemeralKeyPair()
+      : null;
+  final privateKey = ephemeral?.privateKey ?? session!.ephemeralPrivateKey!;
+  final publicKey = ephemeral?.publicKey ?? session!.ephemeralPublicKey!;
+
+  if (ephemeral != null) {
+    await database.sessionsDao.startPendingSession(
+      conversationId: contactId,
+      ephemeralPrivateKey: privateKey,
+      ephemeralPublicKey: publicKey,
+    );
+  }
+
+  final signature = await KeyExchange.signExchange(
+    identity: const IdentityCrypto(),
+    conversationId: contactId,
+    localIdentityId: identity!.identityId,
+    peerIdentityId: contactId,
+    localIdentityPublicKey: base64Decode(identity.publicKey!),
+    peerIdentityPublicKey: base64Decode(contact.publicKey!),
+    localEphemeralPublicKey: publicKey,
+    peerEphemeralPublicKey: Uint8List(0),
+    initiator: true,
+  );
+
+  await _sendDhPayload(
+    contactId: contactId,
+    contactUserName: contact.nickname ?? contactId,
+    serverId: serverId,
+    ephemeralPublicKey: publicKey,
+    signature: signature,
+  );
+}
+
+Future<void> sendHandshakeConfirmationTask(
+  List<dynamic> args,
+  AppDatabase database,
+) async {
+  final contactId = args[0] as String;
+  final serverId = args[1] as String;
+  await _ensureServerRegistered(database, serverId);
+  final session = await database.sessionsDao.getSessionByConversationId(
+    contactId,
+  );
+  if (session?.status == 2) return;
+  final symmetricKey = session?.symmetricKey;
+  if (symmetricKey == null) {
+    throw StateError('Waiting for DH exchange with $contactId.');
+  }
+
+  final contact = await database.contactsDao.getContactById(contactId);
+  if (contact == null) throw StateError('Contact $contactId not found.');
+
+  await sendOknullConfirmation(
+    contactId: contactId,
+    contactUserName: contact.nickname ?? contactId,
+    serverId: serverId,
+    symmetricKeyBytes: symmetricKey,
+  );
+}
 
 /// Starts (or resumes) an encrypted conversation as the initiator. Sends
 /// our DH public key (message type 0), and retries until the contact
@@ -119,7 +204,7 @@ Future<void> startEncryptedConversation(
     maxAttempts: maxAttempts,
     attemptTimeout: attemptTimeout,
     waitFor: () => HandshakeRegistry.instance.registerConfirmWait(contactId),
-    send: () => _sendOknullConfirmation(
+    send: () => sendOknullConfirmation(
       contactId: contactId,
       contactUserName: contact.nickname ?? contactId,
       serverId: serverId,
@@ -195,11 +280,12 @@ Future<void> _sendDhPayload({
   );
 }
 
-Future<void> _sendOknullConfirmation({
+Future<void> sendOknullConfirmation({
   required String contactId,
   required String contactUserName,
   required String serverId,
   required Uint8List symmetricKeyBytes,
+  bool reply = false,
 }) async {
   final aesGcm = AesGcm.with256bits();
   final secretKey = SecretKey(symmetricKeyBytes);
@@ -210,6 +296,7 @@ Future<void> _sendOknullConfirmation({
 
   final payload = jsonEncode({
     'kind': 'confirmation',
+    'reply': reply,
     'nonce': base64UrlEncode(secretBox.nonce),
     'ciphertext': base64UrlEncode(secretBox.cipherText),
     'mac': base64UrlEncode(secretBox.mac.bytes),
@@ -228,5 +315,21 @@ Future<void> _sendOknullConfirmation({
     messageOrder: 0,
     nonce: 'none',
     senderSequence: 0,
+  );
+}
+
+Future<void> _ensureServerRegistered(
+  AppDatabase database,
+  String serverId,
+) async {
+  if (ApiClient.isRegistered(serverId)) return;
+  final server = await database.serversDao.getServerById(serverId);
+  if (server == null || server.serverUrl.isEmpty) {
+    throw StateError('No URL is stored for server $serverId.');
+  }
+  ApiClient.registerServer(
+    serverId: serverId,
+    baseUrl: server.serverUrl,
+    onAuthFailure: () {},
   );
 }

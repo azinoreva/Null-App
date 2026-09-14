@@ -5,7 +5,6 @@ import 'package:drift/drift.dart';
 
 import '../../database/app_database.dart';
 import '../../database/queries/contacts_queries.dart';
-import '../../database/queries/identity_queries.dart';
 import '../../database/queries/messages_queries.dart';
 import '../../crypto/chat/null_crypto.dart'; // NullCrypto
 
@@ -36,6 +35,7 @@ Future<void> receiveChatMessage(
   final ciphertext = base64Url.decode(decoded['ciphertext'] as String);
   final nonce = base64Url.decode(decoded['nonce'] as String);
   final mac = base64Url.decode(decoded['mac'] as String);
+  final senderSequence = decoded['sender_sequence'] as int? ?? 1;
 
   // AAD must match exactly what the sender used, or decryption/auth
   // fails — sendChatMessage bound it to the conversationId.
@@ -58,7 +58,7 @@ Future<void> receiveChatMessage(
     logicalMessageId: logicalId,
     conversationId: senderContactId,
     senderId: senderContactId,
-    senderSequence: 1,
+    senderSequence: senderSequence,
     messageOrder: chainIndex,
     chainIndex: chainIndex,
     timestamp: now,

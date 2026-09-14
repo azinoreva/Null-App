@@ -22,12 +22,16 @@ void main() async {
   MainServerClient.init();
   await AppSettings.init();
   final database = await DatabaseInitializer.initialize();
-  await TaskEngine.start(database: database);
+  final taskEngine = await TaskEngine.start(
+    database: database,
+    initiallyOnline: true,
+  );
   runApp(
     ProviderScope(
       overrides: [
         // Make the initialized database available to every Riverpod provider.
         appDatabaseProvider.overrideWithValue(database),
+        taskEngineProvider.overrideWithValue(taskEngine),
       ],
       child: const MyApp(),
     ),

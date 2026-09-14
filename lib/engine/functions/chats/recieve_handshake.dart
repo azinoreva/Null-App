@@ -9,6 +9,7 @@ import '../../database/queries/messages_queries.dart';
 import '../../database/queries/sessions_queries.dart';
 import '../../crypto/chat/key_exchange.dart';
 import '../../crypto/chat/identity_crypto.dart';
+import 'handshake.dart';
 import 'handshake_registry.dart.dart';
 
 /// Call this from your SSE listener for every incoming message where
@@ -49,6 +50,7 @@ Future<bool> handleIncomingHandshakeMessage(
 
   if (kind == 'confirmation') {
     await _handleConfirmation(
+      contactsDao,
       sessionsDao,
       senderContactId: senderContactId,
       decoded: decoded,
@@ -131,6 +133,7 @@ Future<void> _handleDhExchange(
 }
 
 Future<void> _handleConfirmation(
+  ContactsDao contactsDao,
   SessionsDao sessionsDao, {
   required String senderContactId,
   required Map<String, dynamic> decoded,
@@ -158,5 +161,20 @@ Future<void> _handleConfirmation(
     throw StateError('Confirmation from $senderContactId was not "oknull".');
   }
 
+  final contact = await contactsDao.getContactById(senderContactId);
+  if (contact == null) {
+    throw StateError('Contact $senderContactId not found.');
+  }
+
+  await sessionsDao.markEstablished(senderContactId);
+  if (decoded['reply'] != true) {
+    await sendOknullConfirmation(
+      contactId: senderContactId,
+      contactUserName: contact.nickname ?? senderContactId,
+      serverId: contact.serverId,
+      symmetricKeyBytes: symmetricKeyBytes,
+      reply: true,
+    );
+  }
   HandshakeRegistry.instance.confirmOknullReceived(senderContactId);
 }

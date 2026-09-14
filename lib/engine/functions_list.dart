@@ -15,6 +15,8 @@ import 'database/queries/messages_queries.dart';
 import 'database/queries/network_queries.dart';
 import 'database/queries/servers_queries.dart';
 import 'database/queries/sessions_queries.dart';
+import 'database/queries/tasks_queries.dart';
+import 'engine.dart';
 import 'network/servers/servers.dart';
 import 'crypto/shamirs/vault_secrets.dart';
 import 'functions/auth/loginfxn.dart' as auth_login;
@@ -36,7 +38,27 @@ import 'functions/people/sendmycontact.dart' as contact_details;
 import 'functions/security/share_secret.dart' as secret;
 import 'functions/servers/serverfxn.dart' as server;
 
-final Map<String, dynamic> functionRegistry = {};
+final Map<String, dynamic> functionRegistry = {
+  'sendChatHandshakeDh': TaskDefinition(
+    kind: TaskKind.network,
+    databaseExecutor: (payload, database) =>
+        handshake.sendDhHandshakeTask(payload.functionArgs, database),
+  ),
+  'sendChatHandshakeConfirmation': TaskDefinition(
+    kind: TaskKind.network,
+    databaseExecutor: (payload, database) =>
+        handshake.sendHandshakeConfirmationTask(payload.functionArgs, database),
+  ),
+  'sendChatMessage': TaskDefinition(
+    kind: TaskKind.network,
+    databaseExecutor: _sendChatMessageTask,
+  ),
+};
+
+Future<void> _sendChatMessageTask(
+  TaskPayload payload,
+  AppDatabase database,
+) => chat_send.sendQueuedChatMessage(payload.functionArgs, database);
 
 class FunctionsList {
   //auth

@@ -96,10 +96,8 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:isolate';
-import 'dart:typed_data';
 
 import 'package:drift/drift.dart';
-import 'package:drift/native.dart';
 
 import 'database/app_database.dart';
 import 'database/queries/tasks_queries.dart';
@@ -113,17 +111,26 @@ const int kMaxRetries = 10000;
 /// Shared contract type: what every entry in functions_list.dart's
 /// `functionRegistry` map looks like.
 typedef IsolateTaskExecutor = Future<void> Function(TaskPayload payload);
+typedef DatabaseTaskExecutor = Future<void> Function(
+  TaskPayload payload,
+  AppDatabase database,
+);
 
 /// Pairs an executor with the network kind it was registered under. The
 /// kind is read once, at enqueue time (see TaskQueue.queueTask), and
 /// stamped onto the row -- the engine's claim query never re-derives it.
 class TaskDefinition {
-  const TaskDefinition({required this.kind, required this.executor});
+  const TaskDefinition({
+    required this.kind,
+    this.executor,
+    this.databaseExecutor,
+  }) : assert(executor != null || databaseExecutor != null);
 
   /// One of [TaskKind.network] / [TaskKind.nonNetwork] (from
   /// tasks_queries.dart).
   final int kind;
-  final IsolateTaskExecutor executor;
+  final IsolateTaskExecutor? executor;
+  final DatabaseTaskExecutor? databaseExecutor;
 }
 
 /// What an executor function in functions_list.dart actually receives.
@@ -381,6 +388,28 @@ class _EngineWorker {
       finish(_WorkerResult.failure(task.taskId, description));
     });
 
+    final definition = functions.functionRegistry[task.functionName];
+    if (definition is TaskDefinition && definition.databaseExecutor != null) {
+      try {
+        final decodedArgs = jsonDecode(task.functionArgsJson) as List<dynamic>;
+        final payload = TaskPayload(
+          taskId: task.taskId,
+          functionArgs: decodedArgs,
+          blobs: task.blobs,
+          taskData: task.taskData,
+        );
+        definition.databaseExecutor!(payload, database).then(
+          (_) => finish(_WorkerResult.success(task.taskId)),
+          onError: (Object error, StackTrace stackTrace) {
+            finish(_WorkerResult.failure(task.taskId, '$error\n$stackTrace'));
+          },
+        );
+      } catch (error, stackTrace) {
+        finish(_WorkerResult.failure(task.taskId, '$error\n$stackTrace'));
+      }
+      return handle;
+    }
+
     Isolate.spawn(
       _workerEntryPoint,
       _WorkerRequest(
@@ -540,7 +569,13 @@ void _workerEntryPoint(_WorkerRequest req) async {
       taskData: req.taskData,
     );
 
-    await definition.executor(payload);
+    final executor = definition.executor;
+    if (executor == null) {
+      throw StateError(
+        'Task definition for "${req.functionName}" has no isolate executor.',
+      );
+    }
+    await executor(payload);
     req.replyPort.send(_WorkerResult.success(req.taskId));
   } catch (error, stackTrace) {
     req.replyPort.send(

@@ -90,10 +90,8 @@ Future<int> deleteServerById(ServersDao serversDao, String serverId) {
   return serversDao.deleteServer(serverId);
 }
 /// 4. Refreshes local servers from the remote directory.
-/// Fetches the server list, then for each returned server that already
-/// exists locally, updates only the fields that changed. Servers the
-/// remote directory returns but that aren't already in the local DB are
-/// ignored entirely — this function never creates new rows.
+/// Fetches the server list and persists every returned server, including its
+/// server URL. Existing rows are updated in place; new rows are inserted.
 Future<void> refreshServers(
   ServersDao serversDao,
   ServerDirectoryService directoryService,
@@ -104,7 +102,17 @@ Future<void> refreshServers(
     final local = await serversDao.getServerById(remote.serverId);
 
     if (local == null) {
-      // Unknown server — ignored, per spec.
+      await createServer(
+        serversDao,
+        serverId: remote.serverId,
+        serverName: remote.serverName,
+        serverUrl: remote.serverUrl,
+        mediaUrl: remote.mediaUrl,
+        mediaSizeLimit: remote.mediaSizeLimit,
+        mediaTimer: remote.mediaTimer,
+        maxPayload: remote.maxPayload,
+        capabilities: remote.capabilities,
+      );
       continue;
     }
 

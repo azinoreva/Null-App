@@ -1,5 +1,8 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:uuid/uuid.dart';
 
 import '../state/providers.dart';
 import '../widgets/chats/chat_bubble_component.dart';
@@ -26,6 +29,7 @@ class Chatting extends ConsumerStatefulWidget {
 }
 
 class _ChattingState extends ConsumerState<Chatting> {
+  static const _uuid = Uuid();
   final ScrollController _scrollController = ScrollController();
   int _lastItemCount = 0;
 
@@ -101,11 +105,69 @@ class _ChattingState extends ConsumerState<Chatting> {
                 .read(syncStateDaoProvider)
                 .updateDraft(widget.conversationId, text),
             groupMembers: const [],
-            onSendMessage: (text, mediaType, {mediaUrl}) {},
+            onSendMessage: (text, mediaType, {mediaUrl}) {
+              unawaited(_queueMessage(text));
+            },
           ),
         ],
       ),
     );
+  }
+
+  Future<void> _queueMessage(String text) async {
+    final conversation = await ref
+        .read(conversationsDaoProvider)
+        .getConversationById(widget.conversationId);
+    if (!mounted) return;
+
+    if (conversation == null || conversation.serverId.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('This conversation has no server.')),
+      );
+      return;
+    }
+
+    try {
+      final session = await ref
+          .read(appDatabaseProvider)
+          .sessionsDao
+          .getSessionByConversationId(widget.conversationId);
+      final handshakeRequired = session?.status != 2;
+
+      if (handshakeRequired) {
+        await ref.read(taskQueueProvider).queueTask(
+              functionName: 'sendChatHandshakeDh',
+              args: [widget.conversationId, conversation.serverId],
+              serverId: conversation.serverId,
+            );
+        await ref.read(taskQueueProvider).queueTask(
+              functionName: 'sendChatHandshakeConfirmation',
+              args: [widget.conversationId, conversation.serverId],
+              serverId: conversation.serverId,
+            );
+      }
+
+      await ref.read(taskQueueProvider).queueTask(
+            functionName: 'sendChatMessage',
+            args: [
+              widget.conversationId,
+              text,
+              conversation.serverId,
+              _uuid.v4(),
+              _uuid.v4(),
+            ],
+            serverId: conversation.serverId,
+          );
+
+      await ref
+          .read(syncStateDaoProvider)
+          .updateDraft(widget.conversationId, '');
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not queue message: $error')),
+      );
+    }
   }
 
   Widget _buildHeader(BuildContext context, ColorScheme colorScheme) {
