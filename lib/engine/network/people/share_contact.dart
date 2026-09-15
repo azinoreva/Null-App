@@ -6,7 +6,7 @@ import '../api_client.dart';
 /// Result of creating a shareable contact invite.
 class SendContactResult {
   /// Deeplink URL to share with the recipient, e.g.
-  /// `https://null.app/1/c/{passcode}`.
+  /// `https://null.app/server_1/c/{contact_key}`.
   final String url;
 
   /// Seconds until the invite expires (server-confirmed, may differ
@@ -16,10 +16,13 @@ class SendContactResult {
   /// Whether the invite is single-use (destroyed on first fetch).
   final bool oneTime;
 
+  final String contactKey;
+
   const SendContactResult({
     required this.url,
     required this.expiresIn,
     required this.oneTime,
+    required this.contactKey,
   });
 
   factory SendContactResult.fromJson(Map<String, dynamic> json) {
@@ -27,6 +30,7 @@ class SendContactResult {
       url: json['url'] as String,
       expiresIn: json['expires_in'] as int,
       oneTime: json['one_time'] as bool,
+      contactKey: json['contact_key'] as String,
     );
   }
 }
@@ -50,7 +54,7 @@ class SendContactService {
   /// single-use ([oneTime]).
   ///
   /// Returns a [SendContactResult] containing the invite deeplink URL
-  /// (e.g. `https://null.app/1/c/{passcode}`) to be shared with the
+  /// (e.g. `https://null.app/server_1/c/{passcode}`) to be shared with the
   /// recipient, who consumes it via the receive-contact flow.
   ///
   /// Auth (Bearer access token) and refresh-on-401 are handled automatically

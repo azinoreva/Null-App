@@ -7,7 +7,6 @@ profile.
 | File | Purpose |
 |---|---|
 | `connection_request.dart` | Connection-request lifecycle for local DB: `createConnectionRequest` (generates a UUID, pending status, intro + expiry), `acceptConnectionRequest`, `rejectConnectionRequest` (also sweeps expired requests > 30 days). |
-| `contact_invitation.dart` | `sendContactInvitation(identityDao, serverId)` — reads the user's public key and asks the server for an invite link/token via `SendContactService.generateInvite()`. |
 | `save_contacts.dart` | `saveContact(...)` — insert-or-update a contact (avatar as BLOB, `connectionStatus` default 1 / pending). Sets `conversationId = contactId`. |
 | `save_user_details.dart` | `saveProfile(...)` — partial update of the `Identity` row (display name / bio / avatar). |
 | `sendmycontact.dart` | `sendContactDetails(...)` — builds the identity card JSON, encrypts it with the *current user's* own public key (sealed box), and ships it as message type 22 (vCard). `sendContactDetailsBack(...)` does the same but encrypts for the *recipient's* public key — completing a mutually exchanged vCard handshake. |

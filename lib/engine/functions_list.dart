@@ -4,6 +4,7 @@ import 'package:cryptography/cryptography.dart';
 
 import 'crypto/chat/identity_crypto.dart';
 import 'crypto/chat/null_crypto.dart';
+import 'crypto/chat/ratchet_store.dart';
 import 'database/app_database.dart';
 import 'database/queries/connection_requests_queries.dart';
 import 'database/queries/contacts_queries.dart';
@@ -27,8 +28,8 @@ import 'functions/chats/conversation_function.dart' as conversation;
 import 'functions/chats/handshake.dart' as handshake;
 import 'functions/chats/recieve_handshake.dart' as handshake_receive;
 import 'functions/chats/recieve_message.dart' as chat_receive;
+import 'functions/chats/message_types.dart';
 import 'functions/people/connection_request.dart' as connection_request;
-import 'functions/people/contact_invitation.dart' as contact_invitation;
 import 'functions/people/group_membersfxn.dart' as group_member;
 import 'functions/people/groupsfxn.dart' as group;
 import 'functions/people/networkfxn.dart' as network;
@@ -37,6 +38,55 @@ import 'functions/people/save_user_details.dart' as profile;
 import 'functions/people/sendmycontact.dart' as contact_details;
 import 'functions/security/share_secret.dart' as secret;
 import 'functions/servers/serverfxn.dart' as server;
+
+const Map<int, String> incomingMessageTaskNames = {
+  0: 'receiveExchangeMessage',
+  1: 'receiveChatMessage',
+  2: 'receiveMediaMessage',
+  3: 'receivePingMessage',
+  4: 'receivePongMessage',
+  5: 'receiveJoinMessage',
+  6: 'receiveLeaveMessage',
+  7: 'receiveMetadataMessage',
+  8: 'receiveErrorMessage',
+  9: 'receiveKeysMessage',
+  10: 'receiveReadReceipt',
+  11: 'receiveReceivedReceipt',
+  12: 'receivePollMessage',
+  13: 'receivePollVoteMessage',
+  14: 'receivePollCloseMessage',
+  15: 'receivePinMessage',
+  16: 'receiveUnpinMessage',
+  17: 'receiveEditMessage',
+  18: 'receiveDeleteMessage',
+  19: 'receiveThreadReplyMessage',
+  20: 'receiveLinkPreviewMessage',
+  21: 'receiveLocationMessage',
+  22: 'receiveContactCardMessage',
+  23: 'receiveStickerMessage',
+  24: 'receiveTypingStartMessage',
+  25: 'receiveTypingStopMessage',
+  26: 'receiveReactionAddMessage',
+  27: 'receiveReactionRemoveMessage',
+  28: 'receiveRoomRenameMessage',
+  29: 'receiveRoomAvatarUpdateMessage',
+  30: 'receiveUserMuteMessage',
+  31: 'receiveUserKickMessage',
+  32: 'receiveUserBanMessage',
+  33: 'receiveCallStartMessage',
+  34: 'receiveCallEndMessage',
+  35: 'receiveWebrtcSignalMessage',
+  36: 'receiveAnnotationMessage',
+  37: 'receiveUpdatesMessage',
+};
+
+String incomingMessageTaskName(int messageType) {
+  final taskName = incomingMessageTaskNames[messageType];
+  if (taskName == null) {
+    throw ArgumentError('Unknown message type $messageType.');
+  }
+  return taskName;
+}
 
 final Map<String, dynamic> functionRegistry = {
   'sendChatHandshakeDh': TaskDefinition(
@@ -53,12 +103,75 @@ final Map<String, dynamic> functionRegistry = {
     kind: TaskKind.network,
     databaseExecutor: _sendChatMessageTask,
   ),
+  'receiveQueuedMessage': TaskDefinition(
+    kind: TaskKind.nonNetwork,
+    databaseExecutor: _receiveQueuedMessageTask,
+  ),
+  for (final taskName in incomingMessageTaskNames.values)
+    taskName: TaskDefinition(
+      kind: TaskKind.nonNetwork,
+      databaseExecutor: _receiveQueuedMessageTask,
+    ),
 };
 
 Future<void> _sendChatMessageTask(
   TaskPayload payload,
   AppDatabase database,
 ) => chat_send.sendQueuedChatMessage(payload.functionArgs, database);
+
+Future<void> _receiveQueuedMessageTask(
+  TaskPayload payload,
+  AppDatabase database,
+) async {
+  final args = payload.functionArgs;
+  final senderContactId = args[0] as String;
+  final messageId = args[1] as String;
+  final logicalId = args[2] as String;
+  final messageType = args[3] as int;
+  final rawMessage = args[4] as String;
+  final expectedTaskName = incomingMessageTaskName(messageType);
+  if (payload.taskData != null && payload.taskData != expectedTaskName) {
+    throw StateError(
+      'Task ${payload.taskId} has type $messageType but task name '
+      '"${payload.taskData}".',
+    );
+  }
+  final identityCrypto = const IdentityCrypto();
+
+  if (messageType == 0) {
+    await handshake_receive.handleIncomingHandshakeMessage(
+      database.contactsDao,
+      database.identityDao,
+      database.messagesDao,
+      database.sessionsDao,
+      senderContactId: senderContactId,
+      messageType: messageType,
+      rawMessage: rawMessage,
+      myIdentityCrypto: identityCrypto,
+    );
+    return;
+  }
+
+  if (messageType != MessageType.message.value) {
+    throw StateError(
+      'Receive handler for message type $messageType is not wired yet.',
+    );
+  }
+
+  final crypto = NullCrypto(
+    identity: identityCrypto,
+    ratchetStore: const RatchetStore(),
+  );
+  await chat_receive.receiveChatMessage(
+    crypto,
+    database.contactsDao,
+    database.messagesDao,
+    senderContactId: senderContactId,
+    messageId: messageId,
+    logicalId: logicalId,
+    rawMessage: rawMessage,
+  );
+}
 
 class FunctionsList {
   //auth
@@ -249,14 +362,6 @@ class FunctionsList {
     ConnectionRequestsDao dao,
     String requestId,
   ) => connection_request.rejectConnectionRequest(dao, requestId);
-
-  static Future<dynamic> sendContactInvitation(
-    IdentityDao identityDao, {
-    required String serverId,
-  }) => contact_invitation.sendContactInvitation(
-    identityDao,
-    serverId: serverId,
-  );
 
   static Future<dynamic> createGroupMember(
     GroupMembersDao dao, {

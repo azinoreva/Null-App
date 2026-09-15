@@ -19,6 +19,35 @@ class IdentityCrypto {
 
   static const _privateKeyName = 'identity:private_key';
 
+  /// Ensures the local identity has both a usable private key in secure
+  /// storage and the matching public key in the database.
+  ///
+  /// Registration creates the identity row before generating this keypair,
+  /// so startup must repair rows whose [IdentityData.publicKey] is null.
+  /// Returns false when no identity exists yet (for example, before signup).
+  Future<bool> ensureIdentityKey({required AppDatabase database}) async {
+    final identity = await database.identityDao.getCurrentIdentityOrNull();
+    if (identity == null) return false;
+
+    Uint8List publicKey;
+    try {
+      final privateKey = await loadPrivateKey();
+      if (privateKey == null || privateKey.length != 32) {
+        throw StateError('Identity private key is missing or invalid.');
+      }
+      publicKey = await loadPublicKey();
+    } catch (_) {
+      await generateIdentityKey(database: database);
+      return true;
+    }
+
+    final encodedPublicKey = base64UrlEncode(publicKey);
+    if (identity.publicKey != encodedPublicKey) {
+      await database.identityDao.setPublicKey(encodedPublicKey);
+    }
+    return true;
+  }
+
   Future<void> generateIdentityKey({AppDatabase? database}) async {
     final pair = await _ed25519.newKeyPair();
 

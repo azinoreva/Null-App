@@ -5,6 +5,9 @@ import 'dart:typed_data';
 import 'package:dio/dio.dart';
 
 import '../api_client.dart';
+import '../../task_queue.dart';
+import '../../functions_list.dart' show incomingMessageTaskName;
+import 'pull_messages.dart';
 
 /// A single parsed SSE event, per the spec's `event` / `data` / `id` fields,
 /// tagged with which server it came from.
@@ -49,6 +52,7 @@ class _SseConnection {
 
   String? _lastEventId;
   bool _manuallyClosed = false;
+  bool _opening = false;
   bool isConnected = false;
   int _reconnectAttempt = 0;
 
@@ -81,10 +85,13 @@ class _SseConnection {
   }
 
   Future<void> _open() async {
+    if (_opening || _manuallyClosed) return;
+    _opening = true;
     try {
       final accessToken = await ApiClient.getAccessToken(serverId);
       final headers = <String, dynamic>{
-        'accept': 'application/json',
+        'accept': 'text/event-stream',
+        'cache-control': 'no-cache',
         if (accessToken != null) 'Authorization': 'Bearer $accessToken',
       };
       // Only attach Last-Event-ID on reconnects for THIS server, never on
@@ -127,6 +134,7 @@ class _SseConnection {
         // refresh via the shared auth flow, then retry once.
         final newToken = await ApiClient.refreshAccessToken(serverId);
         if (newToken != null && !_manuallyClosed) {
+          _opening = false;
           await _open();
           return;
         }
@@ -135,7 +143,14 @@ class _SseConnection {
       _handleDrop(error);
     } catch (error) {
       _handleDrop(error);
+    } finally {
+      _opening = false;
     }
+  }
+
+  Future<void> reconnectIfNeeded() async {
+    if (isConnected || _manuallyClosed) return;
+    await _open();
   }
 
   void _drainBuffer(StringBuffer buffer) {
@@ -235,6 +250,7 @@ class _SseConnection {
 /// ```
 class SseHub {
   static const String _defaultPath = '/api/subscribe';
+  static const Duration keepAliveInterval = Duration(seconds: 45);
 
   final Map<String, _SseConnection> _connections = {};
   final Map<String, List<void Function(SseEvent event)>> _handlers = {};
@@ -242,6 +258,49 @@ class SseHub {
   void Function(String serverId, Object error)? _onError;
   void Function(String serverId)? _onConnected;
   void Function(String serverId)? _onDisconnected;
+  Future<void> Function(String serverId)? _pullMessages;
+  final TaskQueue? _taskQueue;
+  Timer? _keepAliveTimer;
+
+  SseHub({
+    Future<void> Function(String serverId)? pullMessages,
+    TaskQueue? taskQueue,
+  })  : _pullMessages = pullMessages,
+        _taskQueue = taskQueue {
+    if (_pullMessages == null && _taskQueue != null) {
+      _pullMessages = _pullAndQueueMessages;
+    }
+    _keepAliveTimer = Timer.periodic(keepAliveInterval, (_) {
+      unawaited(_checkConnections());
+    });
+  }
+
+  /// Supplies the HTTP fallback used when a server's SSE stream is down.
+  void onPullMessages(Future<void> Function(String serverId) callback) {
+    _pullMessages = callback;
+  }
+
+  Future<void> _pullAndQueueMessages(String serverId) async {
+    final queue = _taskQueue;
+    if (queue == null) return;
+
+    final messages = await MessagesQueueService(serverId: serverId).getMessages();
+    for (final message in messages) {
+      final taskName = incomingMessageTaskName(message.messageType);
+      await queue.queueTask(
+        functionName: taskName,
+        serverId: serverId,
+        taskData: taskName,
+        args: [
+          message.senderId,
+          message.messageId,
+          message.logicalId,
+          message.messageType,
+          message.message,
+        ],
+      );
+    }
+  }
 
   /// Registers a handler for a given SSE `event:` name across ALL
   /// currently and subsequently added servers. Use [event.serverId] inside
@@ -272,6 +331,18 @@ class SseHub {
 
   bool isConnected(String serverId) =>
       _connections[serverId]?.isConnected ?? false;
+
+  Future<void> _checkConnections() async {
+    for (final entry in _connections.entries) {
+      if (entry.value.isConnected) continue;
+      try {
+        await _pullMessages?.call(entry.key);
+      } catch (error) {
+        _onError?.call(entry.key, error);
+      }
+      await entry.value.reconnectIfNeeded();
+    }
+  }
 
   /// Opens a subscription to [serverId] at [baseUrl]. If a connection for
   /// this [serverId] already exists, it's replaced (the old one is
@@ -312,9 +383,38 @@ class SseHub {
     }
   }
 
+  /// Stops the health timer and closes every server connection.
+  void dispose() {
+    _keepAliveTimer?.cancel();
+    _keepAliveTimer = null;
+    disconnectAll();
+  }
+
   void _dispatch(SseEvent event) {
+    if (event.event == 'message') {
+      unawaited(_enqueueMessage(event));
+    }
     for (final handler in _handlers[event.event] ?? const []) {
       handler(event);
     }
+  }
+
+  Future<void> _enqueueMessage(SseEvent event) async {
+    final queue = _taskQueue;
+    if (queue == null) return;
+
+    final data = event.json as Map<String, dynamic>;
+    await queue.queueTask(
+      functionName: incomingMessageTaskName(data['messageType'] as int),
+      serverId: event.serverId,
+      taskData: incomingMessageTaskName(data['messageType'] as int),
+      args: [
+        data['sender_id'] as String,
+        data['messageId'] as String,
+        data['logicalId'] as String,
+        data['messageType'] as int,
+        data['message'] as String,
+      ],
+    );
   }
 }

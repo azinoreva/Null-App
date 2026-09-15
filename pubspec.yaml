@@ -58,6 +58,7 @@ dependencies:
   dice_bear: ^1.0.4
   disk_space_plus: ^0.2.6
   audioplayers: ^6.8.1
+  barcode: ^2.2.9
 
 dev_dependencies:
   flutter_test:

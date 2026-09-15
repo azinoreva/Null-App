@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -11,7 +13,12 @@ import 'widgets/app_theme.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 import 'engine/network/main_server_client.dart';
+import 'engine/network/api_client.dart';
+import 'engine/network/chats/sse_connect.dart';
+import 'engine/database/app_database.dart';
 import 'engine/database/init_db.dart';
+import 'engine/crypto/chat/identity_crypto.dart';
+import 'engine/task_queue.dart';
 import '/engine/engine.dart';
 import 'state/providers.dart';
 import 'engine/functions/settings/settings.dart';
@@ -22,10 +29,14 @@ void main() async {
   MainServerClient.init();
   await AppSettings.init();
   final database = await DatabaseInitializer.initialize();
+  await const IdentityCrypto().ensureIdentityKey(database: database);
   final taskEngine = await TaskEngine.start(
     database: database,
     initiallyOnline: true,
   );
+  taskEngine.ping();
+  final taskQueue = TaskQueue(database: database, engine: taskEngine);
+  final prefs = await SharedPreferences.getInstance();
   runApp(
     ProviderScope(
       overrides: [
@@ -36,6 +47,45 @@ void main() async {
       child: const MyApp(),
     ),
   );
+
+  if (prefs.getBool('is_logged_in') ?? false) {
+    unawaited(_startSseConnections(database, taskQueue));
+  }
+}
+
+Future<void> _startSseConnections(
+  AppDatabase database,
+  TaskQueue taskQueue,
+) async {
+  const mainServerId = 'server_1';
+  final mainServerUrl = dotenv.env['MAIN_SERVER_URL'];
+  if (mainServerUrl == null || mainServerUrl.isEmpty) return;
+
+  ApiClient.registerServer(
+    serverId: mainServerId,
+    baseUrl: mainServerUrl,
+    onAuthFailure: () {},
+  );
+
+  final hub = SseHub(taskQueue: taskQueue);
+  final servers = await database.serversDao.getAllServers();
+  final serverUrls = <String, String>{mainServerId: mainServerUrl};
+  for (final server in servers) {
+    if (server.serverUrl.isNotEmpty) {
+      serverUrls[server.serverId] = server.serverUrl;
+    }
+  }
+
+  for (final entry in serverUrls.entries) {
+    if (!ApiClient.isRegistered(entry.key)) {
+      ApiClient.registerServer(
+        serverId: entry.key,
+        baseUrl: entry.value,
+        onAuthFailure: () {},
+      );
+    }
+    unawaited(hub.addServer(entry.key, entry.value));
+  }
 }
 
 class MyApp extends StatefulWidget {
