@@ -68,6 +68,23 @@ class SessionsDao extends DatabaseAccessor<AppDatabase>
     );
   }
 
+  /// Creates an established session for a locally generated pre-shared key.
+  Future<void> establishWithSymmetricKey({
+    required String conversationId,
+    required Uint8List symmetricKey,
+  }) async {
+    final now = DateTime.now().millisecondsSinceEpoch;
+    await upsertSession(
+      SessionsCompanion.insert(
+        conversationId: conversationId,
+        symmetricKey: Value(symmetricKey),
+        status: const Value(2),
+        createdAt: now,
+        updatedAt: now,
+      ),
+    );
+  }
+
   /// Marks the session as fully established and clears the now-unneeded
   /// ephemeral private key.
   Future<void> markEstablished(String conversationId) async {

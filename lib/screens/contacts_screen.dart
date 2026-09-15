@@ -4,6 +4,8 @@ import '../state/providers.dart';
 import '../widgets/app_theme.dart';
 import '../widgets/display/contact_card.dart';
 import '../widgets/display/navigation.dart';
+import 'modals/get_contact_modal.dart';
+import '../engine/media_handling/connection_scan_service.dart';
 import 'chat_screen.dart';
 import 'settings_screen.dart';
 import 'updates_screen.dart';
@@ -56,6 +58,31 @@ class ContactsScreen extends ConsumerWidget {
         ),
         data: (rows) => ContactsListScreen(
           contacts: rows,
+          onAddContact: () async {
+            final added = await showModalBottomSheet<bool>(
+              context: context,
+              isScrollControlled: true,
+              builder: (_) => SizedBox(
+                height: MediaQuery.sizeOf(context).height * 0.9,
+                child: AddConnectionScreen(
+                  onConnectionScanned: (raw, {required isManualPin}) async {
+                    await receiveContact(
+                      database: ref.read(appDatabaseProvider),
+                      taskQueue: ref.read(taskQueueProvider),
+                      scannedValue: raw,
+                      isManualPin: isManualPin,
+                    );
+                    if (context.mounted) {
+                      Navigator.of(context).pop(true);
+                    }
+                  },
+                ),
+              ),
+            );
+            if (added == true && context.mounted) {
+              await ref.read(contactsProvider.notifier).refresh();
+            }
+          },
           onOpenSettings: () => Navigator.of(context).push(
             MaterialPageRoute(builder: (_) => const SettingsScreen()),
           ),

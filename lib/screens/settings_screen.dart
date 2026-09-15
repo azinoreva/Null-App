@@ -9,6 +9,7 @@ import '../engine/functions/settings/settings.dart';
 import '../engine/database/queries/identity_queries.dart';
 import '../engine/media_handling/dicebear.dart';
 import '../engine/media_handling/media_storage.dart';
+import '../engine/network/auth_failure_handler.dart';
 import '../state/providers.dart';
 import 'modals/automatic_messages.dart';
 import 'modals/change_password.dart';
@@ -205,6 +206,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     await _settings.setProfilePicture(avatarPath);
   }
   // ---------------------------------------------------------------------
+
+  Future<void> _handleLogout() async {
+    await redirectToLogin();
+  }
 
   Future<void> _handleSaveProfile() async {
     await Future.wait([
@@ -448,6 +453,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                           title: 'Backup',
                           subtitle: 'Secure your messages in the cloud.',
                           onTap: _openBackup,
+                        ),
+
+                        const SizedBox(height: 24.0),
+                        _LogoutButton(
+                          theme: theme,
+                          onTap: _handleLogout,
                         ),
                       ],
                     ),
@@ -1028,6 +1039,45 @@ class _FieldLabel extends StatelessWidget {
           ).copyWith(fontWeight: FontWeight.w600),
         ),
       ],
+    );
+  }
+}
+
+class _LogoutButton extends StatelessWidget {
+  final AppColorScheme theme;
+  final VoidCallback onTap;
+
+  const _LogoutButton({required this.theme, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(14.0),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(vertical: 14.0),
+        decoration: BoxDecoration(
+          color: AppColors.alertRed.withAlpha(30),
+          borderRadius: BorderRadius.circular(14.0),
+          border: Border.all(color: AppColors.alertRed.withAlpha(80)),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.logout, size: 18.0, color: AppColors.alertRed),
+            const SizedBox(width: 8.0),
+            Text(
+              'Log Out',
+              style: AppTypography.getTextStyle(
+                context,
+                AppTextType.body,
+                color: AppColors.alertRed,
+              ).copyWith(fontWeight: FontWeight.bold),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

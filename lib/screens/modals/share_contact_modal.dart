@@ -2,6 +2,12 @@
 import 'dart:math';
 
 import 'package:barcode/barcode.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
+
+import '../../engine/database/app_database.dart';
+import '../../engine/functions/people/sendmycontact.dart';
+import '../../engine/task_queue.dart';
 
 /// The three things the "Personal Card" screen needs, generated together
 /// so they all represent the same connection identity - but note these
@@ -74,6 +80,18 @@ class ConnectionIdentityService {
     );
   }
 
+  /// Renders an arbitrary connection payload as a bare QR SVG.
+  static String qrSvgForPayload(String payload, {double size = _displaySizePx}) {
+    return Barcode.qrCode(
+      errorCorrectLevel: BarcodeQRCorrectionLevel.medium,
+    ).toSvg(
+      payload,
+      width: size,
+      height: size,
+      drawText: false,
+    );
+  }
+
   static String _buildPayload(String code) => 'yourapp://connect?code=$code';
 
   /// Builds a standalone "share card": dark background, a title, the QR
@@ -115,5 +133,135 @@ class ConnectionIdentityService {
     final part1 = List.generate(4, (_) => letters[random.nextInt(letters.length)]).join();
     final part2 = List.generate(6, (_) => alnum[random.nextInt(alnum.length)]).join();
     return '$part1-$part2';
+  }
+}
+
+/// Runs the real contact exchange and presents its three share artifacts.
+class ShareContactModal extends StatefulWidget {
+  final AppDatabase database;
+  final TaskQueue taskQueue;
+  final String mainServerId;
+
+  const ShareContactModal({
+    super.key,
+    required this.database,
+    required this.taskQueue,
+    this.mainServerId = 'server_1',
+  });
+
+  @override
+  State<ShareContactModal> createState() => _ShareContactModalState();
+}
+
+class _ShareContactModalState extends State<ShareContactModal> {
+  late final Future<SendMyContactResult> _exchange;
+
+  @override
+  void initState() {
+    super.initState();
+    _exchange = sendMyContact(
+      database: widget.database,
+      taskQueue: widget.taskQueue,
+      mainServerId: widget.mainServerId,
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
+        child: FutureBuilder<SendMyContactResult>(
+          future: _exchange,
+          builder: (context, snapshot) {
+            if (snapshot.connectionState != ConnectionState.done) {
+              return const SizedBox(
+                height: 280,
+                child: Center(child: CircularProgressIndicator()),
+              );
+            }
+            if (snapshot.hasError) {
+              return _ErrorView(error: snapshot.error!);
+            }
+
+            final result = snapshot.data!;
+            return SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    'Share contact',
+                    style: Theme.of(context).textTheme.titleLarge,
+                  ),
+                  const SizedBox(height: 16),
+                  SvgPicture.string(
+                    ConnectionIdentityService.qrSvgForPayload(
+                      result.displayQRSVG,
+                    ),
+                    width: 220,
+                    height: 220,
+                  ),
+                  const SizedBox(height: 12),
+                  SelectableText(
+                    result.manualCode,
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Scan this QR or enter the contact key manually.',
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 16),
+                  SvgPicture.string(
+                    ConnectionIdentityService.qrSvgForPayload(
+                      result.shareQRSVG,
+                      size: 180,
+                    ),
+                    width: 180,
+                    height: 180,
+                  ),
+                  const SizedBox(height: 8),
+                  TextButton(
+                    onPressed: () => Navigator.of(context).pop(true),
+                    child: const Text('Done'),
+                  ),
+                ],
+              ),
+            );
+          },
+        ),
+      ),
+    );
+  }
+}
+
+class _ErrorView extends StatelessWidget {
+  final Object error;
+
+  const _ErrorView({required this.error});
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 280,
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const Icon(Icons.error_outline),
+          const SizedBox(height: 12),
+          Text(
+            'Could not share contact. Please retry.',
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 8),
+          Text(
+            error.toString(),
+            maxLines: 3,
+            overflow: TextOverflow.ellipsis,
+            textAlign: TextAlign.center,
+          ),
+        ],
+      ),
+    );
   }
 }

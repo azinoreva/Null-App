@@ -17,6 +17,9 @@ class ConversationKeyStore {
   String _rootKeyName(String conversationId) =>
       'conversation:$conversationId:root';
 
+    String _conversationKeyName(String conversationId) =>
+      'conversation:$conversationId:key';
+
   String _stateName(String conversationId) =>
       'conversation:$conversationId:ratchet';
 
@@ -49,11 +52,37 @@ class ConversationKeyStore {
     return Uint8List.fromList(base64Url.decode(value));
   }
 
+  Future<void> saveConversationKey(
+    String conversationId,
+    Uint8List key,
+  ) async {
+    if (key.length != 32) {
+      throw ArgumentError('Conversation key must be 32 bytes.');
+    }
+
+    await storage.write(
+      key: _conversationKeyName(conversationId),
+      value: base64UrlEncode(key),
+    );
+  }
+
+  Future<Uint8List?> loadConversationKey(String conversationId) async {
+    final value = await storage.read(
+      key: _conversationKeyName(conversationId),
+    );
+
+    return value == null ? null : Uint8List.fromList(base64Url.decode(value));
+  }
+
   Future<void> deleteConversation(
     String conversationId,
   ) async {
     await storage.delete(
       key: _rootKeyName(conversationId),
+    );
+
+    await storage.delete(
+      key: _conversationKeyName(conversationId),
     );
 
     await storage.delete(

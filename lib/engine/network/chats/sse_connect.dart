@@ -54,9 +54,9 @@ class _SseConnection {
   bool _manuallyClosed = false;
   bool _opening = false;
   bool isConnected = false;
-  int _reconnectAttempt = 0;
+  bool _authFailed = false;
+  bool _errored = false;
 
-  static const _maxReconnectDelay = Duration(seconds: 30);
 
   _SseConnection({
     required this.serverId,
@@ -74,6 +74,8 @@ class _SseConnection {
 
   Future<void> connect() async {
     _manuallyClosed = false;
+    _authFailed = false;
+    _errored = false;
     await _open();
   }
 
@@ -110,7 +112,6 @@ class _SseConnection {
       );
 
       isConnected = true;
-      _reconnectAttempt = 0;
       _onConnected?.call(serverId);
 
       final buffer = StringBuffer();
@@ -128,17 +129,18 @@ class _SseConnection {
         },
         cancelOnError: true,
       );
-    } on DioException catch (error) {
+    }     on DioException catch (error) {
       if (error.response?.statusCode == 401) {
-        // Token likely expired before the stream even opened — try one
-        // refresh via the shared auth flow, then retry once.
+        if (_authFailed) return;
         final newToken = await ApiClient.refreshAccessToken(serverId);
         if (newToken != null && !_manuallyClosed) {
           _opening = false;
           await _open();
           return;
         }
+        _authFailed = true;
         await ApiClient.handleAuthFailure(serverId);
+        return;
       }
       _handleDrop(error);
     } catch (error) {
@@ -149,7 +151,7 @@ class _SseConnection {
   }
 
   Future<void> reconnectIfNeeded() async {
-    if (isConnected || _manuallyClosed) return;
+    if (isConnected || _manuallyClosed || _authFailed || _errored) return;
     await _open();
   }
 
@@ -206,15 +208,11 @@ class _SseConnection {
     _subscription?.cancel();
     _subscription = null;
 
-    if (_manuallyClosed) return;
+    if (_manuallyClosed || _authFailed || _errored) return;
 
-    _reconnectAttempt++;
-    final delaySeconds = (1 << (_reconnectAttempt - 1).clamp(0, 5))
-        .clamp(1, _maxReconnectDelay.inSeconds);
-
-    Future.delayed(Duration(seconds: delaySeconds), () {
-      if (!_manuallyClosed) _open();
-    });
+    // Any other /subscribe error means this server keeps failing — stop
+    // polling/reconnecting it so we don't hammer /subscribe forever.
+    _errored = true;
   }
 }
 
@@ -332,9 +330,12 @@ class SseHub {
   bool isConnected(String serverId) =>
       _connections[serverId]?.isConnected ?? false;
 
+  bool isAuthFailed(String serverId) =>
+      _connections[serverId]?._authFailed ?? false;
+
   Future<void> _checkConnections() async {
     for (final entry in _connections.entries) {
-      if (entry.value.isConnected) continue;
+      if (entry.value.isConnected || entry.value._authFailed || entry.value._errored) continue;
       try {
         await _pullMessages?.call(entry.key);
       } catch (error) {

@@ -18,6 +18,7 @@ import 'database/queries/servers_queries.dart';
 import 'database/queries/sessions_queries.dart';
 import 'database/queries/tasks_queries.dart';
 import 'engine.dart';
+import 'task_queue.dart';
 import 'network/servers/servers.dart';
 import 'crypto/shamirs/vault_secrets.dart';
 import 'functions/auth/loginfxn.dart' as auth_login;
@@ -547,6 +548,18 @@ class FunctionsList {
     contactsDao,
     recipientUserId: recipientUserId,
     serverId: serverId,
+  );
+
+  static Future<contact_details.SendMyContactResult> sendMyContact({
+    required AppDatabase database,
+    required TaskQueue taskQueue,
+    required String mainServerId,
+    Duration receiveDelay = const Duration(seconds: 2),
+  }) => contact_details.sendMyContact(
+    database: database,
+    taskQueue: taskQueue,
+    mainServerId: mainServerId,
+    receiveDelay: receiveDelay,
   );
 
   static Future<dynamic> sendContactDetailsBack(

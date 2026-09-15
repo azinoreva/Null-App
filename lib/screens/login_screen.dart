@@ -1,10 +1,16 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:dio/dio.dart';
+
 import '../widgets/app_theme.dart';
 import '../widgets/display/icon.dart';
 import '../widgets/inputs/input_field.dart';
+import '../widgets/inputs/dropdown_input.dart';
 import '../widgets/buttons/send_button.dart';
 import '../widgets/buttons/square_button.dart';
-
+import '../engine/functions_list.dart';
+import '../engine/network/server_error_exception.dart';
+import 'chat_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -14,12 +20,72 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
+  String _selectedCountryCode = '+1';
+  final TextEditingController _phoneController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
+  bool _isSubmitting = false;
 
   @override
   void dispose() {
+    _phoneController.dispose();
     _passwordController.dispose();
     super.dispose();
+  }
+
+  String get _phoneDigits =>
+      _phoneController.text.trim().replaceAll(RegExp(r'\s+'), '');
+
+  String get _fullPhoneNumber => '$_selectedCountryCode$_phoneDigits';
+
+  Future<void> _onLoginPressed() async {
+    final messenger = ScaffoldMessenger.of(context);
+    final password = _passwordController.text;
+
+    if (_phoneDigits.isEmpty || password.isEmpty) {
+      messenger.showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Enter your phone number and password to sign in.',
+          ),
+        ),
+      );
+      return;
+    }
+
+    setState(() => _isSubmitting = true);
+    try {
+      await FunctionsList.login(
+        phoneNumber: _fullPhoneNumber,
+        password: password,
+      );
+
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool('has_signed_up', true);
+      await prefs.setBool('is_logged_in', true);
+
+      if (!mounted) return;
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (_) => const ChatScreen()),
+        (route) => false,
+      );
+    } on DioException catch (e) {
+      final status = e.response?.statusCode;
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(
+            status == 401
+                ? 'Invalid phone number or password.'
+                : 'Sign in failed (${status ?? 'network error'}). Please try again.',
+          ),
+        ),
+      );
+    } on ServerErrorException catch (e) {
+      messenger.showSnackBar(SnackBar(content: Text(e.message)));
+    } catch (e) {
+      messenger.showSnackBar(SnackBar(content: Text('Sign in failed: $e')));
+    } finally {
+      if (mounted) setState(() => _isSubmitting = false);
+    }
   }
 
   @override
@@ -51,10 +117,10 @@ class _LoginScreenState extends State<LoginScreen> {
                     children: [
                       _buildHeaderSection(context, themeExtension),
                       const SizedBox(height: 48.0),
-                      
+
                       _buildFormSection(context, themeExtension),
                       const SizedBox(height: 32.0),
-                      
+
                       // Biometrics only show on mobile/narrow screens
                       if (!isWideScreen) ...[
                         _buildAlternativeAccessSection(context, themeExtension),
@@ -100,7 +166,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 style: TextStyle(
                   color: AppColors.haloRing,
                   fontWeight: FontWeight.w900,
-                  fontStyle: FontStyle.italic, 
+                  fontStyle: FontStyle.italic,
                 ),
               ),
             ],
@@ -116,6 +182,55 @@ class _LoginScreenState extends State<LoginScreen> {
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        // Phone Number Label
+        Row(
+          children: [
+            const Icon(
+              Icons.phone_android,
+              size: 16,
+              color: AppColors.haloRing,
+            ),
+            const SizedBox(width: 6.0),
+            Text(
+              'PHONE NUMBER',
+              style: AppTypography.getTextStyle(
+                context,
+                AppTextType.tiny,
+                color: AppColors.mutedSlate,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8.0),
+        Row(
+          children: [
+            SizedBox(
+              width: 85,
+              child: CustomDropdownField<String>(
+                value: _selectedCountryCode,
+                items: const [
+                  DropdownMenuItem(value: '+1', child: Text('+1')),
+                  DropdownMenuItem(value: '+44', child: Text('+44')),
+                  DropdownMenuItem(value: '+234', child: Text('+234')),
+                ],
+                onChanged: (val) {
+                  if (val != null) {
+                    setState(() => _selectedCountryCode = val);
+                  }
+                },
+              ),
+            ),
+            const SizedBox(width: 8.0),
+            Expanded(
+              child: CustomInputField(
+                controller: _phoneController,
+                hintText: '000  000  0000',
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 20.0),
+
         // Password Label with Lock Icon
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -136,7 +251,7 @@ class _LoginScreenState extends State<LoginScreen> {
           ],
         ),
         const SizedBox(height: 12.0),
-        
+
         // Password Input
         CustomInputField(
           controller: _passwordController,
@@ -144,7 +259,7 @@ class _LoginScreenState extends State<LoginScreen> {
           obscureText: true,
         ),
         const SizedBox(height: 8.0),
-        
+
         // Forgot Password Link
         Align(
           alignment: Alignment.centerRight,
@@ -163,15 +278,14 @@ class _LoginScreenState extends State<LoginScreen> {
           ),
         ),
         const SizedBox(height: 24.0),
-        
+
         // Login Button
         SendButton(
           text: 'Log In',
           icon: Icons.chevron_right,
           iconPosition: IconPosition.right,
-          onPressed: () {
-            // Handle Login
-          },
+          isLocked: _isSubmitting,
+          onPressed: _isSubmitting ? null : _onLoginPressed,
         ),
       ],
     );
@@ -215,7 +329,7 @@ class _LoginScreenState extends State<LoginScreen> {
           ],
         ),
         const SizedBox(height: 24.0),
-        
+
         // Biometric Buttons
         Row(
           mainAxisAlignment: MainAxisAlignment.center,

@@ -14,6 +14,7 @@ import '../../database/queries/sessions_queries.dart';
 import '../../crypto/chat/key_exchange.dart'; // KeyExchange
 import '../../crypto/chat/identity_crypto.dart'; // IdentityCrypto
 import '../../network/api_client.dart';
+import '../../network/auth_failure_handler.dart';
 import '../../network/chats/send_message.dart';
 import 'handshake_registry.dart.dart';
 
@@ -330,6 +331,8 @@ Future<void> _ensureServerRegistered(
   ApiClient.registerServer(
     serverId: serverId,
     baseUrl: server.serverUrl,
-    onAuthFailure: () {},
+    onAuthFailure: () {
+      unawaited(redirectToLogin());
+    },
   );
 }

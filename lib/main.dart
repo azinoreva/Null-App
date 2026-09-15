@@ -13,6 +13,7 @@ import 'widgets/app_theme.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 import 'engine/network/main_server_client.dart';
+import 'engine/network/auth_failure_handler.dart';
 import 'engine/network/api_client.dart';
 import 'engine/network/chats/sse_connect.dart';
 import 'engine/database/app_database.dart';
@@ -64,7 +65,9 @@ Future<void> _startSseConnections(
   ApiClient.registerServer(
     serverId: mainServerId,
     baseUrl: mainServerUrl,
-    onAuthFailure: () {},
+    onAuthFailure: () {
+      unawaited(redirectToLogin());
+    },
   );
 
   final hub = SseHub(taskQueue: taskQueue);
@@ -81,7 +84,9 @@ Future<void> _startSseConnections(
       ApiClient.registerServer(
         serverId: entry.key,
         baseUrl: entry.value,
-        onAuthFailure: () {},
+        onAuthFailure: () {
+          unawaited(redirectToLogin());
+        },
       );
     }
     unawaited(hub.addServer(entry.key, entry.value));
@@ -126,6 +131,7 @@ class _MyAppState extends State<MyApp> {
         final bool isDark = AppSettings.instance.isDarkMode;
         return MaterialApp(
           title: 'Null App',
+          navigatorKey: rootNavigatorKey,
           themeMode: isDark ? ThemeMode.dark : ThemeMode.light,
           theme: ThemeData(
             brightness: Brightness.light,

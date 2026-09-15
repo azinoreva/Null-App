@@ -12,6 +12,7 @@ import '../../crypto/chat/null_crypto.dart'; // NullCrypto, EncryptedMessage
 import '../../crypto/chat/identity_crypto.dart';
 import '../../crypto/chat/ratchet_store.dart';
 import '../../network/api_client.dart';
+import '../../network/auth_failure_handler.dart';
 import '../../network/chats/send_message.dart'; // SendMessageService, MessageRecipient, SendMessageResponse
 
 const _uuid = Uuid();
@@ -57,7 +58,9 @@ Future<void> _sendQueuedChatMessage(
     ApiClient.registerServer(
       serverId: serverId,
       baseUrl: server.serverUrl,
-      onAuthFailure: () {},
+      onAuthFailure: () async {
+        await redirectToLogin();
+      },
     );
   }
 

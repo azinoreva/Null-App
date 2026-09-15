@@ -19,12 +19,12 @@ class SendContactResult {
   }
 }
 
-class SendContactService {
+class SendContactReboundService {
   final String serverId;
 
   Dio get _dio => ApiClient.instance(serverId);
 
-  const SendContactService({required this.serverId});
+  const SendContactReboundService({required this.serverId});
 
 
   /// Sends the current user's contact/profile info to generate an invite.

@@ -12,6 +12,7 @@
 //   * control types    -> wrapped in a plaintext ControlEnvelope, NOT
 //                         stored, POSTed via SendMessageService.
 
+import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
 
@@ -26,6 +27,7 @@ import '../../database/queries/contacts_queries.dart';
 import '../../database/queries/identity_queries.dart';
 import '../../database/queries/messages_queries.dart';
 import '../../network/api_client.dart';
+import '../../network/auth_failure_handler.dart';
 import '../../network/chats/send_message.dart';
 import 'message_types.dart';
 import 'wire_protocol.dart';
@@ -93,7 +95,9 @@ Future<void> _sendTypedMessageTask(
     ApiClient.registerServer(
       serverId: serverId,
       baseUrl: server.serverUrl,
-      onAuthFailure: () {},
+      onAuthFailure: () {
+        unawaited(redirectToLogin());
+      },
     );
   }
 

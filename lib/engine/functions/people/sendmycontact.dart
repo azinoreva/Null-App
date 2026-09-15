@@ -1,14 +1,184 @@
 // module name: send_contact_details
 
 import 'dart:convert';
+
+import 'package:cryptography/cryptography.dart';
+import 'package:drift/drift.dart';
 import 'package:uuid/uuid.dart';
 
+import '../../crypto/chat/conversation_key_store.dart';
+import '../../crypto/chat/crypto_types.dart';
+import '../../crypto/chat/identity_crypto.dart';
+import '../../crypto/chat/null_crypto.dart';
+import '../../crypto/chat/ratchet_store.dart';
+import '../../crypto/chat/symmetric_ratchet.dart';
+import '../../crypto/chat/asymetric_encryption.dart';
+import '../../database/app_database.dart';
 import '../../database/queries/identity_queries.dart';
 import '../../database/queries/contacts_queries.dart';
-import '../../network/chats/send_message.dart'; // SendMessageService, MessageRecipient, SendMessageResponse
-import '../../crypto/chat/asymetric_encryption.dart';
+import '../../network/people/recieve_contact.dart';
+import '../../network/people/share_contact.dart';
+import '../../task_queue.dart';
+import '../../network/chats/send_message.dart';
 
 const _uuid = Uuid();
+
+class SendMyContactResult {
+  final String displayQRSVG;
+  final String manualCode;
+  final String shareQRSVG;
+
+  const SendMyContactResult({
+    required this.displayQRSVG,
+    required this.manualCode,
+    required this.shareQRSVG,
+  });
+}
+
+/// Process-memory cache for the active contact invite.
+final Map<String, Map<String, dynamic>> temporaryContact = {};
+
+/// Shares this identity, creates a non-DH session, receives the peer contact,
+/// persists both sides locally, and queues the first encrypted message.
+Future<SendMyContactResult> sendMyContact({
+  required AppDatabase database,
+  required TaskQueue taskQueue,
+  required String mainServerId,
+  Duration receiveDelay = const Duration(seconds: 2),
+}) async {
+  final identity = await database.identityDao.getCurrentIdentityOrNull();
+  if (identity == null) {
+    throw StateError('No local identity found. Please retry after signing in.');
+  }
+
+  final publicKey = identity.publicKey;
+  if (publicKey == null || publicKey.isEmpty) {
+    throw StateError(
+      'Current identity has no public key. Please retry after identity setup.',
+    );
+  }
+
+  final nameParts = identity.displayName.split(' - ');
+  final nickname = nameParts.first.trim();
+  final title = nameParts.length > 1
+      ? nameParts.skip(1).join(' - ').trim()
+      : '';
+
+  final shared = await SendContactService(serverId: mainServerId).sendContact(
+    nickname: nickname,
+    title: title,
+    bio: identity.bio ?? '',
+    publicKey: publicKey,
+    avatar: identity.avatar ?? '',
+  );
+
+  final secretKey = await AesGcm.with256bits().newSecretKey();
+  final symmetricKey = Uint8List.fromList(await secretKey.extractBytes());
+  final previewState = await SymmetricRatchet.initialize(
+    sharedSecret: symmetricKey,
+    initiator: true,
+  );
+  final temporary = <String, dynamic>{
+    'contact_key': shared.contactKey,
+    'symmetric_key': base64UrlEncode(symmetricKey),
+    'ratchet_state': _ratchetStateJson(previewState),
+  };
+  temporaryContact['temporary contact'] = temporary;
+
+  await Future<void>.delayed(receiveDelay);
+  final received = await GetContactService(serverId: mainServerId).getContact(
+    contactKey: '${shared.contactKey}R',
+  );
+
+  await _saveReceivedContact(database, received);
+  final conversationId = received.contactId;
+  final now = DateTime.now().millisecondsSinceEpoch;
+  await database.conversationsDao.upsertConversation(
+    Conversation(
+      conversationId: conversationId,
+      conversationType: 0,
+      lastMessageId: null,
+      lastMessageTime: null,
+      unreadCount: 0,
+      muted: 0,
+      pinned: 0,
+      archived: 0,
+      draft: null,
+      serverId: received.serverId,
+      createdAt: now,
+      updatedAt: now,
+      sound: null,
+      badge: 0,
+      vibration: 0,
+    ),
+  );
+  await database.sessionsDao.establishWithSymmetricKey(
+    conversationId: conversationId,
+    symmetricKey: symmetricKey,
+  );
+
+  final crypto = NullCrypto(
+    identity: const IdentityCrypto(),
+    ratchetStore: const RatchetStore(),
+  );
+  await crypto.establishConversation(
+    conversationId: conversationId,
+    sharedSecret: symmetricKey,
+    initiator: true,
+  );
+  await const ConversationKeyStore().saveRootKey(
+    conversationId,
+    previewState.rootKey,
+  );
+  await const ConversationKeyStore().saveRatchetState(
+    conversationId,
+    previewState,
+  );
+
+  await taskQueue.queueTask(
+    functionName: 'sendChatMessage',
+    args: [conversationId, 'hi', received.serverId, _uuid.v4(), _uuid.v4()],
+    serverId: received.serverId,
+  );
+
+  return SendMyContactResult(
+    displayQRSVG: jsonEncode(temporary),
+    manualCode: shared.contactKey,
+    shareQRSVG: shared.url,
+  );
+}
+
+Map<String, dynamic> _ratchetStateJson(RatchetState state) => {
+  'root': base64UrlEncode(state.rootKey),
+  'send': base64UrlEncode(state.sendingChainKey),
+  'receive': base64UrlEncode(state.receivingChainKey),
+  'sendIndex': state.sendingIndex,
+  'receiveIndex': state.receivingIndex,
+};
+
+Future<void> _saveReceivedContact(
+  AppDatabase database,
+  ContactInfo contact,
+) async {
+  Uint8List? avatar;
+  if (contact.avatar != null && contact.avatar!.isNotEmpty) {
+    avatar = Uint8List.fromList(base64Decode(contact.avatar!));
+  }
+  await database.contactsDao.db.into(database.contactsDao.db.contacts).insertOnConflictUpdate(
+    ContactsCompanion.insert(
+      contactId: contact.contactId,
+      nickname: Value(contact.nickname),
+      avatar: Value(avatar),
+      bio: Value(contact.bio),
+      publicKey: Value(contact.publicKey),
+      connectionStatus: 1,
+      serverId: contact.serverId,
+      createdAt: DateTime.now().millisecondsSinceEpoch,
+      updatedAt: DateTime.now().millisecondsSinceEpoch,
+      conversationId: Value(contact.contactId),
+    ),
+  );
+}
 
 /// Sends the current user's contact details (identity card) to another
 /// user over the encrypted messaging protocol.
