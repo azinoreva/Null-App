@@ -61,6 +61,7 @@ dependencies:
   barcode: ^2.2.9
   flutter_svg: ^2.3.0
   mobile_scanner: ^7.4.2
+  share_plus: ^13.3.0
 
 dev_dependencies:
   flutter_test:
