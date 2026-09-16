@@ -212,11 +212,21 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   }
 
   Future<void> _handleSaveProfile() async {
+    final nickname = _nicknameController.text.trim();
+    final title = _titleController.text.trim();
+    final bio = _bioController.text.trim();
+
     await Future.wait([
-      _settings.setNickname(_nicknameController.text),
-      _settings.setTitle(_titleController.text),
-      _settings.setBio(_bioController.text),
+      _settings.setNickname(nickname),
+      _settings.setTitle(title),
+      _settings.setBio(bio),
     ]);
+
+    final identityDao = ref.read(appDatabaseProvider).identityDao;
+    final displayName = title.isEmpty ? nickname : '$nickname - $title';
+    await identityDao.setDisplayName(displayName);
+    await identityDao.setBio(bio.isEmpty ? null : bio);
+
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('Profile saved')),

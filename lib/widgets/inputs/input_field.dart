@@ -8,6 +8,7 @@ class CustomInputField extends StatelessWidget {
   final ValueChanged<String>? onChanged;
   final bool obscureText;
   final int? maxLines;
+  final Widget? suffixIcon;
 
   const CustomInputField({
     super.key,
@@ -17,6 +18,7 @@ class CustomInputField extends StatelessWidget {
     this.onChanged,
     this.obscureText = false,
     this.maxLines = 1,
+    this.suffixIcon,
   });
 
   @override
@@ -53,6 +55,7 @@ class CustomInputField extends StatelessWidget {
       decoration: InputDecoration(
         hintText: hintText,
         hintStyle: hintStyle,
+        suffixIcon: suffixIcon,
         filled: false, // Ensures transparent background
         contentPadding: const EdgeInsets.symmetric(
           horizontal: 12.0,

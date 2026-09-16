@@ -118,7 +118,8 @@ class _MyAppState extends State<MyApp> {
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
-      return MaterialApp(
+      return const MaterialApp(
+        debugShowCheckedModeBanner: false,
         home: Scaffold(body: Center(child: CircularProgressIndicator())),
       );
     }
@@ -152,9 +153,13 @@ class _MyAppState extends State<MyApp> {
           debugShowCheckedModeBanner: false,
           home: isLaunched
               ? DecisionScreen(prefs: _prefs!) // skip splash
-              : SplashScreen(
-                  prefs: _prefs!,
-                  destination: DecisionScreen(prefs: _prefs!),
+              : Theme(
+                  // Splash drives its own colour transitions, so no app theme here.
+                  data: ThemeData(),
+                  child: SplashScreen(
+                    prefs: _prefs!,
+                    destination: DecisionScreen(prefs: _prefs!),
+                  ),
                 ),
         );
       },

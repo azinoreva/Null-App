@@ -1,5 +1,6 @@
 // module name: send_contact_details
 
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:cryptography/cryptography.dart';
@@ -17,6 +18,7 @@ import '../../database/app_database.dart';
 import '../../database/queries/identity_queries.dart';
 import '../../database/queries/contacts_queries.dart';
 import '../../network/people/recieve_contact.dart';
+import '../../network/server_error_exception.dart';
 import '../../network/people/share_contact.dart';
 import '../../task_queue.dart';
 import '../../network/chats/send_message.dart';
@@ -38,8 +40,10 @@ class SendMyContactResult {
 /// Process-memory cache for the active contact invite.
 final Map<String, Map<String, dynamic>> temporaryContact = {};
 
-/// Shares this identity, creates a non-DH session, receives the peer contact,
-/// persists both sides locally, and queues the first encrypted message.
+/// Shares this identity and returns the invite as soon as the server creates it.
+///
+/// Completing the peer-side exchange happens in the background so a contact
+/// that has not been claimed yet cannot block the share UI.
 Future<SendMyContactResult> sendMyContact({
   required AppDatabase database,
   required TaskQueue taskQueue,
@@ -85,60 +89,16 @@ Future<SendMyContactResult> sendMyContact({
   };
   temporaryContact['temporary contact'] = temporary;
 
-  await Future<void>.delayed(receiveDelay);
-  final received = await GetContactService(serverId: mainServerId).getContact(
-    contactKey: '${shared.contactKey}R',
-  );
-
-  await _saveReceivedContact(database, received);
-  final conversationId = received.contactId;
-  final now = DateTime.now().millisecondsSinceEpoch;
-  await database.conversationsDao.upsertConversation(
-    Conversation(
-      conversationId: conversationId,
-      conversationType: 0,
-      lastMessageId: null,
-      lastMessageTime: null,
-      unreadCount: 0,
-      muted: 0,
-      pinned: 0,
-      archived: 0,
-      draft: null,
-      serverId: received.serverId,
-      createdAt: now,
-      updatedAt: now,
-      sound: null,
-      badge: 0,
-      vibration: 0,
+  unawaited(
+    _pollForReceivedContact(
+      database: database,
+      taskQueue: taskQueue,
+      mainServerId: mainServerId,
+      contactKey: '${shared.contactKey}R',
+      symmetricKey: symmetricKey,
+      previewState: previewState,
+      firstDelay: receiveDelay,
     ),
-  );
-  await database.sessionsDao.establishWithSymmetricKey(
-    conversationId: conversationId,
-    symmetricKey: symmetricKey,
-  );
-
-  final crypto = NullCrypto(
-    identity: const IdentityCrypto(),
-    ratchetStore: const RatchetStore(),
-  );
-  await crypto.establishConversation(
-    conversationId: conversationId,
-    sharedSecret: symmetricKey,
-    initiator: true,
-  );
-  await const ConversationKeyStore().saveRootKey(
-    conversationId,
-    previewState.rootKey,
-  );
-  await const ConversationKeyStore().saveRatchetState(
-    conversationId,
-    previewState,
-  );
-
-  await taskQueue.queueTask(
-    functionName: 'sendChatMessage',
-    args: [conversationId, 'hi', received.serverId, _uuid.v4(), _uuid.v4()],
-    serverId: received.serverId,
   );
 
   return SendMyContactResult(
@@ -146,6 +106,95 @@ Future<SendMyContactResult> sendMyContact({
     manualCode: shared.contactKey,
     shareQRSVG: shared.url,
   );
+}
+
+Future<void> _pollForReceivedContact({
+  required AppDatabase database,
+  required TaskQueue taskQueue,
+  required String mainServerId,
+  required String contactKey,
+  required Uint8List symmetricKey,
+  required RatchetState previewState,
+  required Duration firstDelay,
+}) async {
+  const retryDelays = [
+    Duration(seconds: 4),
+    Duration(seconds: 8),
+    Duration(seconds: 16),
+    Duration(seconds: 25),
+    Duration(seconds: 30),
+  ];
+
+  try {
+    final delays = [firstDelay, ...retryDelays];
+    ContactInfo? received;
+
+    for (final delay in delays) {
+      await Future<void>.delayed(delay);
+      try {
+        received = await GetContactService(serverId: mainServerId)
+            .getContact(contactKey: contactKey);
+        break;
+      } on ServerErrorException catch (error) {
+        if (error.statusCode != 404) rethrow;
+      }
+    }
+
+    if (received == null) return;
+
+    await _saveReceivedContact(database, received);
+    final conversationId = received.contactId;
+    final now = DateTime.now().millisecondsSinceEpoch;
+    await database.conversationsDao.upsertConversation(
+      Conversation(
+        conversationId: conversationId,
+        conversationType: 0,
+        lastMessageId: null,
+        lastMessageTime: null,
+        unreadCount: 0,
+        muted: 0,
+        pinned: 0,
+        archived: 0,
+        draft: null,
+        serverId: received.serverId,
+        createdAt: now,
+        updatedAt: now,
+        sound: null,
+        badge: 0,
+        vibration: 0,
+      ),
+    );
+    await database.sessionsDao.establishWithSymmetricKey(
+      conversationId: conversationId,
+      symmetricKey: symmetricKey,
+    );
+
+    final crypto = NullCrypto(
+      identity: const IdentityCrypto(),
+      ratchetStore: const RatchetStore(),
+    );
+    await crypto.establishConversation(
+      conversationId: conversationId,
+      sharedSecret: symmetricKey,
+      initiator: true,
+    );
+    await const ConversationKeyStore().saveRootKey(
+      conversationId,
+      previewState.rootKey,
+    );
+    await const ConversationKeyStore().saveRatchetState(
+      conversationId,
+      previewState,
+    );
+
+    await taskQueue.queueTask(
+      functionName: 'sendChatMessage',
+      args: [conversationId, 'hi', received.serverId, _uuid.v4(), _uuid.v4()],
+      serverId: received.serverId,
+    );
+  } catch (_) {
+    // Background completion must never surface an error over the share UI.
+  }
 }
 
 Map<String, dynamic> _ratchetStateJson(RatchetState state) => {
@@ -164,20 +213,22 @@ Future<void> _saveReceivedContact(
   if (contact.avatar != null && contact.avatar!.isNotEmpty) {
     avatar = Uint8List.fromList(base64Decode(contact.avatar!));
   }
-  await database.contactsDao.db.into(database.contactsDao.db.contacts).insertOnConflictUpdate(
-    ContactsCompanion.insert(
-      contactId: contact.contactId,
-      nickname: Value(contact.nickname),
-      avatar: Value(avatar),
-      bio: Value(contact.bio),
-      publicKey: Value(contact.publicKey),
-      connectionStatus: 1,
-      serverId: contact.serverId,
-      createdAt: DateTime.now().millisecondsSinceEpoch,
-      updatedAt: DateTime.now().millisecondsSinceEpoch,
-      conversationId: Value(contact.contactId),
-    ),
-  );
+  await database.contactsDao.db
+      .into(database.contactsDao.db.contacts)
+      .insertOnConflictUpdate(
+        ContactsCompanion.insert(
+          contactId: contact.contactId,
+          nickname: Value(contact.nickname),
+          avatar: Value(avatar),
+          bio: Value(contact.bio),
+          publicKey: Value(contact.publicKey),
+          connectionStatus: 1,
+          serverId: contact.serverId,
+          createdAt: DateTime.now().millisecondsSinceEpoch,
+          updatedAt: DateTime.now().millisecondsSinceEpoch,
+          conversationId: Value(contact.contactId),
+        ),
+      );
 }
 
 /// Sends the current user's contact details (identity card) to another
@@ -227,10 +278,7 @@ Future<SendMessageResponse> sendContactDetails(
 
   final result = await service.sendMessage(
     recipientIds: [
-      MessageRecipient(
-        userId: recipientUserId,
-        userName: recipientUserName,
-      ),
+      MessageRecipient(userId: recipientUserId, userName: recipientUserName),
     ],
     messageId: _uuid.v4(),
     logicalId: _uuid.v4(),

@@ -6,6 +6,7 @@ import '../widgets/display/contact_card.dart';
 import '../widgets/display/navigation.dart';
 import 'modals/get_contact_modal.dart';
 import '../engine/media_handling/connection_scan_service.dart';
+import 'modals/share_contact_modal.dart';
 import 'chat_screen.dart';
 import 'settings_screen.dart';
 import 'updates_screen.dart';
@@ -75,6 +76,16 @@ class ContactsScreen extends ConsumerWidget {
                     if (context.mounted) {
                       Navigator.of(context).pop(true);
                     }
+                  },
+                  onShareContact: () {
+                    showModalBottomSheet<void>(
+                      context: context,
+                      isScrollControlled: true,
+                      builder: (_) => ShareContactModal(
+                        database: ref.read(appDatabaseProvider),
+                        taskQueue: ref.read(taskQueueProvider),
+                      ),
+                    );
                   },
                 ),
               ),

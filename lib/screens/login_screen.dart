@@ -5,10 +5,11 @@ import 'package:dio/dio.dart';
 import '../widgets/app_theme.dart';
 import '../widgets/display/icon.dart';
 import '../widgets/inputs/input_field.dart';
-import '../widgets/inputs/dropdown_input.dart';
+import '../widgets/inputs/african_country_dropdown.dart';
 import '../widgets/buttons/send_button.dart';
 import '../widgets/buttons/square_button.dart';
 import '../engine/functions_list.dart';
+import '../engine/functions/settings/settings.dart';
 import '../engine/network/server_error_exception.dart';
 import 'chat_screen.dart';
 
@@ -20,10 +21,11 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  String _selectedCountryCode = '+1';
+  String _selectedCountryCode = '+234';
   final TextEditingController _phoneController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
   bool _isSubmitting = false;
+  bool _obscurePassword = true;
 
   @override
   void dispose() {
@@ -159,11 +161,11 @@ class _LoginScreenState extends State<LoginScreen> {
               AppTextType.title,
               color: themeExtension.textInputColor,
             ).copyWith(fontSize: 28.0),
-            children: const [
-              TextSpan(text: 'Welcome '),
+            children: [
+              const TextSpan(text: 'Welcome '),
               TextSpan(
-                text: 'Azibaba',
-                style: TextStyle(
+                text: AppSettings.instance.nickname.split(' - ').first.trim(),
+                style: const TextStyle(
                   color: AppColors.haloRing,
                   fontWeight: FontWeight.w900,
                   fontStyle: FontStyle.italic,
@@ -204,21 +206,13 @@ class _LoginScreenState extends State<LoginScreen> {
         const SizedBox(height: 8.0),
         Row(
           children: [
-            SizedBox(
-              width: 85,
-              child: CustomDropdownField<String>(
-                value: _selectedCountryCode,
-                items: const [
-                  DropdownMenuItem(value: '+1', child: Text('+1')),
-                  DropdownMenuItem(value: '+44', child: Text('+44')),
-                  DropdownMenuItem(value: '+234', child: Text('+234')),
-                ],
-                onChanged: (val) {
-                  if (val != null) {
-                    setState(() => _selectedCountryCode = val);
-                  }
-                },
-              ),
+            AfricanCountryCodeDropdown(
+              value: _selectedCountryCode,
+              onChanged: (val) {
+                if (val != null) {
+                  setState(() => _selectedCountryCode = val);
+                }
+              },
             ),
             const SizedBox(width: 8.0),
             Expanded(
@@ -256,7 +250,16 @@ class _LoginScreenState extends State<LoginScreen> {
         CustomInputField(
           controller: _passwordController,
           hintText: '••••••••••••',
-          obscureText: true,
+          obscureText: _obscurePassword,
+          suffixIcon: IconButton(
+            onPressed: () =>
+                setState(() => _obscurePassword = !_obscurePassword),
+            icon: Icon(
+              _obscurePassword ? Icons.visibility_off : Icons.visibility,
+              size: 18,
+              color: AppColors.mutedSlate,
+            ),
+          ),
         ),
         const SizedBox(height: 8.0),
 

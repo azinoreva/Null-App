@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
+
 import '../../widgets/app_theme.dart';
 import '../../engine/media_handling/connection_scan_service.dart';
 
@@ -17,13 +19,15 @@ enum _ScanMode { liveScanner, importImage }
 /// to a server, etc.) is up to you to write later.
 class AddConnectionScreen extends StatefulWidget {
   final Future<void> Function(String code, {required bool isManualPin})
-      onConnectionScanned;
+  onConnectionScanned;
   final VoidCallback? onBack;
+  final VoidCallback? onShareContact;
 
   const AddConnectionScreen({
     super.key,
     required this.onConnectionScanned,
     this.onBack,
+    this.onShareContact,
   });
 
   @override
@@ -31,7 +35,13 @@ class AddConnectionScreen extends StatefulWidget {
 }
 
 class _AddConnectionScreenState extends State<AddConnectionScreen> {
-  _ScanMode _mode = _ScanMode.liveScanner;
+  bool get _supportsLiveScanner =>
+      defaultTargetPlatform != TargetPlatform.windows;
+
+  _ScanMode get _initialMode =>
+      _supportsLiveScanner ? _ScanMode.liveScanner : _ScanMode.importImage;
+
+  late _ScanMode _mode;
   MobileScannerController? _cameraController;
   final TextEditingController _pinController = TextEditingController();
   bool _hasHandledScan = false;
@@ -40,7 +50,10 @@ class _AddConnectionScreenState extends State<AddConnectionScreen> {
   @override
   void initState() {
     super.initState();
-    _cameraController = MobileScannerController();
+    _mode = _initialMode;
+    if (_supportsLiveScanner) {
+      _cameraController = MobileScannerController();
+    }
     _pinController.addListener(_handlePinChanged);
   }
 
@@ -53,6 +66,7 @@ class _AddConnectionScreenState extends State<AddConnectionScreen> {
   }
 
   void _setMode(_ScanMode mode) {
+    if (mode == _ScanMode.liveScanner && !_supportsLiveScanner) return;
     if (_mode == mode) return;
     setState(() {
       _mode = mode;
@@ -73,8 +87,8 @@ class _AddConnectionScreenState extends State<AddConnectionScreen> {
     }
   }
 
-  void _showInfo() {
-    // TODO: show an explanation of what "Add Connection" does.
+  void _handleShareContact() {
+    widget.onShareContact?.call();
   }
 
   void _handleDetect(BarcodeCapture capture) {
@@ -116,7 +130,7 @@ class _AddConnectionScreenState extends State<AddConnectionScreen> {
     final rawChars = _pinController.text.replaceAll('-', '');
     if (rawChars.length >= 9 && !_hasHandledScan) {
       _hasHandledScan = true;
-      _finishWithRawValue(rawChars, isManualPin: true);
+      _finishWithRawValue(_pinController.text, isManualPin: true);
     }
   }
 
@@ -134,7 +148,8 @@ class _AddConnectionScreenState extends State<AddConnectionScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context).extension<AppColorScheme>() ?? AppColorScheme.dark;
+    final theme =
+        Theme.of(context).extension<AppColorScheme>() ?? AppColorScheme.dark;
 
     return Container(
       color: theme.background,
@@ -163,8 +178,25 @@ class _AddConnectionScreenState extends State<AddConnectionScreen> {
                     ),
                   ),
                   InkWell(
-                    onTap: _showInfo,
-                    child: Icon(Icons.info_outline, color: theme.textInputColor),
+                    onTap: _handleShareContact,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.ios_share,
+                          size: 22.0,
+                          color: theme.primaryGreen,
+                        ),
+                        Text(
+                          'share',
+                          style: AppTypography.getTextStyle(
+                            context,
+                            AppTextType.tiny,
+                            color: theme.primaryGreen,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ],
               ),
@@ -178,34 +210,43 @@ class _AddConnectionScreenState extends State<AddConnectionScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     // Viewfinder
-                    AspectRatio(
-                      aspectRatio: 1.0,
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(20.0),
-                        child: Stack(
-                          fit: StackFit.expand,
-                          children: [
-                            Container(color: theme.border.withAlpha(60)),
-                            if (_mode == _ScanMode.liveScanner && _cameraController != null)
-                              MobileScanner(
-                                controller: _cameraController!,
-                                onDetect: _handleDetect,
-                              )
-                            else
-                              Center(
-                                child: _isProcessingImage
-                                    ? CircularProgressIndicator(color: theme.primaryGreen)
-                                    : InkWell(
-                                        onTap: _handleImportImage,
-                                        child: Icon(
-                                          Icons.photo_camera_outlined,
-                                          size: 48.0,
-                                          color: AppColors.mutedSlate.withAlpha(150),
-                                        ),
-                                      ),
-                              ),
-                            const _ScannerBrackets(),
-                          ],
+                    Center(
+                      child: FractionallySizedBox(
+                        widthFactor: 0.6,
+                        child: AspectRatio(
+                          aspectRatio: 1.0,
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(20.0),
+                            child: Stack(
+                              fit: StackFit.expand,
+                              children: [
+                                Container(color: theme.border.withAlpha(60)),
+                                if (_mode == _ScanMode.liveScanner &&
+                                    _cameraController != null)
+                                  MobileScanner(
+                                    controller: _cameraController!,
+                                    onDetect: _handleDetect,
+                                  )
+                                else
+                                  Center(
+                                    child: _isProcessingImage
+                                        ? CircularProgressIndicator(
+                                            color: theme.primaryGreen,
+                                          )
+                                        : InkWell(
+                                            onTap: _handleImportImage,
+                                            child: Icon(
+                                              Icons.photo_camera_outlined,
+                                              size: 48.0,
+                                              color: AppColors.mutedSlate
+                                                  .withAlpha(150),
+                                            ),
+                                          ),
+                                  ),
+                                const _ScannerBrackets(),
+                              ],
+                            ),
+                          ),
                         ),
                       ),
                     ),
@@ -213,45 +254,49 @@ class _AddConnectionScreenState extends State<AddConnectionScreen> {
                     Center(
                       child: Text(
                         'ALIGN QR CODE WITHIN BRACKETS',
-                        style: AppTypography.getTextStyle(
-                          context,
-                          AppTextType.tiny,
-                          color: AppColors.mutedSlate,
-                        ).copyWith(fontWeight: FontWeight.bold, letterSpacing: 0.5),
+                        style:
+                            AppTypography.getTextStyle(
+                              context,
+                              AppTextType.tiny,
+                              color: AppColors.mutedSlate,
+                            ).copyWith(
+                              fontWeight: FontWeight.bold,
+                              letterSpacing: 0.5,
+                            ),
                       ),
                     ),
                     const SizedBox(height: 16.0),
 
-                    // Mode tabs
-                    Container(
-                      padding: const EdgeInsets.all(4.0),
-                      decoration: BoxDecoration(
-                        color: theme.border.withAlpha(70),
-                        borderRadius: BorderRadius.circular(14.0),
-                      ),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: _ModeTab(
-                              theme: theme,
-                              icon: Icons.camera_alt_outlined,
-                              label: 'Live Scanner',
-                              isActive: _mode == _ScanMode.liveScanner,
-                              onTap: () => _setMode(_ScanMode.liveScanner),
+                    if (_supportsLiveScanner)
+                      Container(
+                        padding: const EdgeInsets.all(4.0),
+                        decoration: BoxDecoration(
+                          color: theme.border.withAlpha(70),
+                          borderRadius: BorderRadius.circular(14.0),
+                        ),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: _ModeTab(
+                                theme: theme,
+                                icon: Icons.camera_alt_outlined,
+                                label: 'Live Scanner',
+                                isActive: _mode == _ScanMode.liveScanner,
+                                onTap: () => _setMode(_ScanMode.liveScanner),
+                              ),
                             ),
-                          ),
-                          Expanded(
-                            child: _ModeTab(
-                              theme: theme,
-                              icon: Icons.image_outlined,
-                              label: 'Import Image',
-                              isActive: _mode == _ScanMode.importImage,
-                              onTap: () => _setMode(_ScanMode.importImage),
+                            Expanded(
+                              child: _ModeTab(
+                                theme: theme,
+                                icon: Icons.image_outlined,
+                                label: 'Import Image',
+                                isActive: _mode == _ScanMode.importImage,
+                                onTap: () => _setMode(_ScanMode.importImage),
+                              ),
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
-                    ),
                     const SizedBox(height: 24.0),
 
                     // Manual PIN entry
@@ -260,14 +305,18 @@ class _AddConnectionScreenState extends State<AddConnectionScreen> {
                       children: [
                         Text(
                           'CONNECT VIA PIN',
-                          style: AppTypography.getTextStyle(
-                            context,
-                            AppTextType.tiny,
-                            color: theme.textInputColor,
-                          ).copyWith(fontWeight: FontWeight.bold, letterSpacing: 0.5),
+                          style:
+                              AppTypography.getTextStyle(
+                                context,
+                                AppTextType.tiny,
+                                color: theme.textInputColor,
+                              ).copyWith(
+                                fontWeight: FontWeight.bold,
+                                letterSpacing: 0.5,
+                              ),
                         ),
                         Text(
-                          '9-Character Alphanumeric',
+                          '10-Character Alphanumeric',
                           style: AppTypography.getTextStyle(
                             context,
                             AppTextType.tiny,
@@ -293,7 +342,11 @@ class _AddConnectionScreenState extends State<AddConnectionScreen> {
                               color: theme.primaryGreen.withAlpha(35),
                               shape: BoxShape.circle,
                             ),
-                            child: Icon(Icons.vpn_key_outlined, size: 16.0, color: theme.primaryGreen),
+                            child: Icon(
+                              Icons.vpn_key_outlined,
+                              size: 16.0,
+                              color: theme.primaryGreen,
+                            ),
                           ),
                           const SizedBox(width: 12.0),
                           Expanded(
@@ -302,15 +355,21 @@ class _AddConnectionScreenState extends State<AddConnectionScreen> {
                               inputFormatters: [_PinInputFormatter()],
                               textCapitalization: TextCapitalization.characters,
                               cursorColor: theme.primaryGreen,
-                              style: AppTypography.getTextStyle(
-                                context,
-                                AppTextType.body,
-                                color: theme.textInputColor,
-                              ).copyWith(letterSpacing: 2.0, fontWeight: FontWeight.bold),
+                              style:
+                                  AppTypography.getTextStyle(
+                                    context,
+                                    AppTextType.body,
+                                    color: theme.textInputColor,
+                                  ).copyWith(
+                                    letterSpacing: 2.0,
+                                    fontWeight: FontWeight.bold,
+                                  ),
                               decoration: const InputDecoration(
                                 border: InputBorder.none,
                                 isDense: true,
-                                contentPadding: EdgeInsets.symmetric(vertical: 16.0),
+                                contentPadding: EdgeInsets.symmetric(
+                                  vertical: 16.0,
+                                ),
                               ),
                             ),
                           ),
@@ -363,14 +422,20 @@ class _ModeTab extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 10.0),
         decoration: BoxDecoration(
-          color: isActive ? theme.primaryGreen.withAlpha(35) : Colors.transparent,
+          color: isActive
+              ? theme.primaryGreen.withAlpha(35)
+              : Colors.transparent,
           borderRadius: BorderRadius.circular(10.0),
           border: isActive ? Border.all(color: theme.primaryGreen) : null,
         ),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(icon, size: 16.0, color: isActive ? theme.primaryGreen : AppColors.mutedSlate),
+            Icon(
+              icon,
+              size: 16.0,
+              color: isActive ? theme.primaryGreen : AppColors.mutedSlate,
+            ),
             const SizedBox(width: 6.0),
             Text(
               label,
@@ -410,7 +475,12 @@ class _ScannerBrackets extends StatelessWidget {
           width: length,
           height: length,
           child: CustomPaint(
-            painter: _CornerPainter(top: top, left: left, color: color, thickness: thickness),
+            painter: _CornerPainter(
+              top: top,
+              left: left,
+              color: color,
+              thickness: thickness,
+            ),
           ),
         ),
       );
@@ -436,7 +506,12 @@ class _CornerPainter extends CustomPainter {
   final Color color;
   final double thickness;
 
-  _CornerPainter({required this.top, required this.left, required this.color, required this.thickness});
+  _CornerPainter({
+    required this.top,
+    required this.left,
+    required this.color,
+    required this.thickness,
+  });
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -464,17 +539,23 @@ class _CornerPainter extends CustomPainter {
 }
 
 /// Uppercases input, strips non-alphanumeric characters, caps it at 9
-/// characters, and inserts a "-" every 3 characters for readability
-/// (e.g. "ABC-123-XYZ").
+/// characters, and auto-inserts a "-" after the 4th character so the key
+/// reads as "XXXX-YYYYY" (the dash is part of the key).
 class _PinInputFormatter extends TextInputFormatter {
   @override
-  TextEditingValue formatEditUpdate(TextEditingValue oldValue, TextEditingValue newValue) {
-    final raw = newValue.text.toUpperCase().replaceAll(RegExp(r'[^A-Z0-9]'), '');
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
+    final raw = newValue.text.toUpperCase().replaceAll(
+      RegExp(r'[^A-Z0-9]'),
+      '',
+    );
     final capped = raw.length > 9 ? raw.substring(0, 9) : raw;
 
     final buffer = StringBuffer();
     for (var i = 0; i < capped.length; i++) {
-      if (i != 0 && i % 3 == 0) buffer.write('-');
+      if (i == 4) buffer.write('-');
       buffer.write(capped[i]);
     }
 

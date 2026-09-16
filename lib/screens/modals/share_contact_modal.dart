@@ -46,6 +46,16 @@ class ConnectionIdentityService {
   static const double _shareCardWidthPx = 640.0;
   static const double _shareCardHeightPx = 760.0;
 
+  /// Normalises a manual code for display as "XXXX-YYYYY". Keys coming
+  /// straight from the server already include the dash; if one doesn't, a
+  /// "-" is inserted after the 4th character so it always reads grouped.
+  static String formatManualCode(String code) {
+    if (code.contains('-')) return code;
+    final clean = code.toUpperCase().replaceAll(RegExp(r'[^A-Z0-9]'), '');
+    if (clean.length <= 4) return clean;
+    return '${clean.substring(0, 4)}-${clean.substring(4)}';
+  }
+
   /// Generates a fresh identity. Pass [existingCode] to re-render both
   /// SVGs for a PIN you already have (e.g. loaded from storage) instead
   /// of generating a new one.
@@ -131,7 +141,7 @@ class ConnectionIdentityService {
     const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
     const alnum = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
     final part1 = List.generate(4, (_) => letters[random.nextInt(letters.length)]).join();
-    final part2 = List.generate(6, (_) => alnum[random.nextInt(alnum.length)]).join();
+    final part2 = List.generate(5, (_) => alnum[random.nextInt(alnum.length)]).join();
     return '$part1-$part2';
   }
 }
@@ -203,7 +213,9 @@ class _ShareContactModalState extends State<ShareContactModal> {
                   ),
                   const SizedBox(height: 12),
                   SelectableText(
-                    result.manualCode,
+                    ConnectionIdentityService.formatManualCode(
+                      result.manualCode,
+                    ),
                     style: Theme.of(context).textTheme.titleMedium,
                   ),
                   const SizedBox(height: 8),
