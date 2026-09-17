@@ -142,7 +142,7 @@ Future<void> _pollForReceivedContact({
 
     if (received == null) return;
 
-    await _saveReceivedContact(database, received);
+    await _saveReceivedContact(database, received, localServerId: mainServerId);
     final conversationId = received.contactId;
     final now = DateTime.now().millisecondsSinceEpoch;
     await database.conversationsDao.upsertConversation(
@@ -156,7 +156,7 @@ Future<void> _pollForReceivedContact({
         pinned: 0,
         archived: 0,
         draft: null,
-        serverId: received.serverId,
+        serverId: mainServerId,
         createdAt: now,
         updatedAt: now,
         sound: null,
@@ -189,8 +189,8 @@ Future<void> _pollForReceivedContact({
 
     await taskQueue.queueTask(
       functionName: 'sendChatMessage',
-      args: [conversationId, 'hi', received.serverId, _uuid.v4(), _uuid.v4()],
-      serverId: received.serverId,
+      args: [conversationId, 'hi', mainServerId, _uuid.v4(), _uuid.v4()],
+      serverId: mainServerId,
     );
   } catch (_) {
     // Background completion must never surface an error over the share UI.
@@ -207,8 +207,9 @@ Map<String, dynamic> _ratchetStateJson(RatchetState state) => {
 
 Future<void> _saveReceivedContact(
   AppDatabase database,
-  ContactInfo contact,
-) async {
+  ContactInfo contact, {
+  required String localServerId,
+}) async {
   Uint8List? avatar;
   if (contact.avatar != null && contact.avatar!.isNotEmpty) {
     avatar = Uint8List.fromList(base64Decode(contact.avatar!));
@@ -223,7 +224,7 @@ Future<void> _saveReceivedContact(
           bio: Value(contact.bio),
           publicKey: Value(contact.publicKey),
           connectionStatus: 1,
-          serverId: contact.serverId,
+          serverId: localServerId,
           createdAt: DateTime.now().millisecondsSinceEpoch,
           updatedAt: DateTime.now().millisecondsSinceEpoch,
           conversationId: Value(contact.contactId),

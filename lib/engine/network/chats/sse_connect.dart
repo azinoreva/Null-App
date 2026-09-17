@@ -55,8 +55,8 @@ class _SseConnection {
   bool _opening = false;
   bool isConnected = false;
   bool _authFailed = false;
-  bool _errored = false;
-
+  Timer? _reconnectTimer;
+  Duration _reconnectDelay = const Duration(seconds: 2);
 
   _SseConnection({
     required this.serverId,
@@ -66,21 +66,24 @@ class _SseConnection {
     void Function(String serverId, Object error)? onError,
     void Function(String serverId)? onConnected,
     void Function(String serverId)? onDisconnected,
-  })  : _dispatch = dispatch,
-        _onError = onError,
-        _onConnected = onConnected,
-        _onDisconnected = onDisconnected,
-        _dio = Dio(BaseOptions(baseUrl: baseUrl));
+  }) : _dispatch = dispatch,
+       _onError = onError,
+       _onConnected = onConnected,
+       _onDisconnected = onDisconnected,
+       _dio = Dio(BaseOptions(baseUrl: baseUrl));
 
   Future<void> connect() async {
     _manuallyClosed = false;
     _authFailed = false;
-    _errored = false;
+    _reconnectTimer?.cancel();
+    _reconnectTimer = null;
     await _open();
   }
 
   void disconnect() {
     _manuallyClosed = true;
+    _reconnectTimer?.cancel();
+    _reconnectTimer = null;
     _subscription?.cancel();
     _subscription = null;
     isConnected = false;
@@ -112,6 +115,7 @@ class _SseConnection {
       );
 
       isConnected = true;
+      _reconnectDelay = const Duration(seconds: 2);
       _onConnected?.call(serverId);
 
       final buffer = StringBuffer();
@@ -129,7 +133,7 @@ class _SseConnection {
         },
         cancelOnError: true,
       );
-    }     on DioException catch (error) {
+    } on DioException catch (error) {
       if (error.response?.statusCode == 401) {
         if (_authFailed) return;
         final newToken = await ApiClient.refreshAccessToken(serverId);
@@ -151,7 +155,7 @@ class _SseConnection {
   }
 
   Future<void> reconnectIfNeeded() async {
-    if (isConnected || _manuallyClosed || _authFailed || _errored) return;
+    if (isConnected || _manuallyClosed || _authFailed) return;
     await _open();
   }
 
@@ -190,12 +194,14 @@ class _SseConnection {
       _lastEventId = id; // scoped to this connection only
     }
 
-    _dispatch(SseEvent(
-      serverId: serverId,
-      event: eventName,
-      data: dataLines.join('\n'),
-      id: id,
-    ));
+    _dispatch(
+      SseEvent(
+        serverId: serverId,
+        event: eventName,
+        data: dataLines.join('\n'),
+        id: id,
+      ),
+    );
   }
 
   void _handleDrop(Object error) {
@@ -208,11 +214,22 @@ class _SseConnection {
     _subscription?.cancel();
     _subscription = null;
 
-    if (_manuallyClosed || _authFailed || _errored) return;
+    if (_manuallyClosed || _authFailed) return;
 
-    // Any other /subscribe error means this server keeps failing — stop
-    // polling/reconnecting it so we don't hammer /subscribe forever.
-    _errored = true;
+    _scheduleReconnect();
+  }
+
+  void _scheduleReconnect() {
+    if (_reconnectTimer != null || _manuallyClosed || _authFailed) return;
+
+    final delay = _reconnectDelay;
+    _reconnectDelay = Duration(
+      seconds: (_reconnectDelay.inSeconds * 2).clamp(2, 60),
+    );
+    _reconnectTimer = Timer(delay, () {
+      _reconnectTimer = null;
+      unawaited(reconnectIfNeeded());
+    });
   }
 }
 
@@ -263,8 +280,8 @@ class SseHub {
   SseHub({
     Future<void> Function(String serverId)? pullMessages,
     TaskQueue? taskQueue,
-  })  : _pullMessages = pullMessages,
-        _taskQueue = taskQueue {
+  }) : _pullMessages = pullMessages,
+       _taskQueue = taskQueue {
     if (_pullMessages == null && _taskQueue != null) {
       _pullMessages = _pullAndQueueMessages;
     }
@@ -282,7 +299,8 @@ class SseHub {
     final queue = _taskQueue;
     if (queue == null) return;
 
-    final messages = await MessagesQueueService(serverId: serverId).getMessages();
+    final messages = await MessagesQueueService(serverId: serverId)
+        .getMessages();
     for (final message in messages) {
       final taskName = incomingMessageTaskName(message.messageType);
       await queue.queueTask(
@@ -335,7 +353,7 @@ class SseHub {
 
   Future<void> _checkConnections() async {
     for (final entry in _connections.entries) {
-      if (entry.value.isConnected || entry.value._authFailed || entry.value._errored) continue;
+      if (entry.value.isConnected || entry.value._authFailed) continue;
       try {
         await _pullMessages?.call(entry.key);
       } catch (error) {

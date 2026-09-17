@@ -6,7 +6,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../engine/database/app_database.dart';
 import '../engine/engine.dart';
 import '../engine/task_queue.dart';
+import '../engine/functions/settings/settings.dart';
 import '../engine/network/updates/check_updates.dart';
+import '../engine/network/updates/updates_cache.dart';
 import '../engine/database/queries/contacts_queries.dart';
 import '../engine/database/queries/conversations_queries.dart';
 import '../engine/database/queries/group_members_queries.dart';
@@ -60,7 +62,9 @@ class ContactData {
   /// Just the name portion, used for sorting / grouping by letter.
   String get name {
     final dashIndex = displayName.indexOf('-');
-    return dashIndex == -1 ? displayName.trim() : displayName.substring(0, dashIndex).trim();
+    return dashIndex == -1
+        ? displayName.trim()
+        : displayName.substring(0, dashIndex).trim();
   }
 }
 
@@ -107,8 +111,8 @@ final syncStateDaoProvider = Provider<SyncStateDao>((ref) {
 /// UI rebuilds automatically.
 final syncStatesProvider =
     AsyncNotifierProvider<SyncStatesNotifier, List<SyncStateData>>(
-  SyncStatesNotifier.new,
-);
+      SyncStatesNotifier.new,
+    );
 
 class SyncStatesNotifier extends AsyncNotifier<List<SyncStateData>> {
   StreamSubscription<List<SyncStateData>>? _subscription;
@@ -148,37 +152,34 @@ class SyncStatesNotifier extends AsyncNotifier<List<SyncStateData>> {
     String conversationId, {
     required String messageId,
     required String message,
-  }) =>
-      _dao.updateLastRead(
-        conversationId,
-        messageId: messageId,
-        message: message,
-        unreadCount: 0,
-      );
+  }) => _dao.updateLastRead(
+    conversationId,
+    messageId: messageId,
+    message: message,
+    unreadCount: 0,
+  );
 
   /// Updates the last message preview shown in the chat list.
   Future<void> updateLastMessage(
     String conversationId, {
     required String messageId,
     required String message,
-  }) =>
-      _dao.updateLastMessage(
-        conversationId,
-        messageId: messageId,
-        message: message,
-      );
+  }) => _dao.updateLastMessage(
+    conversationId,
+    messageId: messageId,
+    message: message,
+  );
 
   /// Pins or unpins a conversation.
   Future<void> setPinned(
     String conversationId, {
     required bool pinned,
     int? position,
-  }) =>
-      _dao.setPinned(
-        conversationId,
-        pinned: pinned ? 1 : 0,
-        pinnedPosition: position,
-      );
+  }) => _dao.setPinned(
+    conversationId,
+    pinned: pinned ? 1 : 0,
+    pinnedPosition: position,
+  );
 
   /// Mutes or unmutes a conversation.
   Future<void> setMuted(String conversationId, {required bool muted}) =>
@@ -230,8 +231,9 @@ final groupMembersDaoProvider = Provider<GroupMembersDao>((ref) {
 ///
 /// Determines which messages are "mine" (aligned right, delivery status).
 final currentUserIdProvider = FutureProvider<String?>((ref) async {
-  final identity =
-      await ref.watch(identityDaoProvider).getCurrentIdentityOrNull();
+  final identity = await ref
+      .watch(identityDaoProvider)
+      .getCurrentIdentityOrNull();
   return identity?.identityId;
 });
 
@@ -242,8 +244,8 @@ final currentUserIdProvider = FutureProvider<String?>((ref) async {
 /// the message list (append only the new messages instead of a full reload).
 final conversationSyncStateProvider =
     StreamProvider.family<SyncStateData?, String>((ref, conversationId) {
-  return ref.watch(syncStateDaoProvider).watchSyncStateById(conversationId);
-});
+      return ref.watch(syncStateDaoProvider).watchSyncStateById(conversationId);
+    });
 
 /// The rendered message list for a conversation.
 ///
@@ -253,8 +255,11 @@ final conversationSyncStateProvider =
 /// newer than the last loaded one — the DB and UI update partially rather than
 /// reloading the whole conversation.
 final chatMessagesProvider =
-    AsyncNotifierProvider.family<ChatMessagesNotifier, List<ChatMessageItem>,
-        String>(ChatMessagesNotifier.new);
+    AsyncNotifierProvider.family<
+      ChatMessagesNotifier,
+      List<ChatMessageItem>,
+      String
+    >(ChatMessagesNotifier.new);
 
 class ChatMessagesNotifier extends AsyncNotifier<List<ChatMessageItem>> {
   ChatMessagesNotifier(this.conversationId);
@@ -277,18 +282,21 @@ class ChatMessagesNotifier extends AsyncNotifier<List<ChatMessageItem>> {
   @override
   Future<List<ChatMessageItem>> build() async {
     final messagesDao = ref.watch(messagesDaoProvider);
-    final syncState =
-        await ref.watch(syncStateDaoProvider).getSyncStateById(conversationId);
+    final syncState = await ref
+        .watch(syncStateDaoProvider)
+        .getSyncStateById(conversationId);
     final ownId = await ref.watch(currentUserIdProvider.future);
     final isGroup = (syncState?.conversationType ?? 0) == 1;
 
     _lastProcessedMessageId = syncState?.lastMessageId;
     _loadedUpToOrder = -1;
 
-    final List<Message> initialMessages = await _loadWindow(messagesDao, syncState?.lastMessageId);
+    final List<Message> initialMessages = await _loadWindow(
+      messagesDao,
+      syncState?.lastMessageId,
+    );
 
-    ref.listen(conversationSyncStateProvider(conversationId),
-        (previous, next) {
+    ref.listen(conversationSyncStateProvider(conversationId), (previous, next) {
       unawaited(_onSyncStateChanged(next.value));
     });
 
@@ -310,7 +318,10 @@ class ChatMessagesNotifier extends AsyncNotifier<List<ChatMessageItem>> {
         limit: _initialWindow,
       );
     } else {
-      messages = await dao.getLastMessages(conversationId, limit: _initialWindow);
+      messages = await dao.getLastMessages(
+        conversationId,
+        limit: _initialWindow,
+      );
     }
 
     messages.sort((a, b) => a.messageOrder.compareTo(b.messageOrder));
@@ -331,8 +342,9 @@ class ChatMessagesNotifier extends AsyncNotifier<List<ChatMessageItem>> {
       _lastProcessedMessageId = anchorId;
       await _appendDelta();
 
-      final haveAnchor =
-          (state.value ?? const <ChatMessageItem>[]).any((m) => m.id == anchorId);
+      final haveAnchor = (state.value ?? const <ChatMessageItem>[]).any(
+        (m) => m.id == anchorId,
+      );
       if (!haveAnchor) _lastProcessedMessageId = previousId;
       return;
     }
@@ -340,13 +352,15 @@ class ChatMessagesNotifier extends AsyncNotifier<List<ChatMessageItem>> {
     if (anchor != null) {
       // Anchor moved to an older position (rare) — full window reload.
       _lastProcessedMessageId = anchorId;
-      final syncState =
-          await ref.read(syncStateDaoProvider).getSyncStateById(conversationId);
+      final syncState = await ref
+          .read(syncStateDaoProvider)
+          .getSyncStateById(conversationId);
       final ownId = await ref.read(currentUserIdProvider.future);
       final isGroup = (syncState?.conversationType ?? 0) == 1;
       final window = await _loadWindow(messagesDao, anchorId);
-      state =
-          AsyncData(await _toChatItems(window, isGroup: isGroup, ownId: ownId));
+      state = AsyncData(
+        await _toChatItems(window, isGroup: isGroup, ownId: ownId),
+      );
       return;
     }
 
@@ -371,16 +385,20 @@ class ChatMessagesNotifier extends AsyncNotifier<List<ChatMessageItem>> {
         final current = state.value ?? const <ChatMessageItem>[];
         final existingIds = current.map((m) => m.id).toSet();
         final ownId = await ref.read(currentUserIdProvider.future);
-        final syncState =
-            await ref.read(syncStateDaoProvider).getSyncStateById(conversationId);
+        final syncState = await ref
+            .read(syncStateDaoProvider)
+            .getSyncStateById(conversationId);
         final isGroup = (syncState?.conversationType ?? 0) == 1;
 
-        final additions = (await _toChatItems(fresh, isGroup: isGroup, ownId: ownId))
-            .where((m) => !existingIds.contains(m.id))
-            .toList();
+        final additions = (await _toChatItems(
+          fresh,
+          isGroup: isGroup,
+          ownId: ownId,
+        )).where((m) => !existingIds.contains(m.id)).toList();
 
-        _loadedUpToOrder =
-            _loadedUpToOrder > fresh.last.messageOrder ? _loadedUpToOrder : fresh.last.messageOrder;
+        _loadedUpToOrder = _loadedUpToOrder > fresh.last.messageOrder
+            ? _loadedUpToOrder
+            : fresh.last.messageOrder;
         if (additions.isEmpty) break;
 
         state = AsyncData([...current, ...additions]);
@@ -403,14 +421,17 @@ class ChatMessagesNotifier extends AsyncNotifier<List<ChatMessageItem>> {
 
     Map<String, GroupMember> membersById = const {};
     if (isGroup) {
-      final members =
-          await ref.read(groupMembersDaoProvider).getMembersOfGroup(conversationId);
+      final members = await ref
+          .read(groupMembersDaoProvider)
+          .getMembersOfGroup(conversationId);
       membersById = {for (final m in members) m.identityId: m};
     }
 
     final contact = isGroup
         ? null
-        : await ref.read(contactsDaoProvider).getContactByConversationId(conversationId);
+        : await ref
+              .read(contactsDaoProvider)
+              .getContactByConversationId(conversationId);
 
     final items = <ChatMessageItem>[];
     for (final m in messages) {
@@ -432,17 +453,19 @@ class ChatMessagesNotifier extends AsyncNotifier<List<ChatMessageItem>> {
         );
       }
 
-      items.add(ChatMessageItem(
-        id: m.messageId,
-        isMe: isMe,
-        chatType: isGroup ? ChatType.group : ChatType.individual,
-        sender: sender,
-        content: m.decryptedMessage ?? '',
-        mediaType: MessageMediaType.text,
-        timestamp: formatChatTime(m.timestamp),
-        isEdited: m.edited == 1,
-        deliveryStatus: isMe ? _deliveryStatusFor(m.status) : null,
-      ));
+      items.add(
+        ChatMessageItem(
+          id: m.messageId,
+          isMe: isMe,
+          chatType: isGroup ? ChatType.group : ChatType.individual,
+          sender: sender,
+          content: m.decryptedMessage ?? '',
+          mediaType: MessageMediaType.text,
+          timestamp: formatChatTime(m.timestamp),
+          isEdited: m.edited == 1,
+          deliveryStatus: isMe ? _deliveryStatusFor(m.status) : null,
+        ),
+      );
     }
     return items;
   }
@@ -469,11 +492,16 @@ class UpdatesFeedState {
   final bool hasMore;
   final bool isLoadingMore;
 
+  /// True while a full refresh (first page) is in flight. Existing posts stay
+  /// visible, and pagination is paused so it can't race the refresh.
+  final bool isRefreshing;
+
   const UpdatesFeedState({
     this.posts = const [],
     this.page = 0,
     this.hasMore = true,
     this.isLoadingMore = false,
+    this.isRefreshing = false,
   });
 
   UpdatesFeedState copyWith({
@@ -481,12 +509,14 @@ class UpdatesFeedState {
     int? page,
     bool? hasMore,
     bool? isLoadingMore,
+    bool? isRefreshing,
   }) {
     return UpdatesFeedState(
       posts: posts ?? this.posts,
       page: page ?? this.page,
       hasMore: hasMore ?? this.hasMore,
       isLoadingMore: isLoadingMore ?? this.isLoadingMore,
+      isRefreshing: isRefreshing ?? this.isRefreshing,
     );
   }
 }
@@ -498,8 +528,8 @@ class UpdatesFeedState {
 /// back renders the cached feed instantly instead of refetching.
 final updatesFeedProvider =
     AsyncNotifierProvider<UpdatesFeedNotifier, UpdatesFeedState>(
-  UpdatesFeedNotifier.new,
-);
+      UpdatesFeedNotifier.new,
+    );
 
 class UpdatesFeedNotifier extends AsyncNotifier<UpdatesFeedState> {
   static const int _pageSize = 20;
@@ -508,14 +538,51 @@ class UpdatesFeedNotifier extends AsyncNotifier<UpdatesFeedState> {
   static const Duration _fetchTimeout = Duration(seconds: 4);
 
   UpdatesService get _service => ref.read(updatesServiceProvider);
+  UpdatesCacheService get _cache => UpdatesCacheService.instance;
+
+  /// The feed-control category ids the currently loaded feed was built from.
+  /// Used to notice when the user changes their tags in Settings.
+  List<String> _activeTags = const [];
+  AppSettings? _settings;
 
   @override
   Future<UpdatesFeedState> build() async {
-    // Non-blocking first load: return an empty feed immediately and fetch in
-    // the background, so the screen always renders instead of freezing on a
-    // full-screen spinner.
+    // Keep the feed in sync with Settings > Updates Preferences.
+    _settings = AppSettings.instance;
+    _activeTags = _currentTags();
+    _settings!.addListener(_onSettingsChanged);
+    ref.onDispose(() => _settings?.removeListener(_onSettingsChanged));
+
+    // Seed from the Hive cache so the feed renders immediately (and offline);
+    // the background refresh replaces it with fresh data once it lands.
+    final cached = _cache.load();
     _scheduleBackgroundRefresh();
-    return const UpdatesFeedState();
+    if (cached.isEmpty) return const UpdatesFeedState(isRefreshing: true);
+    return UpdatesFeedState(
+      posts: cached.map(_toPostData).toList(),
+      isRefreshing: true,
+      hasMore: true,
+    );
+  }
+
+  /// Category ids selected in Settings > Updates Preferences. An empty list
+  /// means "no tags" — the whole feed is requested.
+  List<String> _currentTags() => AppSettings.instance.feedControlOrdered
+      .map((category) => category.id)
+      .toList(growable: false);
+
+  void _onSettingsChanged() {
+    final tags = _currentTags();
+    if (_listEquals(tags, _activeTags)) return;
+    unawaited(refresh());
+  }
+
+  bool _listEquals(List<String> a, List<String> b) {
+    if (a.length != b.length) return false;
+    for (var i = 0; i < a.length; i++) {
+      if (a[i] != b[i]) return false;
+    }
+    return true;
   }
 
   void _scheduleBackgroundRefresh() {
@@ -525,20 +592,38 @@ class UpdatesFeedNotifier extends AsyncNotifier<UpdatesFeedState> {
     });
   }
 
-  /// Reloads the feed from the first page. Used by the background loader and
+  /// Reloads the feed from the first page, using the current tags as the
+  /// filter. Existing posts stay on screen while the request is in flight.
+  /// Used by the background loader, pull-to-refresh, the header button and
   /// the inline retry.
   Future<void> refresh() async {
-    state = const AsyncLoading();
+    // Drop anything past its 7-day life before repopulating.
+    unawaited(_cache.purgeExpired());
+
+    final current = state.value;
+    if (current == null) {
+      state = const AsyncLoading();
+    } else {
+      state = AsyncData(current.copyWith(isRefreshing: true));
+    }
+
     try {
       state = AsyncData(await _loadFirstPage());
     } catch (error, stackTrace) {
-      state = AsyncError(error, stackTrace);
+      if (current == null) {
+        state = AsyncError(error, stackTrace);
+      } else {
+        state = AsyncData(current.copyWith(isRefreshing: false));
+      }
     }
   }
 
   Future<UpdatesFeedState> _loadFirstPage() async {
-    final updates =
-        await _service.getUpdates(limit: _pageSize).timeout(_fetchTimeout);
+    _activeTags = _currentTags();
+    final updates = await _service
+        .getUpdates(limit: _pageSize, categories: _activeTags)
+        .timeout(_fetchTimeout);
+    unawaited(_cache.save(updates));
     return UpdatesFeedState(
       posts: updates.map(_toPostData).toList(),
       page: 1,
@@ -546,17 +631,26 @@ class UpdatesFeedNotifier extends AsyncNotifier<UpdatesFeedState> {
     );
   }
 
-  /// Appends the next page of posts. No-op while a page is already loading
-  /// or when there's nothing left to fetch.
+  /// Appends the next page of posts. No-op while a page is already loading,
+  /// while a refresh is in flight, or when there's nothing left to fetch.
   Future<void> loadMore() async {
     final current = state.value;
-    if (current == null || current.isLoadingMore || !current.hasMore) return;
+    if (current == null ||
+        current.isLoadingMore ||
+        current.isRefreshing ||
+        !current.hasMore) {
+      return;
+    }
 
     state = AsyncData(current.copyWith(isLoadingMore: true));
 
     try {
       final updates = await _service
-          .getUpdates(limit: _pageSize, before: current.posts.length)
+          .getUpdates(
+            limit: _pageSize,
+            before: current.posts.length,
+            categories: _activeTags,
+          )
           .timeout(_fetchTimeout);
       if (updates.isEmpty) {
         state = AsyncData(
@@ -565,6 +659,7 @@ class UpdatesFeedNotifier extends AsyncNotifier<UpdatesFeedState> {
         return;
       }
 
+      unawaited(_cache.save(updates));
       state = AsyncData(
         UpdatesFeedState(
           posts: [...current.posts, ...updates.map(_toPostData)],
@@ -599,8 +694,8 @@ class UpdatesFeedNotifier extends AsyncNotifier<UpdatesFeedState> {
 /// cache instead of hitting the database again.
 final contactsProvider =
     AsyncNotifierProvider<ContactsNotifier, List<ContactData>>(
-  ContactsNotifier.new,
-);
+      ContactsNotifier.new,
+    );
 
 class ContactsNotifier extends AsyncNotifier<List<ContactData>> {
   ContactsDao get _dao => ref.read(contactsDaoProvider);

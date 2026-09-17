@@ -46,10 +46,7 @@ class ReceiveContactResult {
   final String contactId;
   final String nickname;
 
-  const ReceiveContactResult({
-    required this.contactId,
-    required this.nickname,
-  });
+  const ReceiveContactResult({required this.contactId, required this.nickname});
 }
 
 /// Decodes a QR code from a still image file (e.g. one picked from the
@@ -100,7 +97,8 @@ Future<ReceiveContactResult> receiveContact({
 
   final payload = _parseScannedPayload(scannedValue);
   final contactKey = payload.contactKey;
-  final hasSessionMaterial = !isManualPin &&
+  final hasSessionMaterial =
+      !isManualPin &&
       payload.symmetricKey != null &&
       payload.ratchetState != null;
 
@@ -115,7 +113,7 @@ Future<ReceiveContactResult> receiveContact({
   final received = await GetContactService(serverId: mainServerId)
       .getContact(contactKey: contactKey);
 
-  await _saveReceivedContact(database, received);
+  await _saveReceivedContact(database, received, localServerId: mainServerId);
 
   final conversationId = received.contactId;
   final now = DateTime.now().millisecondsSinceEpoch;
@@ -130,7 +128,7 @@ Future<ReceiveContactResult> receiveContact({
       pinned: 0,
       archived: 0,
       draft: null,
-      serverId: received.serverId,
+      serverId: mainServerId,
       createdAt: now,
       updatedAt: now,
       sound: null,
@@ -141,7 +139,9 @@ Future<ReceiveContactResult> receiveContact({
 
   final nameParts = identity.displayName.split(' - ');
   final nickname = nameParts.first.trim();
-  final title = nameParts.length > 1 ? nameParts.skip(1).join(' - ').trim() : '';
+  final title = nameParts.length > 1
+      ? nameParts.skip(1).join(' - ').trim()
+      : '';
 
   await SendContactReboundService(serverId: mainServerId).sendContact(
     nickname: nickname,
@@ -241,24 +241,27 @@ _ScannedPayload _parseScannedPayload(String raw) {
 // two copies can't drift apart later.
 Future<void> _saveReceivedContact(
   AppDatabase database,
-  ContactInfo contact,
-) async {
+  ContactInfo contact, {
+  required String localServerId,
+}) async {
   Uint8List? avatar;
   if (contact.avatar != null && contact.avatar!.isNotEmpty) {
     avatar = Uint8List.fromList(base64Decode(contact.avatar!));
   }
-  await database.contactsDao.db.into(database.contactsDao.db.contacts).insertOnConflictUpdate(
-    ContactsCompanion.insert(
-      contactId: contact.contactId,
-      nickname: Value(contact.nickname),
-      avatar: Value(avatar),
-      bio: Value(contact.bio),
-      publicKey: Value(contact.publicKey),
-      connectionStatus: 1,
-      serverId: contact.serverId,
-      createdAt: DateTime.now().millisecondsSinceEpoch,
-      updatedAt: DateTime.now().millisecondsSinceEpoch,
-      conversationId: Value(contact.contactId),
-    ),
-  );
+  await database.contactsDao.db
+      .into(database.contactsDao.db.contacts)
+      .insertOnConflictUpdate(
+        ContactsCompanion.insert(
+          contactId: contact.contactId,
+          nickname: Value(contact.nickname),
+          avatar: Value(avatar),
+          bio: Value(contact.bio),
+          publicKey: Value(contact.publicKey),
+          connectionStatus: 1,
+          serverId: localServerId,
+          createdAt: DateTime.now().millisecondsSinceEpoch,
+          updatedAt: DateTime.now().millisecondsSinceEpoch,
+          conversationId: Value(contact.contactId),
+        ),
+      );
 }

@@ -16,6 +16,7 @@ import 'engine/network/main_server_client.dart';
 import 'engine/network/auth_failure_handler.dart';
 import 'engine/network/api_client.dart';
 import 'engine/network/chats/sse_connect.dart';
+import 'engine/network/updates/updates_cache.dart';
 import 'engine/database/app_database.dart';
 import 'engine/database/init_db.dart';
 import 'engine/crypto/chat/identity_crypto.dart';
@@ -29,6 +30,7 @@ void main() async {
   await dotenv.load();
   MainServerClient.init();
   await AppSettings.init();
+  await UpdatesCacheService.instance.init();
   final database = await DatabaseInitializer.initialize();
   await const IdentityCrypto().ensureIdentityKey(database: database);
   final taskEngine = await TaskEngine.start(

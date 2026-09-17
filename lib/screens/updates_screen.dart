@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+
 import '../state/providers.dart';
 import '../widgets/app_theme.dart';
 import '../widgets/display/updates_card.dart';
@@ -56,6 +57,8 @@ class _UpdatesScreenState extends ConsumerState<UpdatesScreen> {
     _createPost();
   }
 
+  Future<void> _refresh() => ref.read(updatesFeedProvider.notifier).refresh();
+
   void _openTab(NavigationTab tab) {
     if (tab == NavigationTab.updates) return;
 
@@ -66,9 +69,8 @@ class _UpdatesScreenState extends ConsumerState<UpdatesScreen> {
       _ => const ChatScreen(),
     };
 
-    Navigator.of(context).pushReplacement(
-      MaterialPageRoute(builder: (_) => screen),
-    );
+    Navigator.of(context)
+        .pushReplacement(MaterialPageRoute(builder: (_) => screen));
   }
 
   @override
@@ -82,8 +84,12 @@ class _UpdatesScreenState extends ConsumerState<UpdatesScreen> {
     );
   }
 
-  Widget _buildContent(BuildContext context, AsyncValue<UpdatesFeedState> feed) {
-    final theme = Theme.of(context).extension<AppColorScheme>() ?? AppColorScheme.dark;
+  Widget _buildContent(
+    BuildContext context,
+    AsyncValue<UpdatesFeedState> feed,
+  ) {
+    final theme =
+        Theme.of(context).extension<AppColorScheme>() ?? AppColorScheme.dark;
     // Feed content is always rendered; while the first page is still being
     // fetched (or failed), empty state + an inline banner carry the UI.
     final state = feed.value ?? const UpdatesFeedState();
@@ -111,7 +117,26 @@ class _UpdatesScreenState extends ConsumerState<UpdatesScreen> {
                         ).copyWith(fontWeight: FontWeight.bold),
                       ),
                     ),
-                    Icon(Icons.compare_arrows, color: theme.textInputColor),
+                    InkWell(
+                      onTap: _refresh,
+                      customBorder: const CircleBorder(),
+                      child: Padding(
+                        padding: const EdgeInsets.all(6.0),
+                        child: state.isRefreshing
+                            ? SizedBox(
+                                width: 18.0,
+                                height: 18.0,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2.0,
+                                  color: theme.primaryGreen,
+                                ),
+                              )
+                            : Icon(
+                                Icons.compare_arrows,
+                                color: theme.textInputColor,
+                              ),
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -120,76 +145,107 @@ class _UpdatesScreenState extends ConsumerState<UpdatesScreen> {
               if (feed.hasError && state.posts.isEmpty)
                 _buildErrorBanner(context, theme),
 
-              // Feed
+              // Feed (pull-to-refresh; the header button does the same).
               Expanded(
-                child: state.posts.isEmpty
-                    ? Center(
-                        child: Text(
-                          'No updates yet',
-                          style: AppTypography.getTextStyle(
-                            context,
-                            AppTextType.body,
-                            color: AppColors.mutedSlate,
+                child: RefreshIndicator(
+                  onRefresh: _refresh,
+                  color: theme.primaryGreen,
+                  backgroundColor: theme.background,
+                  child: state.posts.isEmpty
+                      ? ListView(
+                          controller: _scrollController,
+                          physics: const AlwaysScrollableScrollPhysics(),
+                          padding: const EdgeInsets.fromLTRB(
+                            16.0,
+                            80.0,
+                            16.0,
+                            100.0,
                           ),
-                        ),
-                      )
-                    : ListView.builder(
-                        controller: _scrollController,
-                        padding: const EdgeInsets.fromLTRB(16.0, 8.0, 16.0, 100.0),
-                        itemCount: state.posts.length + 1,
-                        itemBuilder: (context, index) {
-                          if (index < state.posts.length) {
-                            final post = state.posts[index];
-                            return Padding(
-                              padding: const EdgeInsets.only(bottom: 16.0),
-                              child: UpdateComponent(
-                                avatarUrl: post.avatarUrl,
-                                nickname: post.nickname,
-                                timeText: post.timeText,
-                                text: post.text,
-                                mediaUrl: post.mediaUrl,
-                                isLiked: post.isLiked,
-                                isDisliked: post.isDisliked,
-                                isShared: post.isShared,
-                                isSubscribed: post.isSubscribed,
+                          children: [
+                            Center(
+                              child: Text(
+                                'No updates yet',
+                                style: AppTypography.getTextStyle(
+                                  context,
+                                  AppTextType.body,
+                                  color: AppColors.mutedSlate,
+                                ),
                               ),
-                            );
-                          }
+                            ),
+                          ],
+                        )
+                      : ListView.builder(
+                          controller: _scrollController,
+                          physics: const AlwaysScrollableScrollPhysics(),
+                          padding: const EdgeInsets.fromLTRB(
+                            16.0,
+                            8.0,
+                            16.0,
+                            100.0,
+                          ),
+                          itemCount: state.posts.length + 1,
+                          itemBuilder: (context, index) {
+                            if (index < state.posts.length) {
+                              final post = state.posts[index];
+                              return Padding(
+                                padding: const EdgeInsets.only(bottom: 16.0),
+                                child: UpdateComponent(
+                                  avatarUrl: post.avatarUrl,
+                                  nickname: post.nickname,
+                                  timeText: post.timeText,
+                                  text: post.text,
+                                  mediaUrl: post.mediaUrl,
+                                  isLiked: post.isLiked,
+                                  isDisliked: post.isDisliked,
+                                  isShared: post.isShared,
+                                  isSubscribed: post.isSubscribed,
+                                ),
+                              );
+                            }
 
-                          // Footer: loading spinner, "caught up" message, or nothing.
-                          if (state.isLoadingMore) {
-                            return Padding(
-                              padding: const EdgeInsets.symmetric(vertical: 24.0),
-                              child: Center(
-                                child: SizedBox(
-                                  width: 24.0,
-                                  height: 24.0,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2.5,
-                                    color: theme.primaryGreen,
+                            // Footer: loading spinner, "caught up" message, or nothing.
+                            if (state.isLoadingMore) {
+                              return Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 24.0,
+                                ),
+                                child: Center(
+                                  child: SizedBox(
+                                    width: 24.0,
+                                    height: 24.0,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2.5,
+                                      color: theme.primaryGreen,
+                                    ),
                                   ),
                                 ),
-                              ),
-                            );
-                          }
-                          if (!state.hasMore) {
-                            return Padding(
-                              padding: const EdgeInsets.symmetric(vertical: 24.0),
-                              child: Center(
-                                child: Text(
-                                  "YOU'RE ALL CAUGHT UP",
-                                  style: AppTypography.getTextStyle(
-                                    context,
-                                    AppTextType.tiny,
-                                    color: AppColors.mutedSlate,
-                                  ).copyWith(fontWeight: FontWeight.bold, letterSpacing: 0.5),
+                              );
+                            }
+                            if (!state.hasMore) {
+                              return Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 24.0,
                                 ),
-                              ),
-                            );
-                          }
-                          return const SizedBox.shrink();
-                        },
-                      ),
+                                child: Center(
+                                  child: Text(
+                                    "YOU'RE ALL CAUGHT UP",
+                                    style:
+                                        AppTypography.getTextStyle(
+                                          context,
+                                          AppTextType.tiny,
+                                          color: AppColors.mutedSlate,
+                                        ).copyWith(
+                                          fontWeight: FontWeight.bold,
+                                          letterSpacing: 0.5,
+                                        ),
+                                  ),
+                                ),
+                              );
+                            }
+                            return const SizedBox.shrink();
+                          },
+                        ),
+                ),
               ),
             ],
           ),
@@ -219,7 +275,11 @@ class _UpdatesScreenState extends ConsumerState<UpdatesScreen> {
       ),
       child: Row(
         children: [
-          Icon(Icons.cloud_off_outlined, color: AppColors.mutedSlate, size: 18.0),
+          Icon(
+            Icons.cloud_off_outlined,
+            color: AppColors.mutedSlate,
+            size: 18.0,
+          ),
           const SizedBox(width: 8.0),
           Expanded(
             child: Text(

@@ -87,28 +87,28 @@ class UpdatesService {
 
   /// Fetches a page of updates from POST /api/get_updates.
   ///
-  /// The endpoint supports filtering by exactly one of [category],
-  /// [hashtags], or [userIds] (based on observed usage) — pass whichever
-  /// filter you need and leave the others null. [before] and [limit]
-  /// control pagination and are always sent.
+  /// Filtering is optional. Pass at most one of [category], [categories],
+  /// [hashtags], or [userIds]; omit them all to get the full feed. [before]
+  /// and [limit] control pagination and are always sent.
   ///
   /// Auth (Bearer access token) and refresh-on-401 are handled automatically
   /// by ApiClient's interceptors.
   Future<List<Update>> getUpdates({
     String? category,
+    List<String>? categories,
     List<String>? hashtags,
     List<String>? userIds,
     int before = 0,
     int limit = 20,
   }) async {
-    final data = <String, dynamic>{
-      'before': before,
-      'limit': limit,
-    };
+    final data = <String, dynamic>{'before': before, 'limit': limit};
 
     if (category != null) data['category'] = category;
-    if (hashtags != null) data['hashtags'] = hashtags;
-    if (userIds != null) data['user_ids'] = userIds;
+    if (categories != null && categories.isNotEmpty) {
+      data['categories'] = categories;
+    }
+    if (hashtags != null && hashtags.isNotEmpty) data['hashtags'] = hashtags;
+    if (userIds != null && userIds.isNotEmpty) data['user_ids'] = userIds;
 
     final response = await _dio.post(
       '/api/get_updates',
