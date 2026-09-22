@@ -55,9 +55,8 @@ Future<void> _sendQueuedChatMessage(
   }
 
   if (!ApiClient.isRegistered(serverId)) {
-    ApiClient.registerServer(
+    await ApiClient.registerServer(
       serverId: serverId,
-      baseUrl: server.serverUrl,
       onAuthFailure: () async {
         await redirectToLogin();
       },

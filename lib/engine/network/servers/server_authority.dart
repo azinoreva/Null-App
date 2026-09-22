@@ -1,6 +1,5 @@
 import 'package:dio/dio.dart';
 
-import '../api_client.dart';
 import 'user_credentials_service.dart' show Credential;
 
 /// Represents the response of POST /api/auth/challenge

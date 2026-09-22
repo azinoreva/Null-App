@@ -5,6 +5,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
+import '../../utils/server_list.dart';
 import 'server_error_exception.dart';
 
 /// Manages API clients for multiple servers. Each server has its own
@@ -64,19 +65,26 @@ class ApiClient {
   /// request/response interceptors for auth. Safe to call again for the
   /// same [serverId] (e.g. to update its baseUrl) — this replaces the
   /// existing client for that id.
-  static void registerServer({
+  ///
+  /// The base URL is resolved from the persisted server list (SharedPreferences
+  /// via [ServerListService.lookup]) unless [baseUrl] is given explicitly —
+  /// needed only for servers that haven't been persisted yet (e.g. a directory
+  /// fetched from another server).
+  static Future<void> registerServer({
     required String serverId,
-    required String baseUrl,
+    String? baseUrl,
     required VoidCallback onAuthFailure,
     Duration connectTimeout = const Duration(seconds: 5),
     Duration receiveTimeout = const Duration(seconds: 3),
-  }) {
-    _baseUrls[serverId] = baseUrl;
+  }) async {
+    final resolvedBaseUrl = baseUrl ?? await _resolveServerUrl(serverId);
+
+    _baseUrls[serverId] = resolvedBaseUrl;
     _onAuthFailureCallbacks[serverId] = onAuthFailure;
 
     final dio = Dio(
       BaseOptions(
-        baseUrl: baseUrl,
+        baseUrl: resolvedBaseUrl,
         connectTimeout: connectTimeout,
         receiveTimeout: receiveTimeout,
         headers: {
@@ -140,6 +148,20 @@ class ApiClient {
     );
 
     _clients[serverId] = dio;
+  }
+
+  /// Resolves a server's base URL from the persisted server list. Throws if
+  /// the server isn't in the list (so the failure is loud in dev).
+  static Future<String> _resolveServerUrl(String serverId) async {
+    final server = await ServerListService.lookup(serverId);
+    final url = server?.serverUrl;
+    if (url == null || url.isEmpty) {
+      throw StateError(
+        'No URL stored for server "$serverId" in the server list. '
+        'Register it via ServerListService first, or pass baseUrl explicitly.',
+      );
+    }
+    return url;
   }
 
   /// Removes a server's client and its stored tokens entirely (e.g. when

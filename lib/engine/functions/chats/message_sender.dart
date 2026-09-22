@@ -92,9 +92,8 @@ Future<void> _sendTypedMessageTask(
     throw StateError('No URL is stored for server $serverId.');
   }
   if (!ApiClient.isRegistered(serverId)) {
-    ApiClient.registerServer(
+    await ApiClient.registerServer(
       serverId: serverId,
-      baseUrl: server.serverUrl,
       onAuthFailure: () {
         unawaited(redirectToLogin());
       },

@@ -328,9 +328,8 @@ Future<void> _ensureServerRegistered(
   if (server == null || server.serverUrl.isEmpty) {
     throw StateError('No URL is stored for server $serverId.');
   }
-  ApiClient.registerServer(
+  await ApiClient.registerServer(
     serverId: serverId,
-    baseUrl: server.serverUrl,
     onAuthFailure: () {
       unawaited(redirectToLogin());
     },

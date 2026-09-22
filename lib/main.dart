@@ -14,21 +14,25 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 import 'engine/network/main_server_client.dart';
 import 'engine/network/auth_failure_handler.dart';
-import 'engine/network/api_client.dart';
-import 'engine/network/chats/sse_connect.dart';
 import 'engine/network/updates/updates_cache.dart';
-import 'engine/database/app_database.dart';
+import 'engine/network/server_connections.dart';
 import 'engine/database/init_db.dart';
 import 'engine/crypto/chat/identity_crypto.dart';
 import 'engine/task_queue.dart';
 import '/engine/engine.dart';
 import 'state/providers.dart';
 import 'engine/functions/settings/settings.dart';
+import 'utils/server_list.dart';
+
+/// App-wide handle on the SSE supervisor started once the user is logged in,
+/// so other code (screens, providers) can inspect connection statuses or
+/// register SSE event handlers.
+ServerConnectionService? appServerConnections;
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await dotenv.load();
-  MainServerClient.init();
+  await MainServerClient.init();
   await AppSettings.init();
   await UpdatesCacheService.instance.init();
   final database = await DatabaseInitializer.initialize();
@@ -52,47 +56,18 @@ void main() async {
   );
 
   if (prefs.getBool('is_logged_in') ?? false) {
-    unawaited(_startSseConnections(database, taskQueue));
+    unawaited(_startSseConnections(taskQueue));
   }
 }
 
-Future<void> _startSseConnections(
-  AppDatabase database,
-  TaskQueue taskQueue,
-) async {
-  const mainServerId = 'server_1';
-  final mainServerUrl = dotenv.env['MAIN_SERVER_URL'];
-  if (mainServerUrl == null || mainServerUrl.isEmpty) return;
-
-  ApiClient.registerServer(
-    serverId: mainServerId,
-    baseUrl: mainServerUrl,
-    onAuthFailure: () {
-      unawaited(redirectToLogin());
-    },
+/// Loads the persisted server list and keeps every listed server's SSE
+/// subscription connected for the lifetime of the app.
+Future<void> _startSseConnections(TaskQueue taskQueue) async {
+  appServerConnections = ServerConnectionService(
+    serverList: ServerListService(),
+    taskQueue: taskQueue,
   );
-
-  final hub = SseHub(taskQueue: taskQueue);
-  final servers = await database.serversDao.getAllServers();
-  final serverUrls = <String, String>{mainServerId: mainServerUrl};
-  for (final server in servers) {
-    if (server.serverUrl.isNotEmpty) {
-      serverUrls[server.serverId] = server.serverUrl;
-    }
-  }
-
-  for (final entry in serverUrls.entries) {
-    if (!ApiClient.isRegistered(entry.key)) {
-      ApiClient.registerServer(
-        serverId: entry.key,
-        baseUrl: entry.value,
-        onAuthFailure: () {
-          unawaited(redirectToLogin());
-        },
-      );
-    }
-    unawaited(hub.addServer(entry.key, entry.value));
-  }
+  await appServerConnections!.start();
 }
 
 class MyApp extends StatefulWidget {

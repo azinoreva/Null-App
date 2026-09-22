@@ -3,6 +3,7 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 
+import '../../../utils/server_list.dart';
 import '../api_client.dart';
 
 /// Represents a single server entry from GET /api/servers.
@@ -11,6 +12,7 @@ class ServerInfo {
   final String serverName;
   final String serverUrl;
   final String mediaUrl;
+  final String serverType;
   final int mediaSizeLimit;
   final int mediaTimer;
   final int maxPayload;
@@ -21,6 +23,7 @@ class ServerInfo {
     required this.serverName,
     required this.serverUrl,
     required this.mediaUrl,
+    required this.serverType,
     required this.mediaSizeLimit,
     required this.mediaTimer,
     required this.maxPayload,
@@ -33,6 +36,7 @@ class ServerInfo {
       serverName: json['serverName'] as String,
       serverUrl: json['serverUrl'] as String,
       mediaUrl: json['mediaUrl'] as String,
+      serverType: json['serverType'] as String,
       mediaSizeLimit: json['mediaSizeLimit'] as int,
       mediaTimer: json['mediaTimer'] as int,
       maxPayload: json['maxPayload'] as int,
@@ -46,6 +50,7 @@ class ServerInfo {
       'serverName': serverName,
       'serverUrl': serverUrl,
       'mediaUrl': mediaUrl,
+      'serverType': serverType,
       'mediaSizeLimit': mediaSizeLimit,
       'mediaTimer': mediaTimer,
       'maxPayload': maxPayload,
@@ -101,7 +106,9 @@ class ServerDirectoryService {
   }
 
   /// Fetches the server list and registers each one with ApiClient in one
-  /// step, using each server's own [ServerInfo.serverUrl] as its baseUrl.
+  /// step. Every discovered server is also persisted into the app's server
+  /// list ([ServerListService.lookup] is what ApiClient reads URLs from), so
+  /// a re-registration later can resolve `serverUrl` on its own.
   ///
   /// Note: registering a server here only creates its Dio client — it does
   /// NOT by itself give that server valid tokens. You still need to obtain
@@ -114,11 +121,34 @@ class ServerDirectoryService {
     required VoidCallback Function(ServerInfo server) onAuthFailureFor,
   }) async {
     final result = await getServers();
+    final serverList = ServerListService();
+    await serverList.init();
 
     for (final server in result.servers) {
-      ApiClient.registerServer(
+      final existing = serverList.getServer(server.serverId);
+      if (existing == null) {
+        await serverList.addServer(
+          ServerConfig(
+            serverId: server.serverId,
+            serverName: server.serverName,
+            serverUrl: server.serverUrl,
+            mediaUrl: server.mediaUrl,
+            serverType: server.serverType,
+            mediaSizeLimit: server.mediaSizeLimit,
+            mediaTimer: server.mediaTimer,
+            maxPayload: server.maxPayload,
+            capabilities: server.capabilities,
+          ),
+        );
+      } else if (existing.serverUrl != server.serverUrl) {
+        await serverList.updateServer(
+          server.serverId,
+          server: existing.copyWith(serverUrl: server.serverUrl),
+        );
+      }
+
+      await ApiClient.registerServer(
         serverId: server.serverId,
-        baseUrl: server.serverUrl,
         onAuthFailure: onAuthFailureFor(server),
       );
     }

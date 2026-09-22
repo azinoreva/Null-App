@@ -65,7 +65,8 @@ class CreateUserPostprocessResponse {
 /// stable, authoritative backend (unlike the dynamically discovered
 /// per-user servers from /api/servers), so this does NOT go through
 /// ApiClient's multi-server registry — it shares MainServerClient.dio
-/// instead. Call MainServerClient.init(baseUrl: ...) once at app startup.
+/// instead. Call MainServerClient.init() once at app startup to point it at
+/// the persisted main server.
 ///
 /// Both calls are unauthenticated — there's no user/token yet at this
 /// point in the flow — so no auth interceptor is needed here at all.
