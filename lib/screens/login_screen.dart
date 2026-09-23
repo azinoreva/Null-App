@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:dio/dio.dart';
@@ -11,6 +13,7 @@ import '../widgets/buttons/square_button.dart';
 import '../engine/functions_list.dart';
 import '../engine/functions/settings/settings.dart';
 import '../engine/network/server_error_exception.dart';
+import '../main.dart';
 import 'chat_screen.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -64,6 +67,8 @@ class _LoginScreenState extends State<LoginScreen> {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setBool('has_signed_up', true);
       await prefs.setBool('is_logged_in', true);
+
+      unawaited(startSseConnections());
 
       if (!mounted) return;
       Navigator.of(context).pushAndRemoveUntil(

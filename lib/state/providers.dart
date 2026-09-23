@@ -17,6 +17,7 @@ import '../engine/database/queries/identity_queries.dart';
 import '../engine/database/queries/messages_queries.dart';
 import '../engine/database/queries/sync_state_queries.dart';
 import '../utils/formatting.dart';
+import '../utils/server_list.dart';
 import '../widgets/chats/chat_bubble_component.dart';
 
 /// Data needed to render one post in the updates feed (see [UpdateComponent]).
@@ -89,6 +90,19 @@ final taskQueueProvider = Provider<TaskQueue>((ref) {
   return TaskQueue(
     database: ref.watch(appDatabaseProvider),
     engine: ref.watch(taskEngineProvider),
+  );
+});
+
+/// The app's single [ServerListService] instance.
+///
+/// This provider has no default value; it is overridden in `main()` with the
+/// same instance handed to the SSE supervisor so everything that reads or
+/// writes the persisted server list (settings screen, connection service)
+/// shares one source of truth.
+final serverListProvider = Provider<ServerListService>((ref) {
+  throw UnimplementedError(
+    'serverListProvider must be overridden in ProviderScope '
+    'with the shared ServerListService instance.',
   );
 });
 

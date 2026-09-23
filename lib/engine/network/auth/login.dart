@@ -1,6 +1,5 @@
 import 'package:dio/dio.dart';
 
-import '../api_client.dart';
 import '../main_server_client.dart';
 
 /// Represents the response of POST /api/sign-in
@@ -25,21 +24,12 @@ class SignInResponse {
 }
 
 /// Signs a returning user in on the main server using phone number +
-/// password, and saves the resulting tokens into ApiClient so the main
-/// server is immediately usable via ApiClient.instance(mainServerId).
-///
-/// Uses MainServerClient (the shared, single-backend client) for the
-/// request itself, since sign-in is unauthenticated and happens before
-/// any tokens exist — but stores the result through ApiClient, since from
-/// this point on the main server behaves like any other registered server
-/// (its own access/refresh tokens, auto-refresh-on-401, etc.).
+/// password, and saves the returned tokens as the main-server (login)
+/// credentials used by [MainServerClient] — the only consumer of these
+/// tokens. They are intentionally NOT stored in [ApiClient], whose
+/// per-server token store is reserved for other servers.
 class SignInService {
-  /// [mainServerId] is whatever id you use when calling
-  /// ApiClient.registerServer(...) for the main server (e.g. 'main') —
-  /// tokens are saved under that id so ApiClient.instance('main') works
-  /// right after sign-in succeeds.
   Future<SignInResponse> signIn({
-    required String mainServerId,
     required String phoneNumber,
     required String password,
   }) async {
@@ -61,8 +51,7 @@ class SignInService {
       response.data as Map<String, dynamic>,
     );
 
-    await ApiClient.saveTokens(
-      serverId: mainServerId,
+    await MainServerClient.saveTokens(
       accessToken: result.accessToken,
       refreshToken: result.refreshToken,
     );

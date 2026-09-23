@@ -99,30 +99,13 @@ class ServerListException implements Exception {
 ///
 /// Usage:
 ///   final service = ServerListService();
-///   await service.init();              // loads cached list (or defaults)
+///   await service.init();              // loads the cached list
 ///   service.servers;                   // read the current list
 ///   await service.addServer(newServer);
 ///   await service.updateServer('server_1', (s) => s.copyWith(serverName: 'New name'));
 ///   await service.removeServer('server_1');
 class ServerListService extends ChangeNotifier {
   static const _serverListKey = 'server_list';
-
-  /// Seed list used the first time the app runs, before anything has been
-  /// cached. Edit/extend as needed, or pass an empty list if you don't
-  /// want any defaults.
-  static const List<ServerConfig> defaultServers = [
-    ServerConfig(
-      serverId: 'server_1',
-      serverName: 'Null main Server',
-      serverUrl: 'https://nullrelay.com',
-      mediaUrl: 'https://media.nullrelay.com',
-      serverType: 'public',
-      mediaSizeLimit: 100000,
-      mediaTimer: 86400,
-      maxPayload: 5,
-      capabilities: 0,
-    ),
-  ];
 
   List<ServerConfig> _servers = [];
   bool _initialized = false;
@@ -143,15 +126,15 @@ class ServerListService extends ChangeNotifier {
 
   List<ServerConfig> _readFrom(SharedPreferences prefs) {
     final raw = prefs.getString(_serverListKey);
-    if (raw == null || raw.isEmpty) return List.of(defaultServers);
+    if (raw == null || raw.isEmpty) return [];
     try {
       final decoded = jsonDecode(raw) as List<dynamic>;
       return decoded
           .map((e) => ServerConfig.fromJson(e as Map<String, dynamic>))
           .toList();
     } catch (_) {
-      // Corrupt cache: fall back to defaults rather than crash.
-      return List.of(defaultServers);
+      // Corrupt cache: start empty rather than crash.
+      return [];
     }
   }
 
@@ -232,11 +215,11 @@ class ServerListService extends ChangeNotifier {
     return true;
   }
 
-  /// Clears the cached list and reverts to [defaultServers].
+  /// Clears the cached list and reverts to an empty list.
   Future<void> reset() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_serverListKey);
-    _servers = List.of(defaultServers);
+    _servers = [];
     notifyListeners();
   }
 }

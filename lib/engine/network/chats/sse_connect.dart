@@ -5,6 +5,8 @@ import 'dart:typed_data';
 import 'package:dio/dio.dart';
 
 import '../api_client.dart';
+import '../main_server_client.dart';
+import '../auth_failure_handler.dart';
 import '../../task_queue.dart';
 import '../../functions_list.dart' show incomingMessageTaskName;
 import 'pull_messages.dart';
@@ -93,7 +95,7 @@ class _SseConnection {
     if (_opening || _manuallyClosed) return;
     _opening = true;
     try {
-      final accessToken = await ApiClient.getAccessToken(serverId);
+      final accessToken = await _accessTokenFor(serverId);
       final headers = <String, dynamic>{
         'accept': 'text/event-stream',
         'cache-control': 'no-cache',
@@ -136,14 +138,14 @@ class _SseConnection {
     } on DioException catch (error) {
       if (error.response?.statusCode == 401) {
         if (_authFailed) return;
-        final newToken = await ApiClient.refreshAccessToken(serverId);
+        final newToken = await _refreshFor(serverId);
         if (newToken != null && !_manuallyClosed) {
           _opening = false;
           await _open();
           return;
         }
         _authFailed = true;
-        await ApiClient.handleAuthFailure(serverId);
+        await _handleAuthFailureFor(serverId);
         return;
       }
       _handleDrop(error);
@@ -158,6 +160,24 @@ class _SseConnection {
     if (isConnected || _manuallyClosed || _authFailed) return;
     await _open();
   }
+
+  // The main server (`server_1`) authenticates with its login tokens via
+  // [MainServerClient]; every other server uses [ApiClient]'s per-server
+  // token store.
+  static Future<String?> _accessTokenFor(String serverId) =>
+      serverId == MainServerClient.serverId
+          ? MainServerClient.getAccessToken()
+          : ApiClient.getAccessToken(serverId);
+
+  static Future<String?> _refreshFor(String serverId) =>
+      serverId == MainServerClient.serverId
+          ? MainServerClient.refreshAccessToken()
+          : ApiClient.refreshAccessToken(serverId);
+
+  static Future<void> _handleAuthFailureFor(String serverId) =>
+      serverId == MainServerClient.serverId
+          ? redirectToLogin()
+          : ApiClient.handleAuthFailure(serverId);
 
   void _drainBuffer(StringBuffer buffer) {
     final content = buffer.toString();

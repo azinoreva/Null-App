@@ -9,11 +9,15 @@ import '../engine/functions/settings/settings.dart';
 import '../engine/database/queries/identity_queries.dart';
 import '../engine/media_handling/dicebear.dart';
 import '../engine/media_handling/media_storage.dart';
+import '../engine/network/api_client.dart';
 import '../engine/network/auth_failure_handler.dart';
+import '../engine/network/servers/servers.dart' as server_directory;
 import '../state/providers.dart';
+import '../utils/server_list.dart';
 import 'modals/automatic_messages.dart';
 import 'modals/change_password.dart';
 import 'modals/choose_interests.dart';
+import 'modals/server_list_modal.dart';
 
 /// Settings screen, driven entirely by [AppSettings].
 ///
@@ -131,11 +135,114 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   }
 
   void _openConnectedServers() {
-    // TODO: navigate to the connected servers list.
+    unawaited(_showConnectedServers());
+  }
+
+  Future<void> _showConnectedServers() async {
+    final serverList = ref.read(serverListProvider);
+    await serverList.init();
+    if (!mounted) return;
+
+    final servers = serverList.servers
+        .map((s) => ServerInfo.fromJson(s.toJson()))
+        .toList();
+
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => ServersListModal(
+        servers: servers,
+        action: ServerAction.disconnect,
+        onServerAction: _disconnectServer,
+      ),
+    );
+  }
+
+  Future<void> _disconnectServer(ServerInfo server) async {
+    final serverList = ref.read(serverListProvider);
+    await serverList.removeServer(server.serverId);
+    await ApiClient.unregisterServer(server.serverId);
+
+    // The shared server list notifies the SSE supervisor, which drops that
+    // server's subscription (see ServerConnectionService._syncToServerList).
   }
 
   void _openAddServer() {
-    // TODO: navigate to the add-a-server flow.
+    unawaited(_showAddServer());
+  }
+
+  Future<void> _showAddServer() async {
+    try {
+      final directory = server_directory.ServerDirectoryService();
+      final response = await directory.getServers();
+
+      final byId = {for (final s in response.servers) s.serverId: s};
+      final servers = response.servers
+          .map((s) => ServerInfo.fromJson(s.toJson()))
+          .toList();
+
+      if (!mounted) return;
+      showModalBottomSheet<void>(
+        context: context,
+        isScrollControlled: true,
+        backgroundColor: Colors.transparent,
+        builder: (context) => ServersListModal(
+          servers: servers,
+          action: ServerAction.connect,
+          title: 'Add a Server',
+          subtitle: 'Servers available to connect',
+          emptyMessage: 'No servers available',
+          onServerAction: (server) => _connectServer(
+            server,
+            full: byId[server.serverId],
+          ),
+        ),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not load servers: $error')),
+      );
+    }
+  }
+
+  Future<void> _connectServer(
+    ServerInfo server, {
+    server_directory.ServerInfo? full,
+  }) async {
+    // The modal only carries the four display fields; pull the full config
+    // from the directory response so nothing is lost when persisting.
+    if (full == null) return;
+
+    final serverList = ref.read(serverListProvider);
+    await serverList.init();
+
+    if (serverList.getServer(full.serverId) == null) {
+      await serverList.addServer(
+        ServerConfig(
+          serverId: full.serverId,
+          serverName: full.serverName,
+          serverUrl: full.serverUrl,
+          mediaUrl: full.mediaUrl,
+          serverType: full.serverType,
+          mediaSizeLimit: full.mediaSizeLimit,
+          mediaTimer: full.mediaTimer,
+          maxPayload: full.maxPayload,
+          capabilities: full.capabilities,
+        ),
+      );
+    }
+
+    await ApiClient.registerServer(
+      serverId: full.serverId,
+      onAuthFailure: () {
+        unawaited(redirectToLogin());
+      },
+    );
+
+    // Adding to the shared server list notifies the SSE supervisor, which
+    // registers the connection automatically (ServerConnectionService).
   }
 
   void _openViewStorage() {

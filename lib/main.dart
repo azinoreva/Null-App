@@ -29,6 +29,15 @@ import 'utils/server_list.dart';
 /// register SSE event handlers.
 ServerConnectionService? appServerConnections;
 
+/// The newest [TaskQueue] created at startup; used to (re)start the SSE
+/// supervisor outside of [main] (e.g. right after a login).
+TaskQueue? appTaskQueue;
+
+/// The app's single server-list instance, shared between the SSE supervisor
+/// and the settings screen so connecting/disconnecting a server stays in
+/// sync with the live subscriptions.
+final ServerListService appServerList = ServerListService();
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await dotenv.load();
@@ -43,6 +52,7 @@ void main() async {
   );
   taskEngine.ping();
   final taskQueue = TaskQueue(database: database, engine: taskEngine);
+  appTaskQueue = taskQueue;
   final prefs = await SharedPreferences.getInstance();
   runApp(
     ProviderScope(
@@ -50,21 +60,28 @@ void main() async {
         // Make the initialized database available to every Riverpod provider.
         appDatabaseProvider.overrideWithValue(database),
         taskEngineProvider.overrideWithValue(taskEngine),
+        serverListProvider.overrideWithValue(appServerList),
       ],
       child: const MyApp(),
     ),
   );
 
   if (prefs.getBool('is_logged_in') ?? false) {
-    unawaited(_startSseConnections(taskQueue));
+    unawaited(startSseConnections());
   }
 }
 
 /// Loads the persisted server list and keeps every listed server's SSE
 /// subscription connected for the lifetime of the app.
-Future<void> _startSseConnections(TaskQueue taskQueue) async {
-  appServerConnections = ServerConnectionService(
-    serverList: ServerListService(),
+///
+/// Idempotent: reuses the running [appServerConnections] supervisor when one
+/// exists (e.g. a second login), and rebuilds it if it was torn down (e.g.
+/// after a logout).
+Future<void> startSseConnections() async {
+  final taskQueue = appTaskQueue;
+  if (taskQueue == null) return;
+  appServerConnections ??= ServerConnectionService(
+    serverList: appServerList,
     taskQueue: taskQueue,
   );
   await appServerConnections!.start();

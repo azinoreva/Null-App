@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 
 import '../../../utils/server_list.dart';
 import '../api_client.dart';
+import '../main_server_client.dart';
 
 /// Represents a single server entry from GET /api/servers.
 class ServerInfo {
@@ -80,20 +81,13 @@ class ServerListResponse {
 
 /// Fetches the directory of servers the user has access to.
 ///
-/// This call itself has to go to a server ApiClient already knows about —
-/// typically your main/bootstrap server (the one the user originally
-/// logged into). Register that one with ApiClient.registerServer(...)
-/// first, then call this with its serverId.
+/// Directory requests always go to the env-configured main server through
+/// [MainServerClient].
 class ServerDirectoryService {
-  final String _mainServerId;
-
-  ServerDirectoryService({required String mainServerId})
-      : _mainServerId = mainServerId;
+  ServerDirectoryService();
 
   Future<ServerListResponse> getServers() async {
-    final dio = ApiClient.instance(_mainServerId);
-
-    final response = await dio.get(
+    final response = await MainServerClient.dio.get(
       '/api/servers',
       options: Options(
         headers: {
