@@ -375,13 +375,13 @@ class _SignupScreenState extends State<SignupScreen> {
           isLocked: _isSubmitting,
           onPressed: _onSignUpPressed,
         ),
-        const SizedBox(height: 16.0),
-        TransparentButton(
-          text: 'Accept an invitation instead',
-          icon: Icons.verified_user_outlined,
-          iconPosition: IconPosition.left,
-          onPressed: () {},
-        ),
+        // const SizedBox(height: 16.0),
+        // TransparentButton(
+        //   text: 'Accept an invitation instead',
+        //   icon: Icons.verified_user_outlined,
+        //   iconPosition: IconPosition.left,
+        //   onPressed: () {},
+        // ),
         if (!isWideScreen) ...[
           const SizedBox(height: 32.0),
           Center(child: _buildTermsText(context, themeExtension)),

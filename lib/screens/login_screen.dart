@@ -24,11 +24,19 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
+  static const _savedPhoneNumberKey = 'saved_phone_number';
+
   String _selectedCountryCode = '+234';
   final TextEditingController _phoneController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
   bool _isSubmitting = false;
   bool _obscurePassword = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _restoreSavedPhoneNumber();
+  }
 
   @override
   void dispose() {
@@ -41,6 +49,36 @@ class _LoginScreenState extends State<LoginScreen> {
       _phoneController.text.trim().replaceAll(RegExp(r'\s+'), '');
 
   String get _fullPhoneNumber => '$_selectedCountryCode$_phoneDigits';
+
+  /// Pre-fills the phone field with the number used at the last login.
+  Future<void> _restoreSavedPhoneNumber() async {
+    final prefs = await SharedPreferences.getInstance();
+    final saved = prefs.getString(_savedPhoneNumberKey);
+    if (saved == null || saved.isEmpty) return;
+
+    final parts = _splitPhoneNumber(saved);
+    if (parts == null) return;
+    if (!mounted) return;
+
+    setState(() {
+      _selectedCountryCode = parts.countryCode;
+      _phoneController.text = parts.digits;
+    });
+  }
+
+  /// Splits a full number (e.g. `+2340000000000`) into its country code and
+  /// the remaining digits, matching against the known African codes.
+  ({String countryCode, String digits})? _splitPhoneNumber(String full) {
+    String? bestCode;
+    for (final country in africanCountries) {
+      if (full.startsWith(country.code) &&
+          (bestCode == null || country.code.length > bestCode.length)) {
+        bestCode = country.code;
+      }
+    }
+    if (bestCode == null) return null;
+    return (countryCode: bestCode, digits: full.substring(bestCode.length));
+  }
 
   Future<void> _onLoginPressed() async {
     final messenger = ScaffoldMessenger.of(context);
@@ -67,6 +105,7 @@ class _LoginScreenState extends State<LoginScreen> {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setBool('has_signed_up', true);
       await prefs.setBool('is_logged_in', true);
+      await prefs.setString(_savedPhoneNumberKey, _fullPhoneNumber);
 
       unawaited(startSseConnections());
 
