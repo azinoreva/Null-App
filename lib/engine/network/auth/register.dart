@@ -35,6 +35,7 @@ class CreateUserPostprocessResponse {
   final int schemaVersion;
   final String recoveryType;
   final int invitationCount;
+  final String passport;
 
   CreateUserPostprocessResponse({
     required this.userId,
@@ -43,6 +44,7 @@ class CreateUserPostprocessResponse {
     required this.schemaVersion,
     required this.recoveryType,
     required this.invitationCount,
+    required this.passport
   });
 
   factory CreateUserPostprocessResponse.fromJson(Map<String, dynamic> json) {
@@ -53,6 +55,7 @@ class CreateUserPostprocessResponse {
       schemaVersion: json['schema_version'] as int,
       recoveryType: json['recovery_type'] as String,
       invitationCount: json['invitation_count'] as int,
+      passport: json['passport'] as String
     );
   }
 

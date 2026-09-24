@@ -1,6 +1,8 @@
+
 // Ties together: password_vault.dart (key generation + AES-GCM encrypt +
 // Shamir split), vault_secure_storage.dart (persist the vault),
 // security_token_storage.dart (persist the security token),
+// passport_storage.dart (persist the passport),
 // register_null.dart (the actual network call), and identity_queries.dart
 // (the local Identity row).
 //
@@ -80,30 +82,31 @@ class RegistrationResult {
 /// 4. Makes the one network call, `POST /api/create-new-user-postprocess`,
 ///    sending the encrypted payload as `encrypted_blob`.
 /// 5. Saves the returned `securityToken` to secure storage.
-/// 6. Writes an `Identity` row to the local database from the response,
+/// 6. Saves the returned `passport` to secure storage.
+/// 7. Writes an `Identity` row to the local database from the response,
 ///    with `displayName` fixed to `"Null User"`.
 ///
 /// Before doing any of this, unless [forceOverwrite] is true, it checks
 /// whether a complete local registration already exists (Shamir vault +
-/// security token + Identity row, all three). If all three are present,
-/// it returns [RegistrationOutcome.alreadyExists] without touching
-/// anything. If [forceOverwrite] is true, that check is skipped entirely
-/// and everything is regenerated and overwritten. If some but not all
-/// three are present and [forceOverwrite] is false, the partial state is
-/// NOT patched up piecemeal — the whole flow runs again from scratch, as
-/// if nothing existed, and overwrites whatever was there.
+/// security token + passport + Identity row, all four). If all four are
+/// present, it returns [RegistrationOutcome.alreadyExists] without
+/// touching anything. If [forceOverwrite] is true, that check is skipped
+/// entirely and everything is regenerated and overwritten. If some but
+/// not all four are present and [forceOverwrite] is false, the partial
+/// state is NOT patched up piecemeal — the whole flow runs again from
+/// scratch, as if nothing existed, and overwrites whatever was there.
 ///
 /// Every step is wrapped individually: if something fails partway
 /// through, [RegistrationResult.failed] reports which step
 /// (`encrypt_and_split`, `save_vault`, `network_call`,
-/// `save_security_token`, or `save_identity`) and why. Steps completed
-/// before the failure are NOT rolled back — e.g. a failure in
-/// `save_identity` still leaves the vault, token, and server-side user
-/// in place. A subsequent call (without [forceOverwrite]) will detect
-/// the incomplete local state and retry the whole flow, which does mean
-/// `create-new-user-postprocess` may be called again for an already
-/// -registered phone number; how the server handles that repeat call is
-/// outside this function's control.
+/// `save_security_token`, `save_passport`, or `save_identity`) and why.
+/// Steps completed before the failure are NOT rolled back — e.g. a
+/// failure in `save_identity` still leaves the vault, token, passport,
+/// and server-side user in place. A subsequent call (without
+/// [forceOverwrite]) will detect the incomplete local state and retry
+/// the whole flow, which does mean `create-new-user-postprocess` may be
+/// called again for an already-registered phone number; how the server
+/// handles that repeat call is outside this function's control.
 Future<RegistrationResult> registerNewUser({
   required String phoneNumber,
   required String pin,
@@ -164,7 +167,14 @@ Future<RegistrationResult> registerNewUser({
       return RegistrationResult.failed('save_security_token', e.toString());
     }
 
-    // 6. Persist the Identity row.
+    // 6. Save the passport.
+    try {
+      await savePassport(response.passport);
+    } catch (e) {
+      return RegistrationResult.failed('save_passport', e.toString());
+    }
+
+    // 7. Persist the Identity row.
     try {
       final identity = IdentityData(
         identityId: response.userId,
@@ -194,12 +204,13 @@ Future<RegistrationResult> registerNewUser({
   }
 }
 
-/// True only if all three pieces of a completed registration are
-/// present locally: the Shamir vault, the security token, and the
-/// Identity row.
+/// True only if all four pieces of a completed registration are
+/// present locally: the Shamir vault, the security token, the
+/// passport, and the Identity row.
 Future<bool> _localRegistrationIsComplete(AppDatabase database) async {
   final hasVault = await hasVaultInSecureStorage();
   final hasToken = await hasSecurityToken();
+  final hasPassportSaved = await hasPassport();
   final identity = await database.identityDao.getCurrentIdentityOrNull();
-  return hasVault && hasToken && identity != null;
+  return hasVault && hasToken && hasPassportSaved && identity != null;
 }

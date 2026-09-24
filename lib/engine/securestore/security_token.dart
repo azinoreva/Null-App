@@ -38,3 +38,36 @@ Future<void> deleteSecurityToken({
 }) {
   return _secureStorage.delete(key: storageKey);
 }
+
+
+/// Storage key under which the passport is kept.
+const String kPassportStorageKey = 'passport';
+
+/// Saves [passport] to secure storage under [storageKey].
+Future<void> savePassport(
+  String passport, {
+  String storageKey = kPassportStorageKey,
+}) {
+  return _secureStorage.write(key: storageKey, value: passport);
+}
+
+/// Reads the passport from secure storage, or null if unset.
+Future<String?> getPassport({
+  String storageKey = kPassportStorageKey,
+}) {
+  return _secureStorage.read(key: storageKey);
+}
+
+/// True if a passport is currently stored under [storageKey].
+Future<bool> hasPassport({
+  String storageKey = kPassportStorageKey,
+}) {
+  return _secureStorage.containsKey(key: storageKey);
+}
+
+/// Deletes the passport from secure storage, if any.
+Future<void> deletePassport({
+  String storageKey = kPassportStorageKey,
+}) {
+  return _secureStorage.delete(key: storageKey);
+}
