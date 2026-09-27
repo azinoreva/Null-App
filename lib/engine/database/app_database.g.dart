@@ -10208,6 +10208,18 @@ class $SessionsTable extends Sessions with TableInfo<$SessionsTable, Session> {
         type: DriftSqlType.blob,
         requiredDuringInsert: false,
       );
+  static const VerificationMeta _dropSentMeta = const VerificationMeta(
+    'dropSent',
+  );
+  @override
+  late final GeneratedColumn<int> dropSent = GeneratedColumn<int>(
+    'drop_sent',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
   static const VerificationMeta _keyVersionMeta = const VerificationMeta(
     'keyVersion',
   );
@@ -10259,6 +10271,7 @@ class $SessionsTable extends Sessions with TableInfo<$SessionsTable, Session> {
     ephemeralPrivateKey,
     ephemeralPublicKey,
     symmetricKey,
+    dropSent,
     keyVersion,
     status,
     createdAt,
@@ -10314,6 +10327,12 @@ class $SessionsTable extends Sessions with TableInfo<$SessionsTable, Session> {
         ),
       );
     }
+    if (data.containsKey('drop_sent')) {
+      context.handle(
+        _dropSentMeta,
+        dropSent.isAcceptableOrUnknown(data['drop_sent']!, _dropSentMeta),
+      );
+    }
     if (data.containsKey('key_version')) {
       context.handle(
         _keyVersionMeta,
@@ -10367,6 +10386,10 @@ class $SessionsTable extends Sessions with TableInfo<$SessionsTable, Session> {
         DriftSqlType.blob,
         data['${effectivePrefix}symmetric_key'],
       ),
+      dropSent: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}drop_sent'],
+      )!,
       keyVersion: attachedDatabase.typeMapping.read(
         DriftSqlType.int,
         data['${effectivePrefix}key_version'],
@@ -10397,6 +10420,7 @@ class Session extends DataClass implements Insertable<Session> {
   final Uint8List? ephemeralPrivateKey;
   final Uint8List? ephemeralPublicKey;
   final Uint8List? symmetricKey;
+  final int dropSent;
   final int keyVersion;
   final int status;
   final int createdAt;
@@ -10406,6 +10430,7 @@ class Session extends DataClass implements Insertable<Session> {
     this.ephemeralPrivateKey,
     this.ephemeralPublicKey,
     this.symmetricKey,
+    required this.dropSent,
     required this.keyVersion,
     required this.status,
     required this.createdAt,
@@ -10424,6 +10449,7 @@ class Session extends DataClass implements Insertable<Session> {
     if (!nullToAbsent || symmetricKey != null) {
       map['symmetric_key'] = Variable<Uint8List>(symmetricKey);
     }
+    map['drop_sent'] = Variable<int>(dropSent);
     map['key_version'] = Variable<int>(keyVersion);
     map['status'] = Variable<int>(status);
     map['created_at'] = Variable<int>(createdAt);
@@ -10443,6 +10469,7 @@ class Session extends DataClass implements Insertable<Session> {
       symmetricKey: symmetricKey == null && nullToAbsent
           ? const Value.absent()
           : Value(symmetricKey),
+      dropSent: Value(dropSent),
       keyVersion: Value(keyVersion),
       status: Value(status),
       createdAt: Value(createdAt),
@@ -10464,6 +10491,7 @@ class Session extends DataClass implements Insertable<Session> {
         json['ephemeralPublicKey'],
       ),
       symmetricKey: serializer.fromJson<Uint8List?>(json['symmetricKey']),
+      dropSent: serializer.fromJson<int>(json['dropSent']),
       keyVersion: serializer.fromJson<int>(json['keyVersion']),
       status: serializer.fromJson<int>(json['status']),
       createdAt: serializer.fromJson<int>(json['createdAt']),
@@ -10478,6 +10506,7 @@ class Session extends DataClass implements Insertable<Session> {
       'ephemeralPrivateKey': serializer.toJson<Uint8List?>(ephemeralPrivateKey),
       'ephemeralPublicKey': serializer.toJson<Uint8List?>(ephemeralPublicKey),
       'symmetricKey': serializer.toJson<Uint8List?>(symmetricKey),
+      'dropSent': serializer.toJson<int>(dropSent),
       'keyVersion': serializer.toJson<int>(keyVersion),
       'status': serializer.toJson<int>(status),
       'createdAt': serializer.toJson<int>(createdAt),
@@ -10490,6 +10519,7 @@ class Session extends DataClass implements Insertable<Session> {
     Value<Uint8List?> ephemeralPrivateKey = const Value.absent(),
     Value<Uint8List?> ephemeralPublicKey = const Value.absent(),
     Value<Uint8List?> symmetricKey = const Value.absent(),
+    int? dropSent,
     int? keyVersion,
     int? status,
     int? createdAt,
@@ -10503,6 +10533,7 @@ class Session extends DataClass implements Insertable<Session> {
         ? ephemeralPublicKey.value
         : this.ephemeralPublicKey,
     symmetricKey: symmetricKey.present ? symmetricKey.value : this.symmetricKey,
+    dropSent: dropSent ?? this.dropSent,
     keyVersion: keyVersion ?? this.keyVersion,
     status: status ?? this.status,
     createdAt: createdAt ?? this.createdAt,
@@ -10522,6 +10553,7 @@ class Session extends DataClass implements Insertable<Session> {
       symmetricKey: data.symmetricKey.present
           ? data.symmetricKey.value
           : this.symmetricKey,
+      dropSent: data.dropSent.present ? data.dropSent.value : this.dropSent,
       keyVersion: data.keyVersion.present
           ? data.keyVersion.value
           : this.keyVersion,
@@ -10538,6 +10570,7 @@ class Session extends DataClass implements Insertable<Session> {
           ..write('ephemeralPrivateKey: $ephemeralPrivateKey, ')
           ..write('ephemeralPublicKey: $ephemeralPublicKey, ')
           ..write('symmetricKey: $symmetricKey, ')
+          ..write('dropSent: $dropSent, ')
           ..write('keyVersion: $keyVersion, ')
           ..write('status: $status, ')
           ..write('createdAt: $createdAt, ')
@@ -10552,6 +10585,7 @@ class Session extends DataClass implements Insertable<Session> {
     $driftBlobEquality.hash(ephemeralPrivateKey),
     $driftBlobEquality.hash(ephemeralPublicKey),
     $driftBlobEquality.hash(symmetricKey),
+    dropSent,
     keyVersion,
     status,
     createdAt,
@@ -10571,6 +10605,7 @@ class Session extends DataClass implements Insertable<Session> {
             this.ephemeralPublicKey,
           ) &&
           $driftBlobEquality.equals(other.symmetricKey, this.symmetricKey) &&
+          other.dropSent == this.dropSent &&
           other.keyVersion == this.keyVersion &&
           other.status == this.status &&
           other.createdAt == this.createdAt &&
@@ -10582,6 +10617,7 @@ class SessionsCompanion extends UpdateCompanion<Session> {
   final Value<Uint8List?> ephemeralPrivateKey;
   final Value<Uint8List?> ephemeralPublicKey;
   final Value<Uint8List?> symmetricKey;
+  final Value<int> dropSent;
   final Value<int> keyVersion;
   final Value<int> status;
   final Value<int> createdAt;
@@ -10592,6 +10628,7 @@ class SessionsCompanion extends UpdateCompanion<Session> {
     this.ephemeralPrivateKey = const Value.absent(),
     this.ephemeralPublicKey = const Value.absent(),
     this.symmetricKey = const Value.absent(),
+    this.dropSent = const Value.absent(),
     this.keyVersion = const Value.absent(),
     this.status = const Value.absent(),
     this.createdAt = const Value.absent(),
@@ -10603,6 +10640,7 @@ class SessionsCompanion extends UpdateCompanion<Session> {
     this.ephemeralPrivateKey = const Value.absent(),
     this.ephemeralPublicKey = const Value.absent(),
     this.symmetricKey = const Value.absent(),
+    this.dropSent = const Value.absent(),
     this.keyVersion = const Value.absent(),
     this.status = const Value.absent(),
     required int createdAt,
@@ -10616,6 +10654,7 @@ class SessionsCompanion extends UpdateCompanion<Session> {
     Expression<Uint8List>? ephemeralPrivateKey,
     Expression<Uint8List>? ephemeralPublicKey,
     Expression<Uint8List>? symmetricKey,
+    Expression<int>? dropSent,
     Expression<int>? keyVersion,
     Expression<int>? status,
     Expression<int>? createdAt,
@@ -10629,6 +10668,7 @@ class SessionsCompanion extends UpdateCompanion<Session> {
       if (ephemeralPublicKey != null)
         'ephemeral_public_key': ephemeralPublicKey,
       if (symmetricKey != null) 'symmetric_key': symmetricKey,
+      if (dropSent != null) 'drop_sent': dropSent,
       if (keyVersion != null) 'key_version': keyVersion,
       if (status != null) 'status': status,
       if (createdAt != null) 'created_at': createdAt,
@@ -10642,6 +10682,7 @@ class SessionsCompanion extends UpdateCompanion<Session> {
     Value<Uint8List?>? ephemeralPrivateKey,
     Value<Uint8List?>? ephemeralPublicKey,
     Value<Uint8List?>? symmetricKey,
+    Value<int>? dropSent,
     Value<int>? keyVersion,
     Value<int>? status,
     Value<int>? createdAt,
@@ -10653,6 +10694,7 @@ class SessionsCompanion extends UpdateCompanion<Session> {
       ephemeralPrivateKey: ephemeralPrivateKey ?? this.ephemeralPrivateKey,
       ephemeralPublicKey: ephemeralPublicKey ?? this.ephemeralPublicKey,
       symmetricKey: symmetricKey ?? this.symmetricKey,
+      dropSent: dropSent ?? this.dropSent,
       keyVersion: keyVersion ?? this.keyVersion,
       status: status ?? this.status,
       createdAt: createdAt ?? this.createdAt,
@@ -10680,6 +10722,9 @@ class SessionsCompanion extends UpdateCompanion<Session> {
     if (symmetricKey.present) {
       map['symmetric_key'] = Variable<Uint8List>(symmetricKey.value);
     }
+    if (dropSent.present) {
+      map['drop_sent'] = Variable<int>(dropSent.value);
+    }
     if (keyVersion.present) {
       map['key_version'] = Variable<int>(keyVersion.value);
     }
@@ -10705,6 +10750,7 @@ class SessionsCompanion extends UpdateCompanion<Session> {
           ..write('ephemeralPrivateKey: $ephemeralPrivateKey, ')
           ..write('ephemeralPublicKey: $ephemeralPublicKey, ')
           ..write('symmetricKey: $symmetricKey, ')
+          ..write('dropSent: $dropSent, ')
           ..write('keyVersion: $keyVersion, ')
           ..write('status: $status, ')
           ..write('createdAt: $createdAt, ')
@@ -18066,6 +18112,7 @@ typedef $$SessionsTableCreateCompanionBuilder = SessionsCompanion Function({
   Value<Uint8List?> ephemeralPrivateKey,
   Value<Uint8List?> ephemeralPublicKey,
   Value<Uint8List?> symmetricKey,
+  Value<int> dropSent,
   Value<int> keyVersion,
   Value<int> status,
   required int createdAt,
@@ -18077,6 +18124,7 @@ typedef $$SessionsTableUpdateCompanionBuilder = SessionsCompanion Function({
   Value<Uint8List?> ephemeralPrivateKey,
   Value<Uint8List?> ephemeralPublicKey,
   Value<Uint8List?> symmetricKey,
+  Value<int> dropSent,
   Value<int> keyVersion,
   Value<int> status,
   Value<int> createdAt,
@@ -18128,6 +18176,11 @@ class $$SessionsTableFilterComposer
 
   ColumnFilters<Uint8List> get symmetricKey => $composableBuilder(
     column: $table.symmetricKey,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get dropSent => $composableBuilder(
+    column: $table.dropSent,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -18199,6 +18252,11 @@ class $$SessionsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<int> get dropSent => $composableBuilder(
+    column: $table.dropSent,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<int> get keyVersion => $composableBuilder(
     column: $table.keyVersion,
     builder: (column) => ColumnOrderings(column),
@@ -18266,6 +18324,9 @@ class $$SessionsTableAnnotationComposer
     column: $table.symmetricKey,
     builder: (column) => column,
   );
+
+  GeneratedColumn<int> get dropSent =>
+      $composableBuilder(column: $table.dropSent, builder: (column) => column);
 
   GeneratedColumn<int> get keyVersion => $composableBuilder(
     column: $table.keyVersion,
@@ -18337,6 +18398,7 @@ class $$SessionsTableTableManager
                 Value<Uint8List?> ephemeralPrivateKey = const Value.absent(),
                 Value<Uint8List?> ephemeralPublicKey = const Value.absent(),
                 Value<Uint8List?> symmetricKey = const Value.absent(),
+                Value<int> dropSent = const Value.absent(),
                 Value<int> keyVersion = const Value.absent(),
                 Value<int> status = const Value.absent(),
                 Value<int> createdAt = const Value.absent(),
@@ -18347,6 +18409,7 @@ class $$SessionsTableTableManager
                 ephemeralPrivateKey: ephemeralPrivateKey,
                 ephemeralPublicKey: ephemeralPublicKey,
                 symmetricKey: symmetricKey,
+                dropSent: dropSent,
                 keyVersion: keyVersion,
                 status: status,
                 createdAt: createdAt,
@@ -18359,6 +18422,7 @@ class $$SessionsTableTableManager
                 Value<Uint8List?> ephemeralPrivateKey = const Value.absent(),
                 Value<Uint8List?> ephemeralPublicKey = const Value.absent(),
                 Value<Uint8List?> symmetricKey = const Value.absent(),
+                Value<int> dropSent = const Value.absent(),
                 Value<int> keyVersion = const Value.absent(),
                 Value<int> status = const Value.absent(),
                 required int createdAt,
@@ -18369,6 +18433,7 @@ class $$SessionsTableTableManager
                 ephemeralPrivateKey: ephemeralPrivateKey,
                 ephemeralPublicKey: ephemeralPublicKey,
                 symmetricKey: symmetricKey,
+                dropSent: dropSent,
                 keyVersion: keyVersion,
                 status: status,
                 createdAt: createdAt,

@@ -1,7 +1,7 @@
 // module name: send_contact_rebound
 import 'package:dio/dio.dart';
 
-import '../api_client.dart';
+import '../main_server_client.dart';
 
 /// Result of creating a shareable contact invite.
 class SendContactResult {
@@ -20,18 +20,16 @@ class SendContactResult {
 }
 
 class SendContactReboundService {
-  final String serverId;
+  Dio get _dio => MainServerClient.dio;
 
-  Dio get _dio => ApiClient.instance(serverId);
-
-  const SendContactReboundService({required this.serverId});
+  const SendContactReboundService();
 
 
   /// Sends the current user's contact/profile info to generate an invite.
   /// Returns a string in json
   ///
   /// Auth (Bearer access token) and refresh-on-401 are handled automatically
-  /// by ApiClient's interceptors.
+  /// by MainServerClient's interceptors.
   Future<SendContactResult> sendContact({
     required String nickname,
     required String title,

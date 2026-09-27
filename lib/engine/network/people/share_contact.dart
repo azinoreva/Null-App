@@ -1,7 +1,7 @@
 // module name: send_contact
 import 'package:dio/dio.dart';
 
-import '../api_client.dart';
+import '../main_server_client.dart';
 
 /// Result of creating a shareable contact invite.
 class SendContactResult {
@@ -36,11 +36,9 @@ class SendContactResult {
 }
 
 class SendContactService {
-  final String serverId;
+  Dio get _dio => MainServerClient.dio;
 
-  Dio get _dio => ApiClient.instance(serverId);
-
-  const SendContactService({required this.serverId});
+  const SendContactService();
 
   /// Minimum / maximum / default expiry, mirroring the backend contract.
   static const int minExpirySeconds = 60;
@@ -58,7 +56,7 @@ class SendContactService {
   /// recipient, who consumes it via the receive-contact flow.
   ///
   /// Auth (Bearer access token) and refresh-on-401 are handled automatically
-  /// by ApiClient's interceptors.
+  /// by MainServerClient's interceptors.
   Future<SendContactResult> sendContact({
     required String nickname,
     required String title,

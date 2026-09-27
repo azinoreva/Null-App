@@ -1,7 +1,7 @@
 // module name: get_contact
 import 'package:dio/dio.dart';
 
-import '../api_client.dart';
+import '../main_server_client.dart';
 
 class ContactInfo {
   final String nickname;
@@ -39,11 +39,9 @@ class ContactInfo {
 }
 
 class GetContactService {
-  final String serverId;
+  Dio get _dio => MainServerClient.dio;
 
-  Dio get _dio => ApiClient.instance(serverId);
-
-  const GetContactService({required this.serverId});
+  const GetContactService();
 
   /// Looks up a contact's profile info by [contactKey].
   ///
@@ -52,10 +50,10 @@ class GetContactService {
   /// identifying the underlying account.
   ///
   /// Errors (404 for an unknown/expired/consumed key, 429 for rate limiting)
-  /// surface as [DioException]s from ApiClient.
+  /// surface as [DioException]s from MainServerClient.
   ///
   /// Auth (Bearer access token) and refresh-on-401 are handled automatically
-  /// by ApiClient's interceptors.
+  /// by MainServerClient's interceptors.
   Future<ContactInfo> getContact({
     required String contactKey,
   }) async {

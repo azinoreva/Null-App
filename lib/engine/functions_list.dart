@@ -15,7 +15,6 @@ import 'database/queries/identity_queries.dart';
 import 'database/queries/messages_queries.dart';
 import 'database/queries/network_queries.dart';
 import 'database/queries/servers_queries.dart';
-import 'database/queries/sessions_queries.dart';
 import 'database/queries/tasks_queries.dart';
 import 'engine.dart';
 import 'task_queue.dart';
@@ -26,11 +25,10 @@ import 'functions/auth/registerfxn.dart' as auth_register;
 import 'functions/chats/01_send_message.dart' as chat_send;
 import 'functions/chats/22_contact.dart' as chat_contact;
 import 'functions/chats/conversation_function.dart' as conversation;
-import 'functions/chats/handshake.dart' as handshake;
-import 'functions/chats/recieve_handshake.dart' as handshake_receive;
 import 'functions/chats/recieve_message.dart' as chat_receive;
 import 'functions/chats/message_types.dart';
 import 'functions/people/connection_request.dart' as connection_request;
+import 'functions/people/dh_drop_flow.dart' as dh_flow;
 import 'functions/people/group_membersfxn.dart' as group_member;
 import 'functions/people/groupsfxn.dart' as group;
 import 'functions/people/networkfxn.dart' as network;
@@ -39,6 +37,7 @@ import 'functions/people/save_user_details.dart' as profile;
 import 'functions/people/sendmycontact.dart' as contact_details;
 import 'functions/security/share_secret.dart' as secret;
 import 'functions/servers/serverfxn.dart' as server;
+import 'functions/servers/connect_serverfxn.dart' as server_connect;
 
 const Map<int, String> incomingMessageTaskNames = {
   0: 'receiveExchangeMessage',
@@ -90,15 +89,15 @@ String incomingMessageTaskName(int messageType) {
 }
 
 final Map<String, dynamic> functionRegistry = {
-  'sendChatHandshakeDh': TaskDefinition(
+  'ensureDhFlow': TaskDefinition(
     kind: TaskKind.network,
     databaseExecutor: (payload, database) =>
-        handshake.sendDhHandshakeTask(payload.functionArgs, database),
+        dh_flow.runEnsureDhFlowTask(payload.functionArgs, database),
   ),
-  'sendChatHandshakeConfirmation': TaskDefinition(
+  'checkDhDrops': TaskDefinition(
     kind: TaskKind.network,
     databaseExecutor: (payload, database) =>
-        handshake.sendHandshakeConfirmationTask(payload.functionArgs, database),
+        dh_flow.runCheckDhDropsTask(payload.functionArgs, database),
   ),
   'sendChatMessage': TaskDefinition(
     kind: TaskKind.network,
@@ -139,17 +138,10 @@ Future<void> _receiveQueuedMessageTask(
   }
   final identityCrypto = const IdentityCrypto();
 
-  if (messageType == 0) {
-    await handshake_receive.handleIncomingHandshakeMessage(
-      database.contactsDao,
-      database.identityDao,
-      database.messagesDao,
-      database.sessionsDao,
-      senderContactId: senderContactId,
-      messageType: messageType,
-      rawMessage: rawMessage,
-      myIdentityCrypto: identityCrypto,
-    );
+  if (messageType == MessageType.exchange.value) {
+    // The message-type-0 signature handshake was retired in favor of the
+    // main-server DH-drop flow. Any stale envelopes still arriving are
+    // dropped on the floor instead of failing the receive task.
     return;
   }
 
@@ -241,48 +233,6 @@ class FunctionsList {
     encryptedMessage: encryptedMessage,
     privateKeyPair: privateKeyPair,
     contactPublicKey: contactPublicKey,
-  );
-
-  static Future<dynamic> startEncryptedConversation(
-    ContactsDao contactsDao,
-    ConversationsDao conversationsDao,
-    IdentityDao identityDao,
-    SessionsDao sessionsDao, {
-    required String contactId,
-    required String serverId,
-    required IdentityCrypto myIdentityCrypto,
-    int maxAttempts = 5,
-    Duration attemptTimeout = const Duration(seconds: 15),
-  }) => handshake.startEncryptedConversation(
-    contactsDao,
-    conversationsDao,
-    identityDao,
-    sessionsDao,
-    contactId: contactId,
-    serverId: serverId,
-    myIdentityCrypto: myIdentityCrypto,
-    maxAttempts: maxAttempts,
-    attemptTimeout: attemptTimeout,
-  );
-
-  static Future<dynamic> handleIncomingHandshakeMessage(
-    ContactsDao contactsDao,
-    IdentityDao identityDao,
-    MessagesDao messagesDao,
-    SessionsDao sessionsDao, {
-    required String senderContactId,
-    required int messageType,
-    required String rawMessage,
-    required IdentityCrypto myIdentityCrypto,
-  }) => handshake_receive.handleIncomingHandshakeMessage(
-    contactsDao,
-    identityDao,
-    messagesDao,
-    sessionsDao,
-    senderContactId: senderContactId,
-    messageType: messageType,
-    rawMessage: rawMessage,
-    myIdentityCrypto: myIdentityCrypto,
   );
 
   static Future<dynamic> createConversation(
@@ -653,6 +603,14 @@ class FunctionsList {
     ServersDao serversDao,
     ServerDirectoryService directoryService,
   ) => server.refreshServers(serversDao, directoryService);
+
+  static Future<dynamic> connectServerUsingPassport({
+    required String serverId,
+    required AppDatabase database,
+  }) => server_connect.connectServerUsingPassport(
+    serverId: serverId,
+    database: database,
+  );
 
   //other
 }

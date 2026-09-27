@@ -136,12 +136,7 @@ class _ChattingState extends ConsumerState<Chatting> {
 
       if (handshakeRequired) {
         await ref.read(taskQueueProvider).queueTask(
-              functionName: 'sendChatHandshakeDh',
-              args: [widget.conversationId, conversation.serverId],
-              serverId: conversation.serverId,
-            );
-        await ref.read(taskQueueProvider).queueTask(
-              functionName: 'sendChatHandshakeConfirmation',
+              functionName: 'ensureDhFlow',
               args: [widget.conversationId, conversation.serverId],
               serverId: conversation.serverId,
             );

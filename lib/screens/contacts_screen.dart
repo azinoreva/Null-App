@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../state/providers.dart';
@@ -6,6 +8,7 @@ import '../widgets/display/contact_card.dart';
 import '../widgets/display/navigation.dart';
 import 'modals/get_contact_modal.dart';
 import '../engine/media_handling/connection_scan_service.dart';
+import '../engine/network/main_server_client.dart';
 import 'modals/share_contact_modal.dart';
 import 'chat_screen.dart';
 import 'settings_screen.dart';
@@ -14,11 +17,30 @@ import 'updates_screen.dart';
 /// Contacts screen: contact list owned by Riverpod ([contactsProvider]) and
 /// kept alive, so leaving the screen and returning renders the cached
 /// contacts instantly.
-class ContactsScreen extends ConsumerWidget {
+class ContactsScreen extends ConsumerStatefulWidget {
   const ContactsScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<ContactsScreen> createState() => _ContactsScreenState();
+}
+
+class _ContactsScreenState extends ConsumerState<ContactsScreen> {
+  @override
+  void initState() {
+    super.initState();
+    // Give any DH drops that landed while we were away a chance to complete
+    // (picks up the peer's ephemeral key and brings the ratchet up).
+    unawaited(
+      ref.read(taskQueueProvider).queueTask(
+            functionName: 'checkDhDrops',
+            args: const [],
+            serverId: MainServerClient.serverId,
+          ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final contacts = ref.watch(contactsProvider);
 
     return AdaptiveNavigationShell(

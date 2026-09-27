@@ -12,6 +12,7 @@ import '../engine/media_handling/media_storage.dart';
 import '../engine/network/api_client.dart';
 import '../engine/network/auth_failure_handler.dart';
 import '../engine/network/servers/servers.dart' as server_directory;
+import '../engine/functions/servers/connect_serverfxn.dart' as server_connect;
 import '../state/providers.dart';
 import '../utils/server_list.dart';
 import 'modals/automatic_messages.dart';
@@ -240,6 +241,28 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         unawaited(redirectToLogin());
       },
     );
+
+    // Exchange the passport saved at signup for this server's token pair.
+    final result = await server_connect.connectServerUsingPassport(
+      serverId: full.serverId,
+      database: ref.read(appDatabaseProvider),
+    );
+
+    if (!mounted) return;
+    final messenger = ScaffoldMessenger.of(context);
+    final message = switch (result.outcome) {
+      server_connect.ServerConnectOutcome.success =>
+        'Connected to ${full.serverName}.',
+      server_connect.ServerConnectOutcome.noPassport =>
+        'No passport found. Sign up again to obtain one.',
+      server_connect.ServerConnectOutcome.noIdentity =>
+        'No local identity found. Sign up again.',
+      server_connect.ServerConnectOutcome.failed =>
+        result.errorMessage != null
+            ? 'Could not connect: ${result.errorMessage}'
+            : 'Could not connect to the server.',
+    };
+    messenger.showSnackBar(SnackBar(content: Text(message)));
 
     // Adding to the shared server list notifies the SSE supervisor, which
     // registers the connection automatically (ServerConnectionService).

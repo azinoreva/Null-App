@@ -26,20 +26,11 @@ import 'dart:convert';
 
 import 'package:drift/drift.dart';
 import 'package:mobile_scanner/mobile_scanner.dart' hide ContactInfo;
-import 'package:uuid/uuid.dart';
 
-import '../crypto/chat/conversation_key_store.dart';
-import '../crypto/chat/identity_crypto.dart';
-import '../crypto/chat/null_crypto.dart';
-import '../crypto/chat/ratchet_store.dart';
-import '../crypto/chat/symmetric_ratchet.dart';
 import '../database/app_database.dart';
-import '../functions/people/sendmycontact.dart';
 import '../network/people/recieve_contact.dart';
 import '../network/people/share_contact_rebound.dart';
 import '../task_queue.dart';
-
-const _uuid = Uuid();
 
 /// What a successfully-completed scan pairing leaves you with.
 class ReceiveContactResult {
@@ -95,22 +86,9 @@ Future<ReceiveContactResult> receiveContact({
     );
   }
 
-  final payload = _parseScannedPayload(scannedValue);
-  final contactKey = payload.contactKey;
-  final hasSessionMaterial =
-      !isManualPin &&
-      payload.symmetricKey != null &&
-      payload.ratchetState != null;
+  final contactKey = _extractContactKey(scannedValue);
 
-  if (hasSessionMaterial) {
-    temporaryContact['temporary contact'] = {
-      'contact_key': contactKey,
-      'symmetric_key': base64UrlEncode(payload.symmetricKey!),
-      'ratchet_state': payload.ratchetState,
-    };
-  }
-
-  final received = await GetContactService(serverId: mainServerId)
+  final received = await GetContactService()
       .getContact(contactKey: contactKey);
 
   await _saveReceivedContact(database, received, localServerId: mainServerId);
@@ -143,7 +121,7 @@ Future<ReceiveContactResult> receiveContact({
       ? nameParts.skip(1).join(' - ').trim()
       : '';
 
-  await SendContactReboundService(serverId: mainServerId).sendContact(
+  await SendContactReboundService().sendContact(
     nickname: nickname,
     title: title,
     bio: identity.bio ?? '',
@@ -152,44 +130,14 @@ Future<ReceiveContactResult> receiveContact({
     contactKey: '${contactKey}R',
   );
 
-  if (hasSessionMaterial) {
-    final symmetricKey = payload.symmetricKey!;
-    final ratchetState = await SymmetricRatchet.initialize(
-      sharedSecret: symmetricKey,
-      initiator: false,
-    );
-    await database.sessionsDao.establishWithSymmetricKey(
-      conversationId: conversationId,
-      symmetricKey: symmetricKey,
-    );
-    final crypto = NullCrypto(
-      identity: const IdentityCrypto(),
-      ratchetStore: const RatchetStore(),
-    );
-    await crypto.establishConversation(
-      conversationId: conversationId,
-      sharedSecret: symmetricKey,
-      initiator: false,
-    );
-    await const ConversationKeyStore().saveConversationKey(
-      conversationId,
-      symmetricKey,
-    );
-    await const ConversationKeyStore().saveRootKey(
-      conversationId,
-      ratchetState.rootKey,
-    );
-    await const ConversationKeyStore().saveRatchetState(
-      conversationId,
-      ratchetState,
-    );
-
-    await taskQueue.queueTask(
-      functionName: 'sendChatMessage',
-      args: [conversationId, 'hi', mainServerId, _uuid.v4(), _uuid.v4()],
-      serverId: mainServerId,
-    );
-  }
+  // Encrypted messaging is established through the main-server DH-drop flow
+  // (seal our ephemeral key to the contact's X25519 public key, drop it,
+  // pick up theirs, ratchet up). No QR session-state pass-through anymore.
+  await taskQueue.queueTask(
+    functionName: 'ensureDhFlow',
+    args: [received.contactId, mainServerId],
+    serverId: mainServerId,
+  );
 
   return ReceiveContactResult(
     contactId: received.contactId,
@@ -197,32 +145,14 @@ Future<ReceiveContactResult> receiveContact({
   );
 }
 
-class _ScannedPayload {
-  final String contactKey;
-  final Uint8List? symmetricKey;
-  final Map<String, dynamic>? ratchetState;
-
-  const _ScannedPayload({
-    required this.contactKey,
-    this.symmetricKey,
-    this.ratchetState,
-  });
-}
-
-_ScannedPayload _parseScannedPayload(String raw) {
+/// Pulls the invite contact key out of a scanned value — a bare manual PIN
+/// (already the key), a URL, or the old JSON QR payload.
+String _extractContactKey(String raw) {
   try {
     final decoded = jsonDecode(raw);
     if (decoded is Map<String, dynamic>) {
       final key = decoded['contact_key'];
-      final encoded = decoded['symmetric_key'];
-      final state = decoded['ratchet_state'];
-      if (key is String && encoded is String && state is Map<String, dynamic>) {
-        return _ScannedPayload(
-          contactKey: key,
-          symmetricKey: Uint8List.fromList(base64Url.decode(encoded)),
-          ratchetState: state,
-        );
-      }
+      if (key is String && key.isNotEmpty) return key;
     }
   } on FormatException {
     // The value may be a URL or a manual PIN.
@@ -230,9 +160,9 @@ _ScannedPayload _parseScannedPayload(String raw) {
 
   final uri = Uri.tryParse(raw);
   if (uri != null && uri.pathSegments.isNotEmpty) {
-    return _ScannedPayload(contactKey: uri.pathSegments.last);
+    return uri.pathSegments.last;
   }
-  return _ScannedPayload(contactKey: raw);
+  return raw;
 }
 
 // Duplicated from send_contact_details.dart's private `_saveReceivedContact`

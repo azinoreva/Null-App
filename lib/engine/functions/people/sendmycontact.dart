@@ -7,11 +7,7 @@ import 'package:cryptography/cryptography.dart';
 import 'package:drift/drift.dart';
 import 'package:uuid/uuid.dart';
 
-import '../../crypto/chat/conversation_key_store.dart';
 import '../../crypto/chat/crypto_types.dart';
-import '../../crypto/chat/identity_crypto.dart';
-import '../../crypto/chat/null_crypto.dart';
-import '../../crypto/chat/ratchet_store.dart';
 import '../../crypto/chat/symmetric_ratchet.dart';
 import '../../crypto/chat/asymetric_encryption.dart';
 import '../../database/app_database.dart';
@@ -68,7 +64,7 @@ Future<SendMyContactResult> sendMyContact({
       ? nameParts.skip(1).join(' - ').trim()
       : '';
 
-  final shared = await SendContactService(serverId: mainServerId).sendContact(
+  final shared = await SendContactService().sendContact(
     nickname: nickname,
     title: title,
     bio: identity.bio ?? '',
@@ -132,7 +128,7 @@ Future<void> _pollForReceivedContact({
     for (final delay in delays) {
       await Future<void>.delayed(delay);
       try {
-        received = await GetContactService(serverId: mainServerId)
+        received = await GetContactService()
             .getContact(contactKey: contactKey);
         break;
       } on ServerErrorException catch (error) {
@@ -164,32 +160,14 @@ Future<void> _pollForReceivedContact({
         vibration: 0,
       ),
     );
-    await database.sessionsDao.establishWithSymmetricKey(
-      conversationId: conversationId,
-      symmetricKey: symmetricKey,
-    );
 
-    final crypto = NullCrypto(
-      identity: const IdentityCrypto(),
-      ratchetStore: const RatchetStore(),
-    );
-    await crypto.establishConversation(
-      conversationId: conversationId,
-      sharedSecret: symmetricKey,
-      initiator: true,
-    );
-    await const ConversationKeyStore().saveRootKey(
-      conversationId,
-      previewState.rootKey,
-    );
-    await const ConversationKeyStore().saveRatchetState(
-      conversationId,
-      previewState,
-    );
-
+    // Encrypted messaging is established through the main-server DH-drop
+    // flow (seal our ephemeral key to the contact's X25519 public key, drop
+    // it, pick up theirs, ratchet up). The symmetric key preview embedded in
+    // the QR above is no longer consumed by this side.
     await taskQueue.queueTask(
-      functionName: 'sendChatMessage',
-      args: [conversationId, 'hi', mainServerId, _uuid.v4(), _uuid.v4()],
+      functionName: 'ensureDhFlow',
+      args: [conversationId, mainServerId],
       serverId: mainServerId,
     );
   } catch (_) {

@@ -7,6 +7,7 @@ import 'package:cryptography/cryptography.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 import '../../database/app_database.dart';
+import 'dh_identity_crypto.dart';
 
 class IdentityCrypto {
   static final Ed25519 _ed25519 = Ed25519();
@@ -29,19 +30,23 @@ class IdentityCrypto {
     final identity = await database.identityDao.getCurrentIdentityOrNull();
     if (identity == null) return false;
 
-    Uint8List publicKey;
     try {
       final privateKey = await loadPrivateKey();
       if (privateKey == null || privateKey.length != 32) {
         throw StateError('Identity private key is missing or invalid.');
       }
-      publicKey = await loadPublicKey();
+      await loadPublicKey();
     } catch (_) {
       await generateIdentityKey(database: database);
-      return true;
     }
 
-    final encodedPublicKey = base64UrlEncode(publicKey);
+    // The public key shared in contact cards is now the long-term X25519
+    // *encryption* key — contacts seal their DH drops to it. The Ed25519
+    // keypair above stays in secure storage for legacy signature work.
+    final dhPrivateKey = await DhIdentityCrypto.ensurePrivateKey();
+    final dhPublicKey = await DhIdentityCrypto.derivePublicKey(dhPrivateKey);
+
+    final encodedPublicKey = base64UrlEncode(dhPublicKey);
     if (identity.publicKey != encodedPublicKey) {
       await database.identityDao.setPublicKey(encodedPublicKey);
     }

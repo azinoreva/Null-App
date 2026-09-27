@@ -29,6 +29,19 @@ class SessionsDao extends DatabaseAccessor<AppDatabase>
             ..where((t) => t.conversationId.equals(conversationId)))
           .go();
 
+  /// Records that our ephemeral public key was successfully dropped into the
+  /// contact's server-side inbox.
+  Future<void> markDhDropped(String conversationId) async {
+    await (update(db.sessions)
+          ..where((t) => t.conversationId.equals(conversationId)))
+        .write(
+      SessionsCompanion(
+        dropSent: const Value(1),
+        updatedAt: Value(DateTime.now().millisecondsSinceEpoch),
+      ),
+    );
+  }
+
   /// Starts a fresh pending session, storing our ephemeral keypair.
   /// Overwrites any prior session for this conversation (a fresh
   /// handshake attempt supersedes an old one).

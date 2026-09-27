@@ -19,6 +19,7 @@ import 'engine/network/server_connections.dart';
 import 'engine/database/init_db.dart';
 import 'engine/crypto/chat/identity_crypto.dart';
 import 'engine/task_queue.dart';
+import 'engine/app_queue.dart';
 import '/engine/engine.dart';
 import 'state/providers.dart';
 import 'engine/functions/settings/settings.dart';
@@ -53,6 +54,7 @@ void main() async {
   taskEngine.ping();
   final taskQueue = TaskQueue(database: database, engine: taskEngine);
   appTaskQueue = taskQueue;
+  appTaskQueueRef = taskQueue;
   final prefs = await SharedPreferences.getInstance();
   runApp(
     ProviderScope(
@@ -68,6 +70,11 @@ void main() async {
 
   if (prefs.getBool('is_logged_in') ?? false) {
     unawaited(startSseConnections());
+    unawaited(taskQueue.queueTask(
+      functionName: 'checkDhDrops',
+      args: const [],
+      serverId: MainServerClient.serverId,
+    ));
   }
 }
 

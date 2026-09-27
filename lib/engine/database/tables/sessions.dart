@@ -35,6 +35,13 @@ class Sessions extends Table {
   // The derived shared symmetric key, once the DH exchange completes.
   BlobColumn get symmetricKey => blob().nullable()();
 
+  // 1 once we have successfully dropped our ephemeral public key into the
+  // contact's server-side inbox (/api/connections/dh-drop). Lets the
+  // drop/check flow distinguish "we haven't dropped yet" from "we dropped
+  // but never completed", without re-dropping on every retry.
+  IntColumn get dropSent =>
+      integer().withDefault(const Constant(0))();
+
   IntColumn get keyVersion => integer().withDefault(const Constant(1))();
 
   // 0 = pending DH, 1 = confirming oknull, 2 = established.
