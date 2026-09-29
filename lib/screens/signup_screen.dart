@@ -13,6 +13,7 @@ import '../engine/network/auth/register.dart';
 import '../engine/network/server_error_exception.dart';
 import 'modals/otp_modal.dart';
 import 'chat_screen.dart';
+import 'login_screen.dart';
 
 class SignupScreen extends StatefulWidget {
   const SignupScreen({super.key});
@@ -270,7 +271,7 @@ class _SignupScreenState extends State<SignupScreen> {
         ),
         const SizedBox(height: 12.0),
         Text(
-          'Verify your identity to connect to the secure relay network. Or go incognito.',
+          'Verify your identity to connect to the secure relay network.',
           textAlign: isWideScreen ? TextAlign.left : TextAlign.center,
           style: AppTypography.getTextStyle(
             context,
@@ -365,6 +366,23 @@ class _SignupScreenState extends State<SignupScreen> {
               size: 18,
               color: AppColors.mutedSlate,
             ),
+          ),
+        ),
+        Align(
+          alignment: Alignment.centerRight,
+          child: TextButton(
+            onPressed: () {
+              Navigator.of(context).pushReplacement(
+                MaterialPageRoute(builder: (_) => const LoginScreen()),
+              );
+            },
+            style: TextButton.styleFrom(
+              foregroundColor: AppColors.haloRing,
+              padding: EdgeInsets.zero,
+              minimumSize: const Size(0, 40),
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            ),
+            child: const Text('Log in'),
           ),
         ),
         const SizedBox(height: 28.0),
