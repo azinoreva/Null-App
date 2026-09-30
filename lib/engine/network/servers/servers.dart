@@ -4,67 +4,112 @@ import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 
 import '../../../utils/server_list.dart';
+import '../../../utils/server_model.dart';
 import '../api_client.dart';
 import '../main_server_client.dart';
 
-/// Represents a single server entry from GET /api/servers.
+// The server value types live in `utils/server_model.dart` so the API layer
+// and the local persistence layer can't drift apart. Re-exported here
+// because this is where callers already expect to find them.
+export '../../../utils/server_model.dart'
+    show ServerType, MediaType, ServerMedia;
+
+/// Mirrors backend `Server`.
 class ServerInfo {
   final String serverId;
   final String serverName;
   final String serverUrl;
-  final String mediaUrl;
-  final String serverType;
-  final int mediaSizeLimit;
-  final int mediaTimer;
-  final int maxPayload;
-  final int capabilities;
+  final ServerType serverType;
+  final int maxPayload;          // max text length for a post message
+  final String colour;
+  final String about;
+  final List<String>? categories; // backend: Optional[List[Categories]]
+  final bool annotated;
+  final bool disabled;
+  final String? location;
+  final ServerMedia? media;
 
   ServerInfo({
     required this.serverId,
     required this.serverName,
     required this.serverUrl,
-    required this.mediaUrl,
     required this.serverType,
-    required this.mediaSizeLimit,
-    required this.mediaTimer,
     required this.maxPayload,
-    required this.capabilities,
+    required this.colour,
+    required this.about,
+    required this.annotated,
+    this.disabled = false,
+    this.categories,
+    this.location,
+    this.media,
   });
+
+  // Convenience getters so existing code that used flat fields still works.
+  String? get mediaUrl => media?.url;
+  int? get mediaSizeLimit => media?.size;
+  int? get mediaTimer => media?.timer;
 
   factory ServerInfo.fromJson(Map<String, dynamic> json) {
     return ServerInfo(
       serverId: json['serverId'] as String,
       serverName: json['serverName'] as String,
       serverUrl: json['serverUrl'] as String,
-      mediaUrl: json['mediaUrl'] as String,
-      serverType: json['serverType'] as String,
-      mediaSizeLimit: json['mediaSizeLimit'] as int,
-      mediaTimer: json['mediaTimer'] as int,
+      serverType: ServerType.fromJson(json['serverType'] as String),
       maxPayload: json['maxPayload'] as int,
-      capabilities: json['capabilities'] as int,
+      colour: json['colour'] as String,
+      about: json['about'] as String,
+      annotated: json['annotated'] as bool,
+      disabled: json['disabled'] as bool? ?? false,
+      location: json['location'] as String?,
+      categories: (json['categories'] as List<dynamic>?)
+          ?.map((e) => e as String)
+          .toList(),
+      media: json['media'] == null
+          ? null
+          : ServerMedia.fromJson(json['media'] as Map<String, dynamic>),
     );
   }
 
-  Map<String, dynamic> toJson() {
-    return {
-      'serverId': serverId,
-      'serverName': serverName,
-      'serverUrl': serverUrl,
-      'mediaUrl': mediaUrl,
-      'serverType': serverType,
-      'mediaSizeLimit': mediaSizeLimit,
-      'mediaTimer': mediaTimer,
-      'maxPayload': maxPayload,
-      'capabilities': capabilities,
-    };
-  }
+  Map<String, dynamic> toJson() => {
+        'serverId': serverId,
+        'serverName': serverName,
+        'serverUrl': serverUrl,
+        'serverType': serverType.toJson(),
+        'maxPayload': maxPayload,
+        'colour': colour,
+        'about': about,
+        'annotated': annotated,
+        'disabled': disabled,
+        'location': location,
+        'categories': categories,
+        'media': media?.toJson(),
+      };
+
+  /// The persistable form of this server. Both models carry the same
+  /// fields, so nothing is dropped on the way into the local list.
+  ServerConfig toConfig() => ServerConfig(
+        serverId: serverId,
+        serverName: serverName,
+        serverUrl: serverUrl,
+        serverType: serverType,
+        maxPayload: maxPayload,
+        colour: colour,
+        about: about,
+        annotated: annotated,
+        disabled: disabled,
+        location: location,
+        categories: categories,
+        media: media,
+      );
 
   @override
   String toString() =>
       'ServerInfo(serverId: $serverId, serverName: $serverName, serverUrl: $serverUrl)';
 }
 
-/// Represents the response of GET /api/servers
+
+
+
 class ServerListResponse {
   final List<ServerInfo> servers;
 
@@ -119,27 +164,13 @@ class ServerDirectoryService {
     await serverList.init();
 
     for (final server in result.servers) {
-      final existing = serverList.getServer(server.serverId);
-      if (existing == null) {
-        await serverList.addServer(
-          ServerConfig(
-            serverId: server.serverId,
-            serverName: server.serverName,
-            serverUrl: server.serverUrl,
-            mediaUrl: server.mediaUrl,
-            serverType: server.serverType,
-            mediaSizeLimit: server.mediaSizeLimit,
-            mediaTimer: server.mediaTimer,
-            maxPayload: server.maxPayload,
-            capabilities: server.capabilities,
-          ),
-        );
-      } else if (existing.serverUrl != server.serverUrl) {
-        await serverList.updateServer(
-          server.serverId,
-          server: existing.copyWith(serverUrl: server.serverUrl),
-        );
+      // The directory is the single source of truth: drop any stale copy
+      // first so every field (not just the URL) is refreshed from the
+      // response, then persist the current one.
+      if (serverList.getServer(server.serverId) != null) {
+        await serverList.removeServer(server.serverId);
       }
+      await serverList.addServer(server.toConfig());
 
       await ApiClient.registerServer(
         serverId: server.serverId,
@@ -150,3 +181,5 @@ class ServerDirectoryService {
     return result.servers;
   }
 }
+
+

@@ -1,3 +1,4 @@
+import '../../securestore/password_verifier.dart';
 
 // Ties together: password_vault.dart (key generation + AES-GCM encrypt +
 // Shamir split), vault_secure_storage.dart (persist the vault),
@@ -194,6 +195,7 @@ Future<RegistrationResult> registerNewUser({
         invitationCount: response.invitationCount,
       );
       await database.identityDao.upsertIdentity(identity);
+      await LocalPasswordVerifier.save(password);
     } catch (e) {
       return RegistrationResult.failed('save_identity', e.toString());
     }

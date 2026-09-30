@@ -59,20 +59,20 @@ class ServersDao extends DatabaseAccessor<AppDatabase> with _$ServersDaoMixin {
     );
   }
 
-  // Update the capabilities bitmask.
-  Future<void> updateCapabilities(String serverId, int newCapabilities) async {
+  // Update the locally picked accent colour for a server.
+  Future<void> updateAccentColour(String serverId, int colour) async {
     await (update(db.servers)..where((t) => t.serverId.equals(serverId))).write(
-      ServersCompanion(capabilities: Value(newCapabilities)),
+      ServersCompanion(accentColour: Value(colour)),
     );
   }
 
-  // NEW: Retrieve all distinct colour values used by servers.
+  // Retrieve all distinct accent colours used by servers.
   Future<List<int>> getAllDistinctColours() async {
     final query = selectOnly(db.servers, distinct: true)
-      ..addColumns([db.servers.colour]);
+      ..addColumns([db.servers.accentColour]);
     final rows = await query.get();
     return rows
-        .map((row) => row.read(db.servers.colour))
+        .map((row) => row.read(db.servers.accentColour))
         .whereType<int>()
         .toList();
   }

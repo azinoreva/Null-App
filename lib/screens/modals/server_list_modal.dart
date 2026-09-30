@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
+import '../../utils/server_model.dart' as model;
 import '../../widgets/app_theme.dart';
 import '../../widgets/buttons/send_button.dart';
 
+/// The modal's view of [model.ServerType], plus an `other` bucket so a server
+/// whose type isn't one the backend is expected to send still appears in the
+/// list instead of silently disappearing.
 enum ServerType { public, private, other }
 
 /// Which action the buttons on each server card should offer.
@@ -9,43 +13,66 @@ enum ServerType { public, private, other }
 /// the whole modal rather than to any individual server.
 enum ServerAction { connect, disconnect }
 
-/// Only the four fields this modal actually needs, pulled out of the
-/// larger server object your app passes around.
+/// The fields this modal needs, read out of the server JSON. Both the
+/// directory response and the locally persisted `ServerConfig` produce the
+/// same keys, so the same factory works for either.
 class ServerInfo {
   final String serverId;
   final String serverName;
   final String serverUrl;
   final ServerType serverType;
 
+  /// Free-form description of the server.
+  final String about;
+
+  /// Whether the server is annotated.
+  final bool annotated;
+
+  /// Whether the server is switched off and shouldn't be contacted.
+  final bool disabled;
+
+  final String? location;
+
+  /// Never null - an absent category list simply reads as empty.
+  final List<String> categories;
+
   const ServerInfo({
     required this.serverId,
     required this.serverName,
     required this.serverUrl,
     required this.serverType,
+    this.about = '',
+    this.annotated = false,
+    this.disabled = false,
+    this.location,
+    this.categories = const [],
   });
 
-  /// Builds one from the raw JSON shape shown in the mockup - safe to
-  /// call with the full server object; everything besides these four
-  /// fields is ignored.
+  /// Safe to call with the full server object; anything not listed here is
+  /// ignored.
   factory ServerInfo.fromJson(Map<String, dynamic> json) {
     return ServerInfo(
       serverId: json['serverId'] as String? ?? '',
       serverName: json['serverName'] as String? ?? '',
       serverUrl: json['serverUrl'] as String? ?? '',
-      serverType: _parseServerType(json['serverType'] as String?),
+      serverType: _parseServerType(json['serverType']),
+      about: json['about'] as String? ?? '',
+      annotated: json['annotated'] as bool? ?? false,
+      disabled: json['disabled'] as bool? ?? false,
+      location: json['location'] as String?,
+      categories: (json['categories'] as List<dynamic>?)
+              ?.whereType<String>()
+              .toList() ??
+          const [],
     );
   }
 
-  static ServerType _parseServerType(String? raw) {
-    switch (raw?.toLowerCase()) {
-      case 'public':
-        return ServerType.public;
-      case 'private':
-        return ServerType.private;
-      default:
-        return ServerType.other;
-    }
-  }
+  static ServerType _parseServerType(Object? raw) =>
+      switch (model.ServerType.tryFromJson(raw)) {
+        model.ServerType.public => ServerType.public,
+        model.ServerType.private => ServerType.private,
+        null => ServerType.other,
+      };
 }
 
 /// "Connected Servers" modal - takes a list of [ServerInfo] and renders
@@ -326,7 +353,7 @@ class _ServerSection extends StatelessWidget {
   }
 }
 
-class _ServerCard extends StatelessWidget {
+class _ServerCard extends StatefulWidget {
   final AppColorScheme theme;
   final ServerInfo server;
   final ServerAction action;
@@ -342,6 +369,18 @@ class _ServerCard extends StatelessWidget {
   });
 
   @override
+  State<_ServerCard> createState() => _ServerCardState();
+}
+
+class _ServerCardState extends State<_ServerCard> {
+  /// Whether the details panel is showing. Kept per-card so opening one
+  /// server doesn't collapse the rest.
+  bool _expanded = false;
+
+  AppColorScheme get theme => widget.theme;
+  ServerInfo get server => widget.server;
+
+  @override
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.all(14.0),
@@ -349,67 +388,177 @@ class _ServerCard extends StatelessWidget {
         color: theme.border.withAlpha(70),
         borderRadius: BorderRadius.circular(14.0),
       ),
-      child: Row(
+      child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            width: 36.0,
-            height: 36.0,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              color: theme.primaryGreen.withAlpha(35),
-              borderRadius: BorderRadius.circular(10.0),
-            ),
-            child: Icon(Icons.computer, size: 18.0, color: theme.primaryGreen),
-          ),
-          const SizedBox(width: 12.0),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  server.serverName,
-                  overflow: TextOverflow.ellipsis,
-                  style: AppTypography.getTextStyle(
-                    context,
-                    AppTextType.body,
-                    color: theme.textInputColor,
-                  ).copyWith(fontWeight: FontWeight.bold),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 36.0,
+                height: 36.0,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: theme.primaryGreen.withAlpha(35),
+                  borderRadius: BorderRadius.circular(10.0),
                 ),
-                const SizedBox(height: 2.0),
-                Text(
-                  server.serverUrl,
-                  overflow: TextOverflow.ellipsis,
-                  style: AppTypography.getTextStyle(
-                    context,
-                    AppTextType.tiny,
-                    color: AppColors.mutedSlate,
+                child: Icon(Icons.computer,
+                    size: 18.0, color: theme.primaryGreen),
+              ),
+              const SizedBox(width: 12.0),
+              // Tapping anywhere on the identity block reveals the rest of
+              // what the server told us about itself.
+              Expanded(
+                child: InkWell(
+                  onTap: () => setState(() => _expanded = !_expanded),
+                  borderRadius: BorderRadius.circular(8.0),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 2.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          server.serverName,
+                          overflow: TextOverflow.ellipsis,
+                          style: AppTypography.getTextStyle(
+                            context,
+                            AppTextType.body,
+                            color: theme.textInputColor,
+                          ).copyWith(fontWeight: FontWeight.bold),
+                        ),
+                        const SizedBox(height: 2.0),
+                        Text(
+                          server.serverUrl,
+                          overflow: TextOverflow.ellipsis,
+                          style: AppTypography.getTextStyle(
+                            context,
+                            AppTextType.tiny,
+                            color: AppColors.mutedSlate,
+                          ),
+                        ),
+                        Text(
+                          server.serverId,
+                          overflow: TextOverflow.ellipsis,
+                          style: AppTypography.getTextStyle(
+                            context,
+                            AppTextType.tiny,
+                            color: AppColors.mutedSlate,
+                          ).copyWith(fontSize: 10.0),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
-                Text(
-                  server.serverId,
-                  overflow: TextOverflow.ellipsis,
-                  style: AppTypography.getTextStyle(
-                    context,
-                    AppTextType.tiny,
-                    color: AppColors.mutedSlate,
-                  ).copyWith(fontSize: 10.0),
+              ),
+              const SizedBox(width: 8.0),
+              Align(
+                alignment: Alignment.topRight,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    _buildExpandButton(),
+                    const SizedBox(width: 8.0),
+                    _buildActionButton(context),
+                  ],
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
-          const SizedBox(width: 8.0),
-          Align(
-            alignment: Alignment.topRight,
-            child: _buildActionButton(context),
-          ),
+          if (_expanded) ...[
+            const SizedBox(height: 12.0),
+            Divider(color: theme.border, height: 1.0),
+            const SizedBox(height: 12.0),
+            _buildDetails(context),
+          ],
         ],
       ),
     );
   }
 
+  Widget _buildExpandButton() {
+    return InkWell(
+      onTap: () => setState(() => _expanded = !_expanded),
+      customBorder: const CircleBorder(),
+      child: Padding(
+        padding: const EdgeInsets.all(2.0),
+        child: Icon(
+          _expanded ? Icons.expand_less : Icons.expand_more,
+          size: 20.0,
+          color: AppColors.mutedSlate,
+        ),
+      ),
+    );
+  }
+
+  /// Everything the server directory reported beyond its name and address.
+  Widget _buildDetails(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (server.about.trim().isNotEmpty)
+          _DetailRow(
+            label: 'About',
+            value: server.about,
+            valueStyle: AppTypography.getTextStyle(
+              context,
+              AppTextType.tiny,
+              color: theme.textInputColor,
+            ),
+          ),
+        if (server.location != null && server.location!.trim().isNotEmpty)
+          _DetailRow(
+            label: 'Location',
+            value: server.location!,
+            valueStyle: AppTypography.getTextStyle(
+              context,
+              AppTextType.tiny,
+              color: theme.textInputColor,
+            ),
+          ),
+        _DetailRow(
+          label: 'Categories',
+          child: server.categories.isEmpty
+              ? Text(
+                  'None',
+                  style: AppTypography.getTextStyle(
+                    context,
+                    AppTextType.tiny,
+                    color: AppColors.mutedSlate,
+                  ),
+                )
+              : Wrap(
+                  spacing: 6.0,
+                  runSpacing: 6.0,
+                  children: server.categories
+                      .map((category) => _CategoryChip(
+                            theme: theme,
+                            label: category,
+                          ))
+                      .toList(),
+                ),
+        ),
+        const SizedBox(height: 8.0),
+        Row(
+          children: [
+            _StatusFlag(
+              theme: theme,
+              label: 'Annotated',
+              isOn: server.annotated,
+            ),
+            const SizedBox(width: 8.0),
+            _StatusFlag(
+              theme: theme,
+              label: 'Disabled',
+              isOn: server.disabled,
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
   Widget _buildActionButton(BuildContext context) {
-    if (isBusy) {
+    if (widget.isBusy) {
       return SizedBox(
         width: 18.0,
         height: 18.0,
@@ -420,7 +569,7 @@ class _ServerCard extends StatelessWidget {
       );
     }
 
-    final bool isConnect = action == ServerAction.connect;
+    final bool isConnect = widget.action == ServerAction.connect;
     final String label = isConnect ? 'Connect' : 'Disconnect';
     final IconData icon = isConnect ? Icons.link : Icons.link_off;
 
@@ -431,7 +580,7 @@ class _ServerCard extends StatelessWidget {
     final Color border = isConnect ? Colors.transparent : theme.border;
 
     return InkWell(
-      onTap: onAction,
+      onTap: widget.onAction,
       borderRadius: BorderRadius.circular(10.0),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 10.0, vertical: 6.0),
@@ -455,6 +604,126 @@ class _ServerCard extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// A label/value pair in the expanded details panel.
+class _DetailRow extends StatelessWidget {
+  final String label;
+  final String? value;
+  final Widget? child;
+  final TextStyle? valueStyle;
+
+  const _DetailRow({
+    required this.label,
+    this.value,
+    this.child,
+    this.valueStyle,
+  }) : assert(value != null || child != null);
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label.toUpperCase(),
+            style: AppTypography.getTextStyle(
+              context,
+              AppTextType.tiny,
+              color: AppColors.mutedSlate,
+            ).copyWith(fontWeight: FontWeight.bold, letterSpacing: 0.5),
+          ),
+          const SizedBox(height: 4.0),
+          child ??
+              Text(
+                value!,
+                style: valueStyle ??
+                    AppTypography.getTextStyle(
+                      context,
+                      AppTextType.tiny,
+                      color: Theme.of(context)
+                          .extension<AppColorScheme>()
+                          ?.textInputColor,
+                    ),
+              ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CategoryChip extends StatelessWidget {
+  final AppColorScheme theme;
+  final String label;
+
+  const _CategoryChip({required this.theme, required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 3.0),
+      decoration: BoxDecoration(
+        color: theme.primaryGreen.withAlpha(35),
+        borderRadius: BorderRadius.circular(8.0),
+      ),
+      child: Text(
+        label,
+        style: AppTypography.getTextStyle(
+          context,
+          AppTextType.tiny,
+          color: theme.primaryGreen,
+        ),
+      ),
+    );
+  }
+}
+
+/// An on/off flag, e.g. Annotated / Disabled.
+class _StatusFlag extends StatelessWidget {
+  final AppColorScheme theme;
+  final String label;
+  final bool isOn;
+
+  const _StatusFlag({
+    required this.theme,
+    required this.label,
+    required this.isOn,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final colour = isOn ? theme.primaryGreen : AppColors.mutedSlate;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
+      decoration: BoxDecoration(
+        color: colour.withAlpha(35),
+        borderRadius: BorderRadius.circular(8.0),
+        border: Border.all(color: colour.withAlpha(120)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            isOn ? Icons.check_circle : Icons.remove_circle_outline,
+            size: 12.0,
+            color: colour,
+          ),
+          const SizedBox(width: 4.0),
+          Text(
+            label,
+            style: AppTypography.getTextStyle(
+              context,
+              AppTextType.tiny,
+              color: colour,
+            ).copyWith(fontWeight: FontWeight.bold),
+          ),
+        ],
       ),
     );
   }

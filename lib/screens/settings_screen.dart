@@ -14,7 +14,6 @@ import '../engine/network/auth_failure_handler.dart';
 import '../engine/network/servers/servers.dart' as server_directory;
 import '../engine/functions/servers/connect_serverfxn.dart' as server_connect;
 import '../state/providers.dart';
-import '../utils/server_list.dart';
 import 'modals/automatic_messages.dart';
 import 'modals/change_password.dart';
 import 'modals/choose_interests.dart';
@@ -220,19 +219,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     await serverList.init();
 
     if (serverList.getServer(full.serverId) == null) {
-      await serverList.addServer(
-        ServerConfig(
-          serverId: full.serverId,
-          serverName: full.serverName,
-          serverUrl: full.serverUrl,
-          mediaUrl: full.mediaUrl,
-          serverType: full.serverType,
-          mediaSizeLimit: full.mediaSizeLimit,
-          mediaTimer: full.mediaTimer,
-          maxPayload: full.maxPayload,
-          capabilities: full.capabilities,
-        ),
-      );
+      await serverList.addServer(full.toConfig());
     }
 
     await ApiClient.registerServer(

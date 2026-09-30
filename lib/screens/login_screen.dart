@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:dio/dio.dart';
+import 'package:drift/drift.dart' show Value;
 
 import '../widgets/app_theme.dart';
 import '../widgets/display/icon.dart';
@@ -12,6 +13,10 @@ import '../widgets/buttons/send_button.dart';
 import '../widgets/buttons/square_button.dart';
 import '../engine/functions_list.dart';
 import '../engine/functions/settings/settings.dart';
+import '../engine/database/init_db.dart';
+import '../engine/database/app_database.dart';
+import '../engine/network/main_server_client.dart';
+import '../engine/securestore/password_verifier.dart';
 import '../engine/network/server_error_exception.dart';
 import '../main.dart';
 import 'chat_screen.dart';
@@ -87,9 +92,7 @@ class _LoginScreenState extends State<LoginScreen> {
     if (_phoneDigits.isEmpty || password.isEmpty) {
       messenger.showSnackBar(
         const SnackBar(
-          content: Text(
-            'Enter your phone number and password to sign in.',
-          ),
+          content: Text('Enter your phone number and password to sign in.'),
         ),
       );
       return;
@@ -97,10 +100,64 @@ class _LoginScreenState extends State<LoginScreen> {
 
     setState(() => _isSubmitting = true);
     try {
-      await FunctionsList.login(
+      final response = await FunctionsList.login(
         phoneNumber: _fullPhoneNumber,
         password: password,
       );
+
+      final database = await DatabaseInitializer.initialize();
+      final currentIdentity = await database.identityDao
+          .getCurrentIdentityOrNull();
+
+      if (currentIdentity != null &&
+          currentIdentity.identityId != response.userId) {
+        final shouldReplace = await _confirmAccountReplacement(
+          currentIdentity.phoneNumber ?? 'Unknown phone number',
+        );
+        if (!shouldReplace) {
+          await MainServerClient.clearTokens();
+          return;
+        }
+
+        final oldPassword = await _requestExistingAccountPassword();
+        if (oldPassword == null ||
+            !await LocalPasswordVerifier.verify(oldPassword)) {
+          await MainServerClient.clearTokens();
+          if (mounted) {
+            messenger.showSnackBar(
+              const SnackBar(
+                content: Text('The existing account password was incorrect.'),
+              ),
+            );
+          }
+          return;
+        }
+
+        await database.clearAllUserData();
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.clear();
+      }
+
+      await database.identityDao.upsertIdentity(
+        currentIdentity != null && currentIdentity.identityId == response.userId
+            ? currentIdentity.copyWith(phoneNumber: Value(_fullPhoneNumber))
+            : IdentityData(
+                identityId: response.userId,
+                displayName: 'Null User',
+                avatar: null,
+                bio: null,
+                phoneNumber: _fullPhoneNumber,
+                saltVersion: 0,
+                shamirNumber: 0,
+                publicKey: null,
+                passportVersion: 1,
+                autoSync: 0,
+                allowConnectReq: 0,
+                recoveryType: null,
+                invitationCount: 1,
+              ),
+      );
+      await LocalPasswordVerifier.save(password);
 
       final prefs = await SharedPreferences.getInstance();
       await prefs.setBool('has_signed_up', true);
@@ -134,6 +191,64 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
+  Future<bool> _confirmAccountReplacement(String existingPhoneNumber) async {
+    final result = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Replace local account?'),
+        content: Text(
+          'This will permanently delete the local account for '
+          '$existingPhoneNumber before saving the new account.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('Continue'),
+          ),
+        ],
+      ),
+    );
+    return result ?? false;
+  }
+
+  Future<String?> _requestExistingAccountPassword() async {
+    final controller = TextEditingController();
+    try {
+      return await showDialog<String>(
+        context: context,
+        barrierDismissible: false,
+        builder: (dialogContext) => AlertDialog(
+          title: const Text('Confirm existing account'),
+          content: TextField(
+            controller: controller,
+            autofocus: true,
+            obscureText: true,
+            decoration: const InputDecoration(
+              labelText: 'Existing account password',
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(dialogContext).pop(controller.text),
+              child: const Text('Verify'),
+            ),
+          ],
+        ),
+      );
+    } finally {
+      controller.dispose();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final themeExtension =
@@ -144,7 +259,8 @@ class _LoginScreenState extends State<LoginScreen> {
       body: SafeArea(
         child: LayoutBuilder(
           builder: (context, constraints) {
-            final isWideScreen = constraints.maxWidth >= 600 ||
+            final isWideScreen =
+                constraints.maxWidth >= 600 ||
                 MediaQuery.of(context).orientation == Orientation.landscape;
 
             return Center(
@@ -155,7 +271,8 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
                 child: ConstrainedBox(
                   constraints: const BoxConstraints(
-                    maxWidth: 420, // Maintains the narrow, centered column layout
+                    maxWidth:
+                        420, // Maintains the narrow, centered column layout
                   ),
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
@@ -186,7 +303,9 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Widget _buildHeaderSection(
-      BuildContext context, AppColorScheme themeExtension) {
+    BuildContext context,
+    AppColorScheme themeExtension,
+  ) {
     return Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.center,
@@ -223,7 +342,9 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Widget _buildFormSection(
-      BuildContext context, AppColorScheme themeExtension) {
+    BuildContext context,
+    AppColorScheme themeExtension,
+  ) {
     return Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -339,7 +460,9 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Widget _buildAlternativeAccessSection(
-      BuildContext context, AppColorScheme themeExtension) {
+    BuildContext context,
+    AppColorScheme themeExtension,
+  ) {
     return Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -348,10 +471,7 @@ class _LoginScreenState extends State<LoginScreen> {
         Row(
           children: [
             Expanded(
-              child: Divider(
-                color: themeExtension.border,
-                thickness: 1.0,
-              ),
+              child: Divider(color: themeExtension.border, thickness: 1.0),
             ),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16.0),
@@ -361,17 +481,11 @@ class _LoginScreenState extends State<LoginScreen> {
                   context,
                   AppTextType.tiny,
                   color: AppColors.mutedSlate,
-                ).copyWith(
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: 1.2,
-                ),
+                ).copyWith(fontWeight: FontWeight.bold, letterSpacing: 1.2),
               ),
             ),
             Expanded(
-              child: Divider(
-                color: themeExtension.border,
-                thickness: 1.0,
-              ),
+              child: Divider(color: themeExtension.border, thickness: 1.0),
             ),
           ],
         ),
@@ -409,7 +523,9 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Widget _buildSecurityBanner(
-      BuildContext context, AppColorScheme themeExtension) {
+    BuildContext context,
+    AppColorScheme themeExtension,
+  ) {
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 12.0, horizontal: 16.0),
       decoration: BoxDecoration(
@@ -423,11 +539,7 @@ class _LoginScreenState extends State<LoginScreen> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          const Icon(
-            Icons.info_outline,
-            color: AppColors.haloRing,
-            size: 16.0,
-          ),
+          const Icon(Icons.info_outline, color: AppColors.haloRing, size: 16.0),
           const SizedBox(width: 12.0),
           Text(
             'Chats exists only on your device.',

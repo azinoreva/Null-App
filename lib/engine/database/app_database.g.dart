@@ -805,6 +805,17 @@ class $ServersTable extends Servers with TableInfo<$ServersTable, Server> {
     type: DriftSqlType.string,
     requiredDuringInsert: true,
   );
+  static const VerificationMeta _serverNameMeta = const VerificationMeta(
+    'serverName',
+  );
+  @override
+  late final GeneratedColumn<String> serverName = GeneratedColumn<String>(
+    'server_name',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
   static const VerificationMeta _serverUrlMeta = const VerificationMeta(
     'serverUrl',
   );
@@ -816,6 +827,102 @@ class $ServersTable extends Servers with TableInfo<$ServersTable, Server> {
     type: DriftSqlType.string,
     requiredDuringInsert: true,
   );
+  static const VerificationMeta _serverTypeMeta = const VerificationMeta(
+    'serverType',
+  );
+  @override
+  late final GeneratedColumn<String> serverType = GeneratedColumn<String>(
+    'server_type',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('public'),
+  );
+  static const VerificationMeta _maxPayloadMeta = const VerificationMeta(
+    'maxPayload',
+  );
+  @override
+  late final GeneratedColumn<int> maxPayload = GeneratedColumn<int>(
+    'max_payload',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(5),
+  );
+  static const VerificationMeta _colourMeta = const VerificationMeta('colour');
+  @override
+  late final GeneratedColumn<String> colour = GeneratedColumn<String>(
+    'colour',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(''),
+  );
+  static const VerificationMeta _aboutMeta = const VerificationMeta('about');
+  @override
+  late final GeneratedColumn<String> about = GeneratedColumn<String>(
+    'about',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(''),
+  );
+  static const VerificationMeta _categoriesMeta = const VerificationMeta(
+    'categories',
+  );
+  @override
+  late final GeneratedColumn<String> categories = GeneratedColumn<String>(
+    'categories',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _annotatedMeta = const VerificationMeta(
+    'annotated',
+  );
+  @override
+  late final GeneratedColumn<bool> annotated = GeneratedColumn<bool>(
+    'annotated',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("annotated" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
+  static const VerificationMeta _disabledMeta = const VerificationMeta(
+    'disabled',
+  );
+  @override
+  late final GeneratedColumn<bool> disabled = GeneratedColumn<bool>(
+    'disabled',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("disabled" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
+  static const VerificationMeta _locationMeta = const VerificationMeta(
+    'location',
+  );
+  @override
+  late final GeneratedColumn<String> location = GeneratedColumn<String>(
+    'location',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _mediaUrlMeta = const VerificationMeta(
     'mediaUrl',
   );
@@ -823,21 +930,42 @@ class $ServersTable extends Servers with TableInfo<$ServersTable, Server> {
   late final GeneratedColumn<String> mediaUrl = GeneratedColumn<String>(
     'media_url',
     aliasedName,
-    false,
+    true,
     type: DriftSqlType.string,
-    requiredDuringInsert: true,
+    requiredDuringInsert: false,
   );
-  static const VerificationMeta _mediaSizeLimitMeta = const VerificationMeta(
-    'mediaSizeLimit',
+  static const VerificationMeta _mediaSizeMeta = const VerificationMeta(
+    'mediaSize',
   );
   @override
-  late final GeneratedColumn<int> mediaSizeLimit = GeneratedColumn<int>(
-    'media_size_limit',
+  late final GeneratedColumn<int> mediaSize = GeneratedColumn<int>(
+    'media_size',
     aliasedName,
-    false,
+    true,
     type: DriftSqlType.int,
     requiredDuringInsert: false,
-    defaultValue: const Constant(100000),
+  );
+  static const VerificationMeta _mediaTimerMeta = const VerificationMeta(
+    'mediaTimer',
+  );
+  @override
+  late final GeneratedColumn<int> mediaTimer = GeneratedColumn<int>(
+    'media_timer',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _mediaTypeMeta = const VerificationMeta(
+    'mediaType',
+  );
+  @override
+  late final GeneratedColumn<String> mediaType = GeneratedColumn<String>(
+    'media_type',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
   );
   static const VerificationMeta _mediaLastResetMeta = const VerificationMeta(
     'mediaLastReset',
@@ -863,57 +991,12 @@ class $ServersTable extends Servers with TableInfo<$ServersTable, Server> {
     requiredDuringInsert: false,
     defaultValue: const Constant(0),
   );
-  static const VerificationMeta _serverNameMeta = const VerificationMeta(
-    'serverName',
+  static const VerificationMeta _accentColourMeta = const VerificationMeta(
+    'accentColour',
   );
   @override
-  late final GeneratedColumn<String> serverName = GeneratedColumn<String>(
-    'server_name',
-    aliasedName,
-    false,
-    type: DriftSqlType.string,
-    requiredDuringInsert: true,
-  );
-  static const VerificationMeta _mediaTimerMeta = const VerificationMeta(
-    'mediaTimer',
-  );
-  @override
-  late final GeneratedColumn<int> mediaTimer = GeneratedColumn<int>(
-    'media_timer',
-    aliasedName,
-    false,
-    type: DriftSqlType.int,
-    requiredDuringInsert: false,
-    defaultValue: const Constant(86400),
-  );
-  static const VerificationMeta _maxPayloadMeta = const VerificationMeta(
-    'maxPayload',
-  );
-  @override
-  late final GeneratedColumn<int> maxPayload = GeneratedColumn<int>(
-    'max_payload',
-    aliasedName,
-    false,
-    type: DriftSqlType.int,
-    requiredDuringInsert: false,
-    defaultValue: const Constant(5),
-  );
-  static const VerificationMeta _capabilitiesMeta = const VerificationMeta(
-    'capabilities',
-  );
-  @override
-  late final GeneratedColumn<int> capabilities = GeneratedColumn<int>(
-    'capabilities',
-    aliasedName,
-    false,
-    type: DriftSqlType.int,
-    requiredDuringInsert: false,
-    defaultValue: const Constant(0),
-  );
-  static const VerificationMeta _colourMeta = const VerificationMeta('colour');
-  @override
-  late final GeneratedColumn<int> colour = GeneratedColumn<int>(
-    'colour',
+  late final GeneratedColumn<int> accentColour = GeneratedColumn<int>(
+    'accent_colour',
     aliasedName,
     false,
     type: DriftSqlType.int,
@@ -923,16 +1006,23 @@ class $ServersTable extends Servers with TableInfo<$ServersTable, Server> {
   @override
   List<GeneratedColumn> get $columns => [
     serverId,
+    serverName,
     serverUrl,
+    serverType,
+    maxPayload,
+    colour,
+    about,
+    categories,
+    annotated,
+    disabled,
+    location,
     mediaUrl,
-    mediaSizeLimit,
+    mediaSize,
+    mediaTimer,
+    mediaType,
     mediaLastReset,
     totalMediaSent,
-    serverName,
-    mediaTimer,
-    maxPayload,
-    capabilities,
-    colour,
+    accentColour,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -954,6 +1044,14 @@ class $ServersTable extends Servers with TableInfo<$ServersTable, Server> {
     } else if (isInserting) {
       context.missing(_serverIdMeta);
     }
+    if (data.containsKey('server_name')) {
+      context.handle(
+        _serverNameMeta,
+        serverName.isAcceptableOrUnknown(data['server_name']!, _serverNameMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_serverNameMeta);
+    }
     if (data.containsKey('server_url')) {
       context.handle(
         _serverUrlMeta,
@@ -962,21 +1060,76 @@ class $ServersTable extends Servers with TableInfo<$ServersTable, Server> {
     } else if (isInserting) {
       context.missing(_serverUrlMeta);
     }
+    if (data.containsKey('server_type')) {
+      context.handle(
+        _serverTypeMeta,
+        serverType.isAcceptableOrUnknown(data['server_type']!, _serverTypeMeta),
+      );
+    }
+    if (data.containsKey('max_payload')) {
+      context.handle(
+        _maxPayloadMeta,
+        maxPayload.isAcceptableOrUnknown(data['max_payload']!, _maxPayloadMeta),
+      );
+    }
+    if (data.containsKey('colour')) {
+      context.handle(
+        _colourMeta,
+        colour.isAcceptableOrUnknown(data['colour']!, _colourMeta),
+      );
+    }
+    if (data.containsKey('about')) {
+      context.handle(
+        _aboutMeta,
+        about.isAcceptableOrUnknown(data['about']!, _aboutMeta),
+      );
+    }
+    if (data.containsKey('categories')) {
+      context.handle(
+        _categoriesMeta,
+        categories.isAcceptableOrUnknown(data['categories']!, _categoriesMeta),
+      );
+    }
+    if (data.containsKey('annotated')) {
+      context.handle(
+        _annotatedMeta,
+        annotated.isAcceptableOrUnknown(data['annotated']!, _annotatedMeta),
+      );
+    }
+    if (data.containsKey('disabled')) {
+      context.handle(
+        _disabledMeta,
+        disabled.isAcceptableOrUnknown(data['disabled']!, _disabledMeta),
+      );
+    }
+    if (data.containsKey('location')) {
+      context.handle(
+        _locationMeta,
+        location.isAcceptableOrUnknown(data['location']!, _locationMeta),
+      );
+    }
     if (data.containsKey('media_url')) {
       context.handle(
         _mediaUrlMeta,
         mediaUrl.isAcceptableOrUnknown(data['media_url']!, _mediaUrlMeta),
       );
-    } else if (isInserting) {
-      context.missing(_mediaUrlMeta);
     }
-    if (data.containsKey('media_size_limit')) {
+    if (data.containsKey('media_size')) {
       context.handle(
-        _mediaSizeLimitMeta,
-        mediaSizeLimit.isAcceptableOrUnknown(
-          data['media_size_limit']!,
-          _mediaSizeLimitMeta,
-        ),
+        _mediaSizeMeta,
+        mediaSize.isAcceptableOrUnknown(data['media_size']!, _mediaSizeMeta),
+      );
+    }
+    if (data.containsKey('media_timer')) {
+      context.handle(
+        _mediaTimerMeta,
+        mediaTimer.isAcceptableOrUnknown(data['media_timer']!, _mediaTimerMeta),
+      );
+    }
+    if (data.containsKey('media_type')) {
+      context.handle(
+        _mediaTypeMeta,
+        mediaType.isAcceptableOrUnknown(data['media_type']!, _mediaTypeMeta),
       );
     }
     if (data.containsKey('media_last_reset')) {
@@ -999,39 +1152,13 @@ class $ServersTable extends Servers with TableInfo<$ServersTable, Server> {
         ),
       );
     }
-    if (data.containsKey('server_name')) {
+    if (data.containsKey('accent_colour')) {
       context.handle(
-        _serverNameMeta,
-        serverName.isAcceptableOrUnknown(data['server_name']!, _serverNameMeta),
-      );
-    } else if (isInserting) {
-      context.missing(_serverNameMeta);
-    }
-    if (data.containsKey('media_timer')) {
-      context.handle(
-        _mediaTimerMeta,
-        mediaTimer.isAcceptableOrUnknown(data['media_timer']!, _mediaTimerMeta),
-      );
-    }
-    if (data.containsKey('max_payload')) {
-      context.handle(
-        _maxPayloadMeta,
-        maxPayload.isAcceptableOrUnknown(data['max_payload']!, _maxPayloadMeta),
-      );
-    }
-    if (data.containsKey('capabilities')) {
-      context.handle(
-        _capabilitiesMeta,
-        capabilities.isAcceptableOrUnknown(
-          data['capabilities']!,
-          _capabilitiesMeta,
+        _accentColourMeta,
+        accentColour.isAcceptableOrUnknown(
+          data['accent_colour']!,
+          _accentColourMeta,
         ),
-      );
-    }
-    if (data.containsKey('colour')) {
-      context.handle(
-        _colourMeta,
-        colour.isAcceptableOrUnknown(data['colour']!, _colourMeta),
       );
     }
     return context;
@@ -1047,18 +1174,62 @@ class $ServersTable extends Servers with TableInfo<$ServersTable, Server> {
         DriftSqlType.string,
         data['${effectivePrefix}server_id'],
       )!,
+      serverName: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}server_name'],
+      )!,
       serverUrl: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}server_url'],
       )!,
+      serverType: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}server_type'],
+      )!,
+      maxPayload: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}max_payload'],
+      )!,
+      colour: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}colour'],
+      )!,
+      about: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}about'],
+      )!,
+      categories: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}categories'],
+      ),
+      annotated: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}annotated'],
+      )!,
+      disabled: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}disabled'],
+      )!,
+      location: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}location'],
+      ),
       mediaUrl: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}media_url'],
-      )!,
-      mediaSizeLimit: attachedDatabase.typeMapping.read(
+      ),
+      mediaSize: attachedDatabase.typeMapping.read(
         DriftSqlType.int,
-        data['${effectivePrefix}media_size_limit'],
-      )!,
+        data['${effectivePrefix}media_size'],
+      ),
+      mediaTimer: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}media_timer'],
+      ),
+      mediaType: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}media_type'],
+      ),
       mediaLastReset: attachedDatabase.typeMapping.read(
         DriftSqlType.dateTime,
         data['${effectivePrefix}media_last_reset'],
@@ -1067,25 +1238,9 @@ class $ServersTable extends Servers with TableInfo<$ServersTable, Server> {
         DriftSqlType.int,
         data['${effectivePrefix}total_media_sent'],
       )!,
-      serverName: attachedDatabase.typeMapping.read(
-        DriftSqlType.string,
-        data['${effectivePrefix}server_name'],
-      )!,
-      mediaTimer: attachedDatabase.typeMapping.read(
+      accentColour: attachedDatabase.typeMapping.read(
         DriftSqlType.int,
-        data['${effectivePrefix}media_timer'],
-      )!,
-      maxPayload: attachedDatabase.typeMapping.read(
-        DriftSqlType.int,
-        data['${effectivePrefix}max_payload'],
-      )!,
-      capabilities: attachedDatabase.typeMapping.read(
-        DriftSqlType.int,
-        data['${effectivePrefix}capabilities'],
-      )!,
-      colour: attachedDatabase.typeMapping.read(
-        DriftSqlType.int,
-        data['${effectivePrefix}colour'],
+        data['${effectivePrefix}accent_colour'],
       )!,
     );
   }
@@ -1097,60 +1252,117 @@ class $ServersTable extends Servers with TableInfo<$ServersTable, Server> {
 }
 
 class Server extends DataClass implements Insertable<Server> {
+  /// --- Mirrors of the API payload ---
   final String serverId;
+  final String serverName;
   final String serverUrl;
-  final String mediaUrl;
-  final int mediaSizeLimit;
+  final String serverType;
+  final int maxPayload;
+  final String colour;
+  final String about;
+  final String? categories;
+  final bool annotated;
+  final bool disabled;
+  final String? location;
+
+  /// Flattened form of the API's `media` object.
+  final String? mediaUrl;
+  final int? mediaSize;
+  final int? mediaTimer;
+  final String? mediaType;
+
+  /// --- Local-only bookkeeping (not part of the API payload) ---
   final DateTime mediaLastReset;
   final int totalMediaSent;
-  final String serverName;
-  final int mediaTimer;
-  final int maxPayload;
-  final int capabilities;
-  final int colour;
+  final int accentColour;
   const Server({
     required this.serverId,
+    required this.serverName,
     required this.serverUrl,
-    required this.mediaUrl,
-    required this.mediaSizeLimit,
+    required this.serverType,
+    required this.maxPayload,
+    required this.colour,
+    required this.about,
+    this.categories,
+    required this.annotated,
+    required this.disabled,
+    this.location,
+    this.mediaUrl,
+    this.mediaSize,
+    this.mediaTimer,
+    this.mediaType,
     required this.mediaLastReset,
     required this.totalMediaSent,
-    required this.serverName,
-    required this.mediaTimer,
-    required this.maxPayload,
-    required this.capabilities,
-    required this.colour,
+    required this.accentColour,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
     map['server_id'] = Variable<String>(serverId);
+    map['server_name'] = Variable<String>(serverName);
     map['server_url'] = Variable<String>(serverUrl);
-    map['media_url'] = Variable<String>(mediaUrl);
-    map['media_size_limit'] = Variable<int>(mediaSizeLimit);
+    map['server_type'] = Variable<String>(serverType);
+    map['max_payload'] = Variable<int>(maxPayload);
+    map['colour'] = Variable<String>(colour);
+    map['about'] = Variable<String>(about);
+    if (!nullToAbsent || categories != null) {
+      map['categories'] = Variable<String>(categories);
+    }
+    map['annotated'] = Variable<bool>(annotated);
+    map['disabled'] = Variable<bool>(disabled);
+    if (!nullToAbsent || location != null) {
+      map['location'] = Variable<String>(location);
+    }
+    if (!nullToAbsent || mediaUrl != null) {
+      map['media_url'] = Variable<String>(mediaUrl);
+    }
+    if (!nullToAbsent || mediaSize != null) {
+      map['media_size'] = Variable<int>(mediaSize);
+    }
+    if (!nullToAbsent || mediaTimer != null) {
+      map['media_timer'] = Variable<int>(mediaTimer);
+    }
+    if (!nullToAbsent || mediaType != null) {
+      map['media_type'] = Variable<String>(mediaType);
+    }
     map['media_last_reset'] = Variable<DateTime>(mediaLastReset);
     map['total_media_sent'] = Variable<int>(totalMediaSent);
-    map['server_name'] = Variable<String>(serverName);
-    map['media_timer'] = Variable<int>(mediaTimer);
-    map['max_payload'] = Variable<int>(maxPayload);
-    map['capabilities'] = Variable<int>(capabilities);
-    map['colour'] = Variable<int>(colour);
+    map['accent_colour'] = Variable<int>(accentColour);
     return map;
   }
 
   ServersCompanion toCompanion(bool nullToAbsent) {
     return ServersCompanion(
       serverId: Value(serverId),
+      serverName: Value(serverName),
       serverUrl: Value(serverUrl),
-      mediaUrl: Value(mediaUrl),
-      mediaSizeLimit: Value(mediaSizeLimit),
+      serverType: Value(serverType),
+      maxPayload: Value(maxPayload),
+      colour: Value(colour),
+      about: Value(about),
+      categories: categories == null && nullToAbsent
+          ? const Value.absent()
+          : Value(categories),
+      annotated: Value(annotated),
+      disabled: Value(disabled),
+      location: location == null && nullToAbsent
+          ? const Value.absent()
+          : Value(location),
+      mediaUrl: mediaUrl == null && nullToAbsent
+          ? const Value.absent()
+          : Value(mediaUrl),
+      mediaSize: mediaSize == null && nullToAbsent
+          ? const Value.absent()
+          : Value(mediaSize),
+      mediaTimer: mediaTimer == null && nullToAbsent
+          ? const Value.absent()
+          : Value(mediaTimer),
+      mediaType: mediaType == null && nullToAbsent
+          ? const Value.absent()
+          : Value(mediaType),
       mediaLastReset: Value(mediaLastReset),
       totalMediaSent: Value(totalMediaSent),
-      serverName: Value(serverName),
-      mediaTimer: Value(mediaTimer),
-      maxPayload: Value(maxPayload),
-      capabilities: Value(capabilities),
-      colour: Value(colour),
+      accentColour: Value(accentColour),
     );
   }
 
@@ -1161,16 +1373,23 @@ class Server extends DataClass implements Insertable<Server> {
     serializer ??= driftRuntimeOptions.defaultSerializer;
     return Server(
       serverId: serializer.fromJson<String>(json['serverId']),
+      serverName: serializer.fromJson<String>(json['serverName']),
       serverUrl: serializer.fromJson<String>(json['serverUrl']),
-      mediaUrl: serializer.fromJson<String>(json['mediaUrl']),
-      mediaSizeLimit: serializer.fromJson<int>(json['mediaSizeLimit']),
+      serverType: serializer.fromJson<String>(json['serverType']),
+      maxPayload: serializer.fromJson<int>(json['maxPayload']),
+      colour: serializer.fromJson<String>(json['colour']),
+      about: serializer.fromJson<String>(json['about']),
+      categories: serializer.fromJson<String?>(json['categories']),
+      annotated: serializer.fromJson<bool>(json['annotated']),
+      disabled: serializer.fromJson<bool>(json['disabled']),
+      location: serializer.fromJson<String?>(json['location']),
+      mediaUrl: serializer.fromJson<String?>(json['mediaUrl']),
+      mediaSize: serializer.fromJson<int?>(json['mediaSize']),
+      mediaTimer: serializer.fromJson<int?>(json['mediaTimer']),
+      mediaType: serializer.fromJson<String?>(json['mediaType']),
       mediaLastReset: serializer.fromJson<DateTime>(json['mediaLastReset']),
       totalMediaSent: serializer.fromJson<int>(json['totalMediaSent']),
-      serverName: serializer.fromJson<String>(json['serverName']),
-      mediaTimer: serializer.fromJson<int>(json['mediaTimer']),
-      maxPayload: serializer.fromJson<int>(json['maxPayload']),
-      capabilities: serializer.fromJson<int>(json['capabilities']),
-      colour: serializer.fromJson<int>(json['colour']),
+      accentColour: serializer.fromJson<int>(json['accentColour']),
     );
   }
   @override
@@ -1178,71 +1397,101 @@ class Server extends DataClass implements Insertable<Server> {
     serializer ??= driftRuntimeOptions.defaultSerializer;
     return <String, dynamic>{
       'serverId': serializer.toJson<String>(serverId),
+      'serverName': serializer.toJson<String>(serverName),
       'serverUrl': serializer.toJson<String>(serverUrl),
-      'mediaUrl': serializer.toJson<String>(mediaUrl),
-      'mediaSizeLimit': serializer.toJson<int>(mediaSizeLimit),
+      'serverType': serializer.toJson<String>(serverType),
+      'maxPayload': serializer.toJson<int>(maxPayload),
+      'colour': serializer.toJson<String>(colour),
+      'about': serializer.toJson<String>(about),
+      'categories': serializer.toJson<String?>(categories),
+      'annotated': serializer.toJson<bool>(annotated),
+      'disabled': serializer.toJson<bool>(disabled),
+      'location': serializer.toJson<String?>(location),
+      'mediaUrl': serializer.toJson<String?>(mediaUrl),
+      'mediaSize': serializer.toJson<int?>(mediaSize),
+      'mediaTimer': serializer.toJson<int?>(mediaTimer),
+      'mediaType': serializer.toJson<String?>(mediaType),
       'mediaLastReset': serializer.toJson<DateTime>(mediaLastReset),
       'totalMediaSent': serializer.toJson<int>(totalMediaSent),
-      'serverName': serializer.toJson<String>(serverName),
-      'mediaTimer': serializer.toJson<int>(mediaTimer),
-      'maxPayload': serializer.toJson<int>(maxPayload),
-      'capabilities': serializer.toJson<int>(capabilities),
-      'colour': serializer.toJson<int>(colour),
+      'accentColour': serializer.toJson<int>(accentColour),
     };
   }
 
   Server copyWith({
     String? serverId,
+    String? serverName,
     String? serverUrl,
-    String? mediaUrl,
-    int? mediaSizeLimit,
+    String? serverType,
+    int? maxPayload,
+    String? colour,
+    String? about,
+    Value<String?> categories = const Value.absent(),
+    bool? annotated,
+    bool? disabled,
+    Value<String?> location = const Value.absent(),
+    Value<String?> mediaUrl = const Value.absent(),
+    Value<int?> mediaSize = const Value.absent(),
+    Value<int?> mediaTimer = const Value.absent(),
+    Value<String?> mediaType = const Value.absent(),
     DateTime? mediaLastReset,
     int? totalMediaSent,
-    String? serverName,
-    int? mediaTimer,
-    int? maxPayload,
-    int? capabilities,
-    int? colour,
+    int? accentColour,
   }) => Server(
     serverId: serverId ?? this.serverId,
+    serverName: serverName ?? this.serverName,
     serverUrl: serverUrl ?? this.serverUrl,
-    mediaUrl: mediaUrl ?? this.mediaUrl,
-    mediaSizeLimit: mediaSizeLimit ?? this.mediaSizeLimit,
+    serverType: serverType ?? this.serverType,
+    maxPayload: maxPayload ?? this.maxPayload,
+    colour: colour ?? this.colour,
+    about: about ?? this.about,
+    categories: categories.present ? categories.value : this.categories,
+    annotated: annotated ?? this.annotated,
+    disabled: disabled ?? this.disabled,
+    location: location.present ? location.value : this.location,
+    mediaUrl: mediaUrl.present ? mediaUrl.value : this.mediaUrl,
+    mediaSize: mediaSize.present ? mediaSize.value : this.mediaSize,
+    mediaTimer: mediaTimer.present ? mediaTimer.value : this.mediaTimer,
+    mediaType: mediaType.present ? mediaType.value : this.mediaType,
     mediaLastReset: mediaLastReset ?? this.mediaLastReset,
     totalMediaSent: totalMediaSent ?? this.totalMediaSent,
-    serverName: serverName ?? this.serverName,
-    mediaTimer: mediaTimer ?? this.mediaTimer,
-    maxPayload: maxPayload ?? this.maxPayload,
-    capabilities: capabilities ?? this.capabilities,
-    colour: colour ?? this.colour,
+    accentColour: accentColour ?? this.accentColour,
   );
   Server copyWithCompanion(ServersCompanion data) {
     return Server(
       serverId: data.serverId.present ? data.serverId.value : this.serverId,
+      serverName: data.serverName.present
+          ? data.serverName.value
+          : this.serverName,
       serverUrl: data.serverUrl.present ? data.serverUrl.value : this.serverUrl,
+      serverType: data.serverType.present
+          ? data.serverType.value
+          : this.serverType,
+      maxPayload: data.maxPayload.present
+          ? data.maxPayload.value
+          : this.maxPayload,
+      colour: data.colour.present ? data.colour.value : this.colour,
+      about: data.about.present ? data.about.value : this.about,
+      categories: data.categories.present
+          ? data.categories.value
+          : this.categories,
+      annotated: data.annotated.present ? data.annotated.value : this.annotated,
+      disabled: data.disabled.present ? data.disabled.value : this.disabled,
+      location: data.location.present ? data.location.value : this.location,
       mediaUrl: data.mediaUrl.present ? data.mediaUrl.value : this.mediaUrl,
-      mediaSizeLimit: data.mediaSizeLimit.present
-          ? data.mediaSizeLimit.value
-          : this.mediaSizeLimit,
+      mediaSize: data.mediaSize.present ? data.mediaSize.value : this.mediaSize,
+      mediaTimer: data.mediaTimer.present
+          ? data.mediaTimer.value
+          : this.mediaTimer,
+      mediaType: data.mediaType.present ? data.mediaType.value : this.mediaType,
       mediaLastReset: data.mediaLastReset.present
           ? data.mediaLastReset.value
           : this.mediaLastReset,
       totalMediaSent: data.totalMediaSent.present
           ? data.totalMediaSent.value
           : this.totalMediaSent,
-      serverName: data.serverName.present
-          ? data.serverName.value
-          : this.serverName,
-      mediaTimer: data.mediaTimer.present
-          ? data.mediaTimer.value
-          : this.mediaTimer,
-      maxPayload: data.maxPayload.present
-          ? data.maxPayload.value
-          : this.maxPayload,
-      capabilities: data.capabilities.present
-          ? data.capabilities.value
-          : this.capabilities,
-      colour: data.colour.present ? data.colour.value : this.colour,
+      accentColour: data.accentColour.present
+          ? data.accentColour.value
+          : this.accentColour,
     );
   }
 
@@ -1250,16 +1499,23 @@ class Server extends DataClass implements Insertable<Server> {
   String toString() {
     return (StringBuffer('Server(')
           ..write('serverId: $serverId, ')
+          ..write('serverName: $serverName, ')
           ..write('serverUrl: $serverUrl, ')
+          ..write('serverType: $serverType, ')
+          ..write('maxPayload: $maxPayload, ')
+          ..write('colour: $colour, ')
+          ..write('about: $about, ')
+          ..write('categories: $categories, ')
+          ..write('annotated: $annotated, ')
+          ..write('disabled: $disabled, ')
+          ..write('location: $location, ')
           ..write('mediaUrl: $mediaUrl, ')
-          ..write('mediaSizeLimit: $mediaSizeLimit, ')
+          ..write('mediaSize: $mediaSize, ')
+          ..write('mediaTimer: $mediaTimer, ')
+          ..write('mediaType: $mediaType, ')
           ..write('mediaLastReset: $mediaLastReset, ')
           ..write('totalMediaSent: $totalMediaSent, ')
-          ..write('serverName: $serverName, ')
-          ..write('mediaTimer: $mediaTimer, ')
-          ..write('maxPayload: $maxPayload, ')
-          ..write('capabilities: $capabilities, ')
-          ..write('colour: $colour')
+          ..write('accentColour: $accentColour')
           ..write(')'))
         .toString();
   }
@@ -1267,135 +1523,197 @@ class Server extends DataClass implements Insertable<Server> {
   @override
   int get hashCode => Object.hash(
     serverId,
+    serverName,
     serverUrl,
+    serverType,
+    maxPayload,
+    colour,
+    about,
+    categories,
+    annotated,
+    disabled,
+    location,
     mediaUrl,
-    mediaSizeLimit,
+    mediaSize,
+    mediaTimer,
+    mediaType,
     mediaLastReset,
     totalMediaSent,
-    serverName,
-    mediaTimer,
-    maxPayload,
-    capabilities,
-    colour,
+    accentColour,
   );
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
       (other is Server &&
           other.serverId == this.serverId &&
+          other.serverName == this.serverName &&
           other.serverUrl == this.serverUrl &&
+          other.serverType == this.serverType &&
+          other.maxPayload == this.maxPayload &&
+          other.colour == this.colour &&
+          other.about == this.about &&
+          other.categories == this.categories &&
+          other.annotated == this.annotated &&
+          other.disabled == this.disabled &&
+          other.location == this.location &&
           other.mediaUrl == this.mediaUrl &&
-          other.mediaSizeLimit == this.mediaSizeLimit &&
+          other.mediaSize == this.mediaSize &&
+          other.mediaTimer == this.mediaTimer &&
+          other.mediaType == this.mediaType &&
           other.mediaLastReset == this.mediaLastReset &&
           other.totalMediaSent == this.totalMediaSent &&
-          other.serverName == this.serverName &&
-          other.mediaTimer == this.mediaTimer &&
-          other.maxPayload == this.maxPayload &&
-          other.capabilities == this.capabilities &&
-          other.colour == this.colour);
+          other.accentColour == this.accentColour);
 }
 
 class ServersCompanion extends UpdateCompanion<Server> {
   final Value<String> serverId;
+  final Value<String> serverName;
   final Value<String> serverUrl;
-  final Value<String> mediaUrl;
-  final Value<int> mediaSizeLimit;
+  final Value<String> serverType;
+  final Value<int> maxPayload;
+  final Value<String> colour;
+  final Value<String> about;
+  final Value<String?> categories;
+  final Value<bool> annotated;
+  final Value<bool> disabled;
+  final Value<String?> location;
+  final Value<String?> mediaUrl;
+  final Value<int?> mediaSize;
+  final Value<int?> mediaTimer;
+  final Value<String?> mediaType;
   final Value<DateTime> mediaLastReset;
   final Value<int> totalMediaSent;
-  final Value<String> serverName;
-  final Value<int> mediaTimer;
-  final Value<int> maxPayload;
-  final Value<int> capabilities;
-  final Value<int> colour;
+  final Value<int> accentColour;
   final Value<int> rowid;
   const ServersCompanion({
     this.serverId = const Value.absent(),
+    this.serverName = const Value.absent(),
     this.serverUrl = const Value.absent(),
+    this.serverType = const Value.absent(),
+    this.maxPayload = const Value.absent(),
+    this.colour = const Value.absent(),
+    this.about = const Value.absent(),
+    this.categories = const Value.absent(),
+    this.annotated = const Value.absent(),
+    this.disabled = const Value.absent(),
+    this.location = const Value.absent(),
     this.mediaUrl = const Value.absent(),
-    this.mediaSizeLimit = const Value.absent(),
+    this.mediaSize = const Value.absent(),
+    this.mediaTimer = const Value.absent(),
+    this.mediaType = const Value.absent(),
     this.mediaLastReset = const Value.absent(),
     this.totalMediaSent = const Value.absent(),
-    this.serverName = const Value.absent(),
-    this.mediaTimer = const Value.absent(),
-    this.maxPayload = const Value.absent(),
-    this.capabilities = const Value.absent(),
-    this.colour = const Value.absent(),
+    this.accentColour = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   ServersCompanion.insert({
     required String serverId,
+    required String serverName,
     required String serverUrl,
-    required String mediaUrl,
-    this.mediaSizeLimit = const Value.absent(),
+    this.serverType = const Value.absent(),
+    this.maxPayload = const Value.absent(),
+    this.colour = const Value.absent(),
+    this.about = const Value.absent(),
+    this.categories = const Value.absent(),
+    this.annotated = const Value.absent(),
+    this.disabled = const Value.absent(),
+    this.location = const Value.absent(),
+    this.mediaUrl = const Value.absent(),
+    this.mediaSize = const Value.absent(),
+    this.mediaTimer = const Value.absent(),
+    this.mediaType = const Value.absent(),
     required DateTime mediaLastReset,
     this.totalMediaSent = const Value.absent(),
-    required String serverName,
-    this.mediaTimer = const Value.absent(),
-    this.maxPayload = const Value.absent(),
-    this.capabilities = const Value.absent(),
-    this.colour = const Value.absent(),
+    this.accentColour = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : serverId = Value(serverId),
+       serverName = Value(serverName),
        serverUrl = Value(serverUrl),
-       mediaUrl = Value(mediaUrl),
-       mediaLastReset = Value(mediaLastReset),
-       serverName = Value(serverName);
+       mediaLastReset = Value(mediaLastReset);
   static Insertable<Server> custom({
     Expression<String>? serverId,
+    Expression<String>? serverName,
     Expression<String>? serverUrl,
+    Expression<String>? serverType,
+    Expression<int>? maxPayload,
+    Expression<String>? colour,
+    Expression<String>? about,
+    Expression<String>? categories,
+    Expression<bool>? annotated,
+    Expression<bool>? disabled,
+    Expression<String>? location,
     Expression<String>? mediaUrl,
-    Expression<int>? mediaSizeLimit,
+    Expression<int>? mediaSize,
+    Expression<int>? mediaTimer,
+    Expression<String>? mediaType,
     Expression<DateTime>? mediaLastReset,
     Expression<int>? totalMediaSent,
-    Expression<String>? serverName,
-    Expression<int>? mediaTimer,
-    Expression<int>? maxPayload,
-    Expression<int>? capabilities,
-    Expression<int>? colour,
+    Expression<int>? accentColour,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
       if (serverId != null) 'server_id': serverId,
+      if (serverName != null) 'server_name': serverName,
       if (serverUrl != null) 'server_url': serverUrl,
+      if (serverType != null) 'server_type': serverType,
+      if (maxPayload != null) 'max_payload': maxPayload,
+      if (colour != null) 'colour': colour,
+      if (about != null) 'about': about,
+      if (categories != null) 'categories': categories,
+      if (annotated != null) 'annotated': annotated,
+      if (disabled != null) 'disabled': disabled,
+      if (location != null) 'location': location,
       if (mediaUrl != null) 'media_url': mediaUrl,
-      if (mediaSizeLimit != null) 'media_size_limit': mediaSizeLimit,
+      if (mediaSize != null) 'media_size': mediaSize,
+      if (mediaTimer != null) 'media_timer': mediaTimer,
+      if (mediaType != null) 'media_type': mediaType,
       if (mediaLastReset != null) 'media_last_reset': mediaLastReset,
       if (totalMediaSent != null) 'total_media_sent': totalMediaSent,
-      if (serverName != null) 'server_name': serverName,
-      if (mediaTimer != null) 'media_timer': mediaTimer,
-      if (maxPayload != null) 'max_payload': maxPayload,
-      if (capabilities != null) 'capabilities': capabilities,
-      if (colour != null) 'colour': colour,
+      if (accentColour != null) 'accent_colour': accentColour,
       if (rowid != null) 'rowid': rowid,
     });
   }
 
   ServersCompanion copyWith({
     Value<String>? serverId,
+    Value<String>? serverName,
     Value<String>? serverUrl,
-    Value<String>? mediaUrl,
-    Value<int>? mediaSizeLimit,
+    Value<String>? serverType,
+    Value<int>? maxPayload,
+    Value<String>? colour,
+    Value<String>? about,
+    Value<String?>? categories,
+    Value<bool>? annotated,
+    Value<bool>? disabled,
+    Value<String?>? location,
+    Value<String?>? mediaUrl,
+    Value<int?>? mediaSize,
+    Value<int?>? mediaTimer,
+    Value<String?>? mediaType,
     Value<DateTime>? mediaLastReset,
     Value<int>? totalMediaSent,
-    Value<String>? serverName,
-    Value<int>? mediaTimer,
-    Value<int>? maxPayload,
-    Value<int>? capabilities,
-    Value<int>? colour,
+    Value<int>? accentColour,
     Value<int>? rowid,
   }) {
     return ServersCompanion(
       serverId: serverId ?? this.serverId,
+      serverName: serverName ?? this.serverName,
       serverUrl: serverUrl ?? this.serverUrl,
+      serverType: serverType ?? this.serverType,
+      maxPayload: maxPayload ?? this.maxPayload,
+      colour: colour ?? this.colour,
+      about: about ?? this.about,
+      categories: categories ?? this.categories,
+      annotated: annotated ?? this.annotated,
+      disabled: disabled ?? this.disabled,
+      location: location ?? this.location,
       mediaUrl: mediaUrl ?? this.mediaUrl,
-      mediaSizeLimit: mediaSizeLimit ?? this.mediaSizeLimit,
+      mediaSize: mediaSize ?? this.mediaSize,
+      mediaTimer: mediaTimer ?? this.mediaTimer,
+      mediaType: mediaType ?? this.mediaType,
       mediaLastReset: mediaLastReset ?? this.mediaLastReset,
       totalMediaSent: totalMediaSent ?? this.totalMediaSent,
-      serverName: serverName ?? this.serverName,
-      mediaTimer: mediaTimer ?? this.mediaTimer,
-      maxPayload: maxPayload ?? this.maxPayload,
-      capabilities: capabilities ?? this.capabilities,
-      colour: colour ?? this.colour,
+      accentColour: accentColour ?? this.accentColour,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -1406,14 +1724,47 @@ class ServersCompanion extends UpdateCompanion<Server> {
     if (serverId.present) {
       map['server_id'] = Variable<String>(serverId.value);
     }
+    if (serverName.present) {
+      map['server_name'] = Variable<String>(serverName.value);
+    }
     if (serverUrl.present) {
       map['server_url'] = Variable<String>(serverUrl.value);
+    }
+    if (serverType.present) {
+      map['server_type'] = Variable<String>(serverType.value);
+    }
+    if (maxPayload.present) {
+      map['max_payload'] = Variable<int>(maxPayload.value);
+    }
+    if (colour.present) {
+      map['colour'] = Variable<String>(colour.value);
+    }
+    if (about.present) {
+      map['about'] = Variable<String>(about.value);
+    }
+    if (categories.present) {
+      map['categories'] = Variable<String>(categories.value);
+    }
+    if (annotated.present) {
+      map['annotated'] = Variable<bool>(annotated.value);
+    }
+    if (disabled.present) {
+      map['disabled'] = Variable<bool>(disabled.value);
+    }
+    if (location.present) {
+      map['location'] = Variable<String>(location.value);
     }
     if (mediaUrl.present) {
       map['media_url'] = Variable<String>(mediaUrl.value);
     }
-    if (mediaSizeLimit.present) {
-      map['media_size_limit'] = Variable<int>(mediaSizeLimit.value);
+    if (mediaSize.present) {
+      map['media_size'] = Variable<int>(mediaSize.value);
+    }
+    if (mediaTimer.present) {
+      map['media_timer'] = Variable<int>(mediaTimer.value);
+    }
+    if (mediaType.present) {
+      map['media_type'] = Variable<String>(mediaType.value);
     }
     if (mediaLastReset.present) {
       map['media_last_reset'] = Variable<DateTime>(mediaLastReset.value);
@@ -1421,20 +1772,8 @@ class ServersCompanion extends UpdateCompanion<Server> {
     if (totalMediaSent.present) {
       map['total_media_sent'] = Variable<int>(totalMediaSent.value);
     }
-    if (serverName.present) {
-      map['server_name'] = Variable<String>(serverName.value);
-    }
-    if (mediaTimer.present) {
-      map['media_timer'] = Variable<int>(mediaTimer.value);
-    }
-    if (maxPayload.present) {
-      map['max_payload'] = Variable<int>(maxPayload.value);
-    }
-    if (capabilities.present) {
-      map['capabilities'] = Variable<int>(capabilities.value);
-    }
-    if (colour.present) {
-      map['colour'] = Variable<int>(colour.value);
+    if (accentColour.present) {
+      map['accent_colour'] = Variable<int>(accentColour.value);
     }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
@@ -1446,16 +1785,23 @@ class ServersCompanion extends UpdateCompanion<Server> {
   String toString() {
     return (StringBuffer('ServersCompanion(')
           ..write('serverId: $serverId, ')
+          ..write('serverName: $serverName, ')
           ..write('serverUrl: $serverUrl, ')
+          ..write('serverType: $serverType, ')
+          ..write('maxPayload: $maxPayload, ')
+          ..write('colour: $colour, ')
+          ..write('about: $about, ')
+          ..write('categories: $categories, ')
+          ..write('annotated: $annotated, ')
+          ..write('disabled: $disabled, ')
+          ..write('location: $location, ')
           ..write('mediaUrl: $mediaUrl, ')
-          ..write('mediaSizeLimit: $mediaSizeLimit, ')
+          ..write('mediaSize: $mediaSize, ')
+          ..write('mediaTimer: $mediaTimer, ')
+          ..write('mediaType: $mediaType, ')
           ..write('mediaLastReset: $mediaLastReset, ')
           ..write('totalMediaSent: $totalMediaSent, ')
-          ..write('serverName: $serverName, ')
-          ..write('mediaTimer: $mediaTimer, ')
-          ..write('maxPayload: $maxPayload, ')
-          ..write('capabilities: $capabilities, ')
-          ..write('colour: $colour, ')
+          ..write('accentColour: $accentColour, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -11601,30 +11947,44 @@ typedef $$IdentityTableProcessedTableManager =
     >;
 typedef $$ServersTableCreateCompanionBuilder = ServersCompanion Function({
   required String serverId,
+  required String serverName,
   required String serverUrl,
-  required String mediaUrl,
-  Value<int> mediaSizeLimit,
+  Value<String> serverType,
+  Value<int> maxPayload,
+  Value<String> colour,
+  Value<String> about,
+  Value<String?> categories,
+  Value<bool> annotated,
+  Value<bool> disabled,
+  Value<String?> location,
+  Value<String?> mediaUrl,
+  Value<int?> mediaSize,
+  Value<int?> mediaTimer,
+  Value<String?> mediaType,
   required DateTime mediaLastReset,
   Value<int> totalMediaSent,
-  required String serverName,
-  Value<int> mediaTimer,
-  Value<int> maxPayload,
-  Value<int> capabilities,
-  Value<int> colour,
+  Value<int> accentColour,
   Value<int> rowid,
 });
 typedef $$ServersTableUpdateCompanionBuilder = ServersCompanion Function({
   Value<String> serverId,
+  Value<String> serverName,
   Value<String> serverUrl,
-  Value<String> mediaUrl,
-  Value<int> mediaSizeLimit,
+  Value<String> serverType,
+  Value<int> maxPayload,
+  Value<String> colour,
+  Value<String> about,
+  Value<String?> categories,
+  Value<bool> annotated,
+  Value<bool> disabled,
+  Value<String?> location,
+  Value<String?> mediaUrl,
+  Value<int?> mediaSize,
+  Value<int?> mediaTimer,
+  Value<String?> mediaType,
   Value<DateTime> mediaLastReset,
   Value<int> totalMediaSent,
-  Value<String> serverName,
-  Value<int> mediaTimer,
-  Value<int> maxPayload,
-  Value<int> capabilities,
-  Value<int> colour,
+  Value<int> accentColour,
   Value<int> rowid,
 });
 
@@ -11665,8 +12025,53 @@ class $$ServersTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
+  ColumnFilters<String> get serverName => $composableBuilder(
+    column: $table.serverName,
+    builder: (column) => ColumnFilters(column),
+  );
+
   ColumnFilters<String> get serverUrl => $composableBuilder(
     column: $table.serverUrl,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get serverType => $composableBuilder(
+    column: $table.serverType,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get maxPayload => $composableBuilder(
+    column: $table.maxPayload,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get colour => $composableBuilder(
+    column: $table.colour,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get about => $composableBuilder(
+    column: $table.about,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get categories => $composableBuilder(
+    column: $table.categories,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get annotated => $composableBuilder(
+    column: $table.annotated,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get disabled => $composableBuilder(
+    column: $table.disabled,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get location => $composableBuilder(
+    column: $table.location,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -11675,8 +12080,18 @@ class $$ServersTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
-  ColumnFilters<int> get mediaSizeLimit => $composableBuilder(
-    column: $table.mediaSizeLimit,
+  ColumnFilters<int> get mediaSize => $composableBuilder(
+    column: $table.mediaSize,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get mediaTimer => $composableBuilder(
+    column: $table.mediaTimer,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get mediaType => $composableBuilder(
+    column: $table.mediaType,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -11690,28 +12105,8 @@ class $$ServersTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
-  ColumnFilters<String> get serverName => $composableBuilder(
-    column: $table.serverName,
-    builder: (column) => ColumnFilters(column),
-  );
-
-  ColumnFilters<int> get mediaTimer => $composableBuilder(
-    column: $table.mediaTimer,
-    builder: (column) => ColumnFilters(column),
-  );
-
-  ColumnFilters<int> get maxPayload => $composableBuilder(
-    column: $table.maxPayload,
-    builder: (column) => ColumnFilters(column),
-  );
-
-  ColumnFilters<int> get capabilities => $composableBuilder(
-    column: $table.capabilities,
-    builder: (column) => ColumnFilters(column),
-  );
-
-  ColumnFilters<int> get colour => $composableBuilder(
-    column: $table.colour,
+  ColumnFilters<int> get accentColour => $composableBuilder(
+    column: $table.accentColour,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -11755,8 +12150,53 @@ class $$ServersTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get serverName => $composableBuilder(
+    column: $table.serverName,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<String> get serverUrl => $composableBuilder(
     column: $table.serverUrl,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get serverType => $composableBuilder(
+    column: $table.serverType,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get maxPayload => $composableBuilder(
+    column: $table.maxPayload,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get colour => $composableBuilder(
+    column: $table.colour,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get about => $composableBuilder(
+    column: $table.about,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get categories => $composableBuilder(
+    column: $table.categories,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get annotated => $composableBuilder(
+    column: $table.annotated,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get disabled => $composableBuilder(
+    column: $table.disabled,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get location => $composableBuilder(
+    column: $table.location,
     builder: (column) => ColumnOrderings(column),
   );
 
@@ -11765,8 +12205,18 @@ class $$ServersTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
-  ColumnOrderings<int> get mediaSizeLimit => $composableBuilder(
-    column: $table.mediaSizeLimit,
+  ColumnOrderings<int> get mediaSize => $composableBuilder(
+    column: $table.mediaSize,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get mediaTimer => $composableBuilder(
+    column: $table.mediaTimer,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get mediaType => $composableBuilder(
+    column: $table.mediaType,
     builder: (column) => ColumnOrderings(column),
   );
 
@@ -11780,28 +12230,8 @@ class $$ServersTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
-  ColumnOrderings<String> get serverName => $composableBuilder(
-    column: $table.serverName,
-    builder: (column) => ColumnOrderings(column),
-  );
-
-  ColumnOrderings<int> get mediaTimer => $composableBuilder(
-    column: $table.mediaTimer,
-    builder: (column) => ColumnOrderings(column),
-  );
-
-  ColumnOrderings<int> get maxPayload => $composableBuilder(
-    column: $table.maxPayload,
-    builder: (column) => ColumnOrderings(column),
-  );
-
-  ColumnOrderings<int> get capabilities => $composableBuilder(
-    column: $table.capabilities,
-    builder: (column) => ColumnOrderings(column),
-  );
-
-  ColumnOrderings<int> get colour => $composableBuilder(
-    column: $table.colour,
+  ColumnOrderings<int> get accentColour => $composableBuilder(
+    column: $table.accentColour,
     builder: (column) => ColumnOrderings(column),
   );
 }
@@ -11818,16 +12248,57 @@ class $$ServersTableAnnotationComposer
   GeneratedColumn<String> get serverId =>
       $composableBuilder(column: $table.serverId, builder: (column) => column);
 
+  GeneratedColumn<String> get serverName => $composableBuilder(
+    column: $table.serverName,
+    builder: (column) => column,
+  );
+
   GeneratedColumn<String> get serverUrl =>
       $composableBuilder(column: $table.serverUrl, builder: (column) => column);
+
+  GeneratedColumn<String> get serverType => $composableBuilder(
+    column: $table.serverType,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get maxPayload => $composableBuilder(
+    column: $table.maxPayload,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get colour =>
+      $composableBuilder(column: $table.colour, builder: (column) => column);
+
+  GeneratedColumn<String> get about =>
+      $composableBuilder(column: $table.about, builder: (column) => column);
+
+  GeneratedColumn<String> get categories => $composableBuilder(
+    column: $table.categories,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<bool> get annotated =>
+      $composableBuilder(column: $table.annotated, builder: (column) => column);
+
+  GeneratedColumn<bool> get disabled =>
+      $composableBuilder(column: $table.disabled, builder: (column) => column);
+
+  GeneratedColumn<String> get location =>
+      $composableBuilder(column: $table.location, builder: (column) => column);
 
   GeneratedColumn<String> get mediaUrl =>
       $composableBuilder(column: $table.mediaUrl, builder: (column) => column);
 
-  GeneratedColumn<int> get mediaSizeLimit => $composableBuilder(
-    column: $table.mediaSizeLimit,
+  GeneratedColumn<int> get mediaSize =>
+      $composableBuilder(column: $table.mediaSize, builder: (column) => column);
+
+  GeneratedColumn<int> get mediaTimer => $composableBuilder(
+    column: $table.mediaTimer,
     builder: (column) => column,
   );
+
+  GeneratedColumn<String> get mediaType =>
+      $composableBuilder(column: $table.mediaType, builder: (column) => column);
 
   GeneratedColumn<DateTime> get mediaLastReset => $composableBuilder(
     column: $table.mediaLastReset,
@@ -11839,28 +12310,10 @@ class $$ServersTableAnnotationComposer
     builder: (column) => column,
   );
 
-  GeneratedColumn<String> get serverName => $composableBuilder(
-    column: $table.serverName,
+  GeneratedColumn<int> get accentColour => $composableBuilder(
+    column: $table.accentColour,
     builder: (column) => column,
   );
-
-  GeneratedColumn<int> get mediaTimer => $composableBuilder(
-    column: $table.mediaTimer,
-    builder: (column) => column,
-  );
-
-  GeneratedColumn<int> get maxPayload => $composableBuilder(
-    column: $table.maxPayload,
-    builder: (column) => column,
-  );
-
-  GeneratedColumn<int> get capabilities => $composableBuilder(
-    column: $table.capabilities,
-    builder: (column) => column,
-  );
-
-  GeneratedColumn<int> get colour =>
-      $composableBuilder(column: $table.colour, builder: (column) => column);
 
   Expression<T> tasksRefs<T extends Object>(
     Expression<T> Function($$TasksTableAnnotationComposer a) f,
@@ -11917,57 +12370,85 @@ class $$ServersTableTableManager
           updateCompanionCallback:
               ({
                 Value<String> serverId = const Value.absent(),
+                Value<String> serverName = const Value.absent(),
                 Value<String> serverUrl = const Value.absent(),
-                Value<String> mediaUrl = const Value.absent(),
-                Value<int> mediaSizeLimit = const Value.absent(),
+                Value<String> serverType = const Value.absent(),
+                Value<int> maxPayload = const Value.absent(),
+                Value<String> colour = const Value.absent(),
+                Value<String> about = const Value.absent(),
+                Value<String?> categories = const Value.absent(),
+                Value<bool> annotated = const Value.absent(),
+                Value<bool> disabled = const Value.absent(),
+                Value<String?> location = const Value.absent(),
+                Value<String?> mediaUrl = const Value.absent(),
+                Value<int?> mediaSize = const Value.absent(),
+                Value<int?> mediaTimer = const Value.absent(),
+                Value<String?> mediaType = const Value.absent(),
                 Value<DateTime> mediaLastReset = const Value.absent(),
                 Value<int> totalMediaSent = const Value.absent(),
-                Value<String> serverName = const Value.absent(),
-                Value<int> mediaTimer = const Value.absent(),
-                Value<int> maxPayload = const Value.absent(),
-                Value<int> capabilities = const Value.absent(),
-                Value<int> colour = const Value.absent(),
+                Value<int> accentColour = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => ServersCompanion(
                 serverId: serverId,
+                serverName: serverName,
                 serverUrl: serverUrl,
+                serverType: serverType,
+                maxPayload: maxPayload,
+                colour: colour,
+                about: about,
+                categories: categories,
+                annotated: annotated,
+                disabled: disabled,
+                location: location,
                 mediaUrl: mediaUrl,
-                mediaSizeLimit: mediaSizeLimit,
+                mediaSize: mediaSize,
+                mediaTimer: mediaTimer,
+                mediaType: mediaType,
                 mediaLastReset: mediaLastReset,
                 totalMediaSent: totalMediaSent,
-                serverName: serverName,
-                mediaTimer: mediaTimer,
-                maxPayload: maxPayload,
-                capabilities: capabilities,
-                colour: colour,
+                accentColour: accentColour,
                 rowid: rowid,
               ),
           createCompanionCallback:
               ({
                 required String serverId,
+                required String serverName,
                 required String serverUrl,
-                required String mediaUrl,
-                Value<int> mediaSizeLimit = const Value.absent(),
+                Value<String> serverType = const Value.absent(),
+                Value<int> maxPayload = const Value.absent(),
+                Value<String> colour = const Value.absent(),
+                Value<String> about = const Value.absent(),
+                Value<String?> categories = const Value.absent(),
+                Value<bool> annotated = const Value.absent(),
+                Value<bool> disabled = const Value.absent(),
+                Value<String?> location = const Value.absent(),
+                Value<String?> mediaUrl = const Value.absent(),
+                Value<int?> mediaSize = const Value.absent(),
+                Value<int?> mediaTimer = const Value.absent(),
+                Value<String?> mediaType = const Value.absent(),
                 required DateTime mediaLastReset,
                 Value<int> totalMediaSent = const Value.absent(),
-                required String serverName,
-                Value<int> mediaTimer = const Value.absent(),
-                Value<int> maxPayload = const Value.absent(),
-                Value<int> capabilities = const Value.absent(),
-                Value<int> colour = const Value.absent(),
+                Value<int> accentColour = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => ServersCompanion.insert(
                 serverId: serverId,
+                serverName: serverName,
                 serverUrl: serverUrl,
+                serverType: serverType,
+                maxPayload: maxPayload,
+                colour: colour,
+                about: about,
+                categories: categories,
+                annotated: annotated,
+                disabled: disabled,
+                location: location,
                 mediaUrl: mediaUrl,
-                mediaSizeLimit: mediaSizeLimit,
+                mediaSize: mediaSize,
+                mediaTimer: mediaTimer,
+                mediaType: mediaType,
                 mediaLastReset: mediaLastReset,
                 totalMediaSent: totalMediaSent,
-                serverName: serverName,
-                mediaTimer: mediaTimer,
-                maxPayload: maxPayload,
-                capabilities: capabilities,
-                colour: colour,
+                accentColour: accentColour,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0

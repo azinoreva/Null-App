@@ -2,75 +2,132 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-/// Model matching your server JSON structure.
+import 'server_model.dart';
+
+/// Locally persisted mirror of a server, field for field identical to the
+/// backend's `Server` payload (see `ServerInfo` in
+/// `engine/network/servers/servers.dart`).
+///
+/// The JSON shape produced by [toJson] is exactly the shape consumed by the
+/// API, so a config can round-trip through either without losing fields.
+/// Older records persisted with the previous flat media shape are still read
+/// by [fromJson] so an upgrade doesn't drop connected servers.
 class ServerConfig {
   final String serverId;
   final String serverName;
   final String serverUrl;
-  final String mediaUrl;
-  final String serverType;
-  final int mediaSizeLimit;
-  final int mediaTimer;
-  final int maxPayload;
-  final int capabilities;
+  final ServerType serverType;
+  final int maxPayload; // max text length for a post message
+  final String colour;
+  final String about;
+  final List<String>? categories; // backend: Optional<List[Categories]]
+  final bool annotated;
+  final bool disabled;
+  final String? location;
+  final ServerMedia? media;
 
   const ServerConfig({
     required this.serverId,
     required this.serverName,
     required this.serverUrl,
-    required this.mediaUrl,
     required this.serverType,
-    required this.mediaSizeLimit,
-    required this.mediaTimer,
     required this.maxPayload,
-    required this.capabilities,
+    required this.colour,
+    required this.about,
+    required this.annotated,
+    this.disabled = false,
+    this.categories,
+    this.location,
+    this.media,
   });
 
-  factory ServerConfig.fromJson(Map<String, dynamic> json) => ServerConfig(
-        serverId: json['serverId'] as String,
-        serverName: json['serverName'] as String,
-        serverUrl: json['serverUrl'] as String,
-        mediaUrl: json['mediaUrl'] as String,
-        serverType: json['serverType'] as String,
-        mediaSizeLimit: json['mediaSizeLimit'] as int,
-        mediaTimer: json['mediaTimer'] as int,
-        maxPayload: json['maxPayload'] as int,
-        capabilities: json['capabilities'] as int,
-      );
+  /// Convenience getters so callers that only care about one media limit
+  /// don't have to unwrap [media].
+  String? get mediaUrl => media?.url;
+  int? get mediaSizeLimit => media?.size;
+  int? get mediaTimer => media?.timer;
+
+  factory ServerConfig.fromJson(Map<String, dynamic> json) {
+    return ServerConfig(
+      serverId: json['serverId'] as String? ?? '',
+      serverName: json['serverName'] as String? ?? '',
+      serverUrl: json['serverUrl'] as String? ?? '',
+      serverType: ServerType.tryFromJson(json['serverType']) ?? ServerType.public,
+      maxPayload: (json['maxPayload'] as num?)?.toInt() ?? 5,
+      colour: json['colour'] as String? ?? '',
+      about: json['about'] as String? ?? '',
+      annotated: json['annotated'] as bool? ?? false,
+      disabled: json['disabled'] as bool? ?? false,
+      location: json['location'] as String?,
+      categories: (json['categories'] as List<dynamic>?)
+          ?.map((e) => e as String)
+          .toList(),
+      media: _mediaFromJson(json),
+    );
+  }
+
+  /// Reads the nested `media` object, falling back to the flat
+  /// `mediaUrl`/`mediaSizeLimit`/`mediaTimer` keys written by older versions.
+  static ServerMedia? _mediaFromJson(Map<String, dynamic> json) {
+    final media = ServerMedia.tryFromJson(json['media']);
+    if (media != null) return media;
+
+    final url = json['mediaUrl'];
+    if (url is! String || url.isEmpty) return null;
+
+    final size = (json['mediaSizeLimit'] as num?)?.toInt() ??
+        (json['mediaSize'] as num?)?.toInt() ??
+        0;
+    final timer = (json['mediaTimer'] as num?)?.toInt() ?? 0;
+
+    return ServerMedia(url: url, size: size, timer: timer, mediaType: const []);
+  }
 
   Map<String, dynamic> toJson() => {
         'serverId': serverId,
         'serverName': serverName,
         'serverUrl': serverUrl,
-        'mediaUrl': mediaUrl,
-        'serverType': serverType,
-        'mediaSizeLimit': mediaSizeLimit,
-        'mediaTimer': mediaTimer,
+        'serverType': serverType.toJson(),
         'maxPayload': maxPayload,
-        'capabilities': capabilities,
+        'colour': colour,
+        'about': about,
+        'annotated': annotated,
+        'disabled': disabled,
+        'location': location,
+        'categories': categories,
+        'media': media?.toJson(),
       };
 
   ServerConfig copyWith({
     String? serverId,
     String? serverName,
     String? serverUrl,
-    String? mediaUrl,
-    String? serverType,
-    int? mediaSizeLimit,
-    int? mediaTimer,
+    ServerType? serverType,
     int? maxPayload,
-    int? capabilities,
+    String? colour,
+    String? about,
+    List<String>? categories,
+    bool? annotated,
+    bool? disabled,
+    String? location,
+    ServerMedia? media,
+    bool clearLocation = false,
+    bool clearCategories = false,
+    bool clearMedia = false,
   }) {
     return ServerConfig(
       serverId: serverId ?? this.serverId,
       serverName: serverName ?? this.serverName,
       serverUrl: serverUrl ?? this.serverUrl,
-      mediaUrl: mediaUrl ?? this.mediaUrl,
       serverType: serverType ?? this.serverType,
-      mediaSizeLimit: mediaSizeLimit ?? this.mediaSizeLimit,
-      mediaTimer: mediaTimer ?? this.mediaTimer,
       maxPayload: maxPayload ?? this.maxPayload,
-      capabilities: capabilities ?? this.capabilities,
+      colour: colour ?? this.colour,
+      about: about ?? this.about,
+      annotated: annotated ?? this.annotated,
+      disabled: disabled ?? this.disabled,
+      location: clearLocation ? null : (location ?? this.location),
+      categories: clearCategories ? null : (categories ?? this.categories),
+      media: clearMedia ? null : (media ?? this.media),
     );
   }
 
@@ -129,9 +186,17 @@ class ServerListService extends ChangeNotifier {
     if (raw == null || raw.isEmpty) return [];
     try {
       final decoded = jsonDecode(raw) as List<dynamic>;
-      return decoded
-          .map((e) => ServerConfig.fromJson(e as Map<String, dynamic>))
-          .toList();
+      final servers = <ServerConfig>[];
+      for (final entry in decoded) {
+        try {
+          servers.add(
+            ServerConfig.fromJson(Map<String, dynamic>.from(entry as Map)),
+          );
+        } catch (_) {
+          // Skip the unreadable entry rather than losing the whole list.
+        }
+      }
+      return servers;
     } catch (_) {
       // Corrupt cache: start empty rather than crash.
       return [];

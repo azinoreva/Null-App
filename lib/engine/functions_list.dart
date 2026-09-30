@@ -1,6 +1,7 @@
 import 'dart:typed_data';
 
 import 'package:cryptography/cryptography.dart';
+import 'package:drift/drift.dart' show Value;
 
 import 'crypto/chat/identity_crypto.dart';
 import 'crypto/chat/null_crypto.dart';
@@ -546,24 +547,12 @@ class FunctionsList {
 
   static Future<dynamic> createServer(
     ServersDao serversDao, {
-    required String serverId,
-    required String serverName,
-    required String serverUrl,
-    required String mediaUrl,
-    required int mediaSizeLimit,
-    required int mediaTimer,
-    required int maxPayload,
-    required int capabilities,
+    required ServerInfo serverInfo,
+    int? accentColour,
   }) => server.createServer(
     serversDao,
-    serverId: serverId,
-    serverName: serverName,
-    serverUrl: serverUrl,
-    mediaUrl: mediaUrl,
-    mediaSizeLimit: mediaSizeLimit,
-    mediaTimer: mediaTimer,
-    maxPayload: maxPayload,
-    capabilities: capabilities,
+    server: serverInfo,
+    accentColour: accentColour,
   );
 
   static Future<dynamic> updateServerFields(
@@ -571,12 +560,16 @@ class FunctionsList {
     required String serverId,
     String? serverName,
     String? serverUrl,
-    String? mediaUrl,
-    int? mediaSizeLimit,
-    int? mediaTimer,
+    ServerType? serverType,
     int? maxPayload,
-    int? capabilities,
-    int? colour,
+    String? colour,
+    String? about,
+    Value<List<String>?>? categories,
+    bool? annotated,
+    bool? disabled,
+    Value<String?>? location,
+    Value<ServerMedia?>? media,
+    int? accentColour,
     int? totalMediaSent,
     DateTime? mediaLastReset,
   }) => server.updateServerFields(
@@ -584,15 +577,22 @@ class FunctionsList {
     serverId: serverId,
     serverName: serverName,
     serverUrl: serverUrl,
-    mediaUrl: mediaUrl,
-    mediaSizeLimit: mediaSizeLimit,
-    mediaTimer: mediaTimer,
+    serverType: serverType,
     maxPayload: maxPayload,
-    capabilities: capabilities,
     colour: colour,
+    about: about,
+    categories: categories,
+    annotated: annotated,
+    disabled: disabled,
+    location: location,
+    media: media,
+    accentColour: accentColour,
     totalMediaSent: totalMediaSent,
     mediaLastReset: mediaLastReset,
   );
+
+  static ServerInfo serverInfoFromRow(Server row) =>
+      server.serverInfoFromRow(row);
 
   static Future<dynamic> deleteServerById(
     ServersDao serversDao,

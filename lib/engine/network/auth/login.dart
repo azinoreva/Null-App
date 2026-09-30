@@ -7,11 +7,13 @@ class SignInResponse {
   final String accessToken;
   final String refreshToken;
   final int expires;
+  final String userId;
 
   SignInResponse({
     required this.accessToken,
     required this.refreshToken,
     required this.expires,
+    required this.userId
   });
 
   factory SignInResponse.fromJson(Map<String, dynamic> json) {
@@ -19,6 +21,7 @@ class SignInResponse {
       accessToken: json['access_token'] as String,
       refreshToken: json['refresh_token'] as String,
       expires: json['expires'] as int,
+      userId:json['user_id'] as String
     );
   }
 }
