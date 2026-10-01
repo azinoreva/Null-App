@@ -7,6 +7,8 @@ import '../engine/database/app_database.dart';
 import '../engine/engine.dart';
 import '../engine/task_queue.dart';
 import '../engine/functions/settings/settings.dart';
+import '../engine/network/api_client.dart';
+import '../engine/network/auth_failure_handler.dart';
 import '../engine/network/updates/check_updates.dart';
 import '../engine/network/updates/updates_cache.dart';
 import '../engine/database/queries/contacts_queries.dart';
@@ -22,6 +24,7 @@ import '../widgets/chats/chat_bubble_component.dart';
 
 /// Data needed to render one post in the updates feed (see [UpdateComponent]).
 class PostData {
+  final String updateId;
   final String avatarUrl;
   final String nickname;
   final String timeText;
@@ -33,6 +36,7 @@ class PostData {
   final bool isSubscribed;
 
   const PostData({
+    required this.updateId,
     required this.avatarUrl,
     required this.nickname,
     required this.timeText,
@@ -494,8 +498,11 @@ class ChatMessagesNotifier extends AsyncNotifier<List<ChatMessageItem>> {
 
 /// API client used to fetch the updates feed. Every request is scoped to a
 /// single server; the app's main server id is `server_1`.
-final updatesServiceProvider = Provider<UpdatesService>((ref) {
-  return const UpdatesService(serverId: 'server_1');
+final updatesServiceProvider = Provider.family<UpdatesService, String>((
+  ref,
+  serverId,
+) {
+  return UpdatesService(serverId: serverId);
 });
 
 /// The state of the updates feed screen: the rendered posts plus its
@@ -551,8 +558,10 @@ class UpdatesFeedNotifier extends AsyncNotifier<UpdatesFeedState> {
   /// Hard cap on a feed request so the screen never hangs on the network.
   static const Duration _fetchTimeout = Duration(seconds: 4);
 
-  UpdatesService get _service => ref.read(updatesServiceProvider);
   UpdatesCacheService get _cache => UpdatesCacheService.instance;
+  final Map<String, int> _offsetByServer = {};
+  final Map<String, bool> _hasMoreByServer = {};
+  final Set<String> _loadedUpdateIds = {};
 
   /// The feed-control category ids the currently loaded feed was built from.
   /// Used to notice when the user changes their tags in Settings.
@@ -570,6 +579,9 @@ class UpdatesFeedNotifier extends AsyncNotifier<UpdatesFeedState> {
     // Seed from the Hive cache so the feed renders immediately (and offline).
     // UpdatesScreen triggers a refresh whenever the route is entered.
     final cached = _cache.load();
+    _loadedUpdateIds
+      ..clear()
+      ..addAll(cached.map((update) => update.updateId));
     if (cached.isEmpty) return const UpdatesFeedState(isRefreshing: true);
     return UpdatesFeedState(
       posts: cached.map(_toPostData).toList(),
@@ -624,16 +636,79 @@ class UpdatesFeedNotifier extends AsyncNotifier<UpdatesFeedState> {
     }
   }
 
-  Future<UpdatesFeedState> _loadFirstPage() async {
+  Future<List<String>> _serverIds() async {
+    final serverList = ref.read(serverListProvider);
+    await serverList.init();
+    return serverList.servers
+        .map((server) => server.serverId)
+        .where((serverId) => serverId.isNotEmpty)
+        .toList(growable: false);
+  }
+
+  Future<List<Update>> _loadPage({required bool reset}) async {
     _activeTags = _currentTags();
-    final updates = await _service
-        .getUpdates(limit: _pageSize, categories: _activeTags)
-        .timeout(_fetchTimeout);
-    unawaited(_cache.save(updates));
+    final serverIds = await _serverIds();
+    if (reset) {
+      await _cache.clearPageState();
+      _offsetByServer.clear();
+      _hasMoreByServer.clear();
+      _loadedUpdateIds.clear();
+    } else {
+      _offsetByServer.addAll(_cache.loadOffsets());
+      _hasMoreByServer.addAll(_cache.loadHasMore());
+    }
+
+    final updates = <Update>[];
+    for (final serverId in serverIds) {
+      if (!reset && _hasMoreByServer[serverId] == false) continue;
+
+      try {
+        if (!ApiClient.isRegistered(serverId)) {
+          await ApiClient.registerServer(
+            serverId: serverId,
+            onAuthFailure: () => unawaited(redirectToLogin()),
+          );
+        }
+
+        final before = _offsetByServer[serverId] ?? 0;
+        final page = await ref
+            .read(updatesServiceProvider(serverId))
+            .getUpdates(
+              limit: _pageSize,
+              before: before,
+              categories: _activeTags,
+            )
+            .timeout(_fetchTimeout);
+
+        _offsetByServer[serverId] = before + page.length;
+        _hasMoreByServer[serverId] = page.length == _pageSize;
+        await _cache.savePageState(
+          serverId,
+          offset: _offsetByServer[serverId]!,
+          hasMore: _hasMoreByServer[serverId]!,
+        );
+        for (final update in page) {
+          if (_loadedUpdateIds.add(update.updateId)) updates.add(update);
+        }
+      } catch (_) {
+        // One unavailable server should not prevent the remaining servers
+        // from contributing to the feed.
+        _hasMoreByServer[serverId] = true;
+      }
+    }
+
+    if (updates.isNotEmpty) unawaited(_cache.save(updates));
+    return updates;
+  }
+
+  bool get _hasMoreServers => _hasMoreByServer.values.any((hasMore) => hasMore);
+
+  Future<UpdatesFeedState> _loadFirstPage() async {
+    final updates = await _loadPage(reset: true);
     return UpdatesFeedState(
       posts: updates.map(_toPostData).toList(),
       page: 1,
-      hasMore: updates.length == _pageSize,
+      hasMore: _hasMoreServers,
     );
   }
 
@@ -651,16 +726,13 @@ class UpdatesFeedNotifier extends AsyncNotifier<UpdatesFeedState> {
     state = AsyncData(current.copyWith(isLoadingMore: true));
 
     try {
-      final updates = await _service
-          .getUpdates(
-            limit: _pageSize,
-            before: current.posts.length,
-            categories: _activeTags,
-          )
-          .timeout(_fetchTimeout);
+      final updates = await _loadPage(reset: false);
       if (updates.isEmpty) {
         state = AsyncData(
-          current.copyWith(isLoadingMore: false, hasMore: false),
+          current.copyWith(
+            isLoadingMore: false,
+            hasMore: _hasMoreServers,
+          ),
         );
         return;
       }
@@ -670,7 +742,7 @@ class UpdatesFeedNotifier extends AsyncNotifier<UpdatesFeedState> {
         UpdatesFeedState(
           posts: [...current.posts, ...updates.map(_toPostData)],
           page: current.page + 1,
-          hasMore: updates.length == _pageSize,
+          hasMore: _hasMoreServers,
         ),
       );
     } catch (_) {
@@ -682,6 +754,7 @@ class UpdatesFeedNotifier extends AsyncNotifier<UpdatesFeedState> {
 
   PostData _toPostData(Update update) {
     return PostData(
+      updateId: update.updateId,
       avatarUrl:
           'https://api.dicebear.com/7.x/avataaars/png?seed='
           '${Uri.encodeComponent(update.nickname)}&size=128',

@@ -21,6 +21,8 @@ class UpdatesCacheService {
   static const String boxName = 'updates_cache';
   static const String _savedAtKey = '_saved_at';
   static const String _updateKey = 'update';
+  static const String _offsetPrefix = '_offset:';
+  static const String _hasMorePrefix = '_has_more:';
 
   /// How long a cached update survives before it is deleted.
   static const Duration ttl = Duration(days: 7);
@@ -73,6 +75,33 @@ class UpdatesCacheService {
     await box.putAll(entries);
   }
 
+  /// Returns the last pagination offset saved for each server.
+  Map<String, int> loadOffsets() => _loadIntMetadata(_offsetPrefix);
+
+  /// Returns whether each server may still have another page.
+  Map<String, bool> loadHasMore() => _loadBoolMetadata(_hasMorePrefix);
+
+  /// Persists pagination progress independently for each server.
+  Future<void> savePageState(
+    String serverId, {
+    required int offset,
+    required bool hasMore,
+  }) async {
+    final box = _requireBox;
+    await box.put(_offsetPrefix + serverId, '$offset');
+    await box.put(_hasMorePrefix + serverId, hasMore ? '1' : '0');
+  }
+
+  /// Clears cursors before a new feed refresh starts.
+  Future<void> clearPageState() async {
+    final box = _requireBox;
+    final keys = box.keys.where((key) {
+      return key is String &&
+          (key.startsWith(_offsetPrefix) || key.startsWith(_hasMorePrefix));
+    }).toList();
+    if (keys.isNotEmpty) await box.deleteAll(keys);
+  }
+
   /// All cached updates, most recently saved first.
   List<Update> load() {
     final box = _requireBox;
@@ -102,6 +131,30 @@ class UpdatesCacheService {
   /// Removes everything from the cache.
   Future<void> clear() async {
     await _requireBox.clear();
+  }
+
+  Map<String, int> _loadIntMetadata(String prefix) {
+    final box = _requireBox;
+    final values = <String, int>{};
+    for (final key in box.keys) {
+      if (key is! String || !key.startsWith(prefix)) continue;
+      final value = int.tryParse(box.get(key) ?? '');
+      if (value != null) values[key.substring(prefix.length)] = value;
+    }
+    return values;
+  }
+
+  Map<String, bool> _loadBoolMetadata(String prefix) {
+    final box = _requireBox;
+    final values = <String, bool>{};
+    for (final key in box.keys) {
+      if (key is! String || !key.startsWith(prefix)) continue;
+      final value = box.get(key);
+      if (value == '0' || value == '1') {
+        values[key.substring(prefix.length)] = value == '1';
+      }
+    }
+    return values;
   }
 
   /// Returns `(savedAtMillis, Update)`, or `null` for malformed entries.

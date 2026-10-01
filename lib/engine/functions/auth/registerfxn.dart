@@ -192,7 +192,6 @@ Future<RegistrationResult> registerNewUser({
         autoSync: 0,
         allowConnectReq: 0,
         recoveryType: response.recoveryType,
-        invitationCount: response.invitationCount,
       );
       await database.identityDao.upsertIdentity(identity);
       await LocalPasswordVerifier.save(password);

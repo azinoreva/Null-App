@@ -8,7 +8,6 @@ import '../widgets/display/contact_card.dart';
 import '../widgets/display/navigation.dart';
 import 'modals/get_contact_modal.dart';
 import '../engine/media_handling/connection_scan_service.dart';
-import '../engine/network/main_server_client.dart';
 import 'modals/share_contact_modal.dart';
 import 'chat_screen.dart';
 import 'settings_screen.dart';
@@ -34,7 +33,6 @@ class _ContactsScreenState extends ConsumerState<ContactsScreen> {
       ref.read(taskQueueProvider).queueTask(
             functionName: 'checkDhDrops',
             args: const [],
-            serverId: MainServerClient.serverId,
           ),
     );
   }

@@ -105,7 +105,7 @@ class AppDatabase extends _$AppDatabase {
   }
 
   @override
-  int get schemaVersion => 6;
+  int get schemaVersion => 7;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -130,6 +130,11 @@ class AppDatabase extends _$AppDatabase {
       }
       if (from < 6) {
         await _migrateServersToApiShape(m);
+      }
+      if (from < 7) {
+        await customStatement(
+          'ALTER TABLE identity DROP COLUMN invitation_count;',
+        );
       }
     },
 

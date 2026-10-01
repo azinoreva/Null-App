@@ -142,18 +142,6 @@ class $IdentityTable extends Identity
     type: DriftSqlType.string,
     requiredDuringInsert: false,
   );
-  static const VerificationMeta _invitationCountMeta = const VerificationMeta(
-    'invitationCount',
-  );
-  @override
-  late final GeneratedColumn<int> invitationCount = GeneratedColumn<int>(
-    'invitation_count',
-    aliasedName,
-    false,
-    type: DriftSqlType.int,
-    requiredDuringInsert: false,
-    defaultValue: const Constant(1),
-  );
   @override
   List<GeneratedColumn> get $columns => [
     identityId,
@@ -168,7 +156,6 @@ class $IdentityTable extends Identity
     autoSync,
     allowConnectReq,
     recoveryType,
-    invitationCount,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -279,15 +266,6 @@ class $IdentityTable extends Identity
         ),
       );
     }
-    if (data.containsKey('invitation_count')) {
-      context.handle(
-        _invitationCountMeta,
-        invitationCount.isAcceptableOrUnknown(
-          data['invitation_count']!,
-          _invitationCountMeta,
-        ),
-      );
-    }
     return context;
   }
 
@@ -345,10 +323,6 @@ class $IdentityTable extends Identity
         DriftSqlType.string,
         data['${effectivePrefix}recovery_type'],
       ),
-      invitationCount: attachedDatabase.typeMapping.read(
-        DriftSqlType.int,
-        data['${effectivePrefix}invitation_count'],
-      )!,
     );
   }
 
@@ -371,7 +345,6 @@ class IdentityData extends DataClass implements Insertable<IdentityData> {
   final int autoSync;
   final int allowConnectReq;
   final String? recoveryType;
-  final int invitationCount;
   const IdentityData({
     required this.identityId,
     required this.displayName,
@@ -385,7 +358,6 @@ class IdentityData extends DataClass implements Insertable<IdentityData> {
     required this.autoSync,
     required this.allowConnectReq,
     this.recoveryType,
-    required this.invitationCount,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -412,7 +384,6 @@ class IdentityData extends DataClass implements Insertable<IdentityData> {
     if (!nullToAbsent || recoveryType != null) {
       map['recovery_type'] = Variable<String>(recoveryType);
     }
-    map['invitation_count'] = Variable<int>(invitationCount);
     return map;
   }
 
@@ -438,7 +409,6 @@ class IdentityData extends DataClass implements Insertable<IdentityData> {
       recoveryType: recoveryType == null && nullToAbsent
           ? const Value.absent()
           : Value(recoveryType),
-      invitationCount: Value(invitationCount),
     );
   }
 
@@ -460,7 +430,6 @@ class IdentityData extends DataClass implements Insertable<IdentityData> {
       autoSync: serializer.fromJson<int>(json['autoSync']),
       allowConnectReq: serializer.fromJson<int>(json['allowConnectReq']),
       recoveryType: serializer.fromJson<String?>(json['recoveryType']),
-      invitationCount: serializer.fromJson<int>(json['invitationCount']),
     );
   }
   @override
@@ -479,7 +448,6 @@ class IdentityData extends DataClass implements Insertable<IdentityData> {
       'autoSync': serializer.toJson<int>(autoSync),
       'allowConnectReq': serializer.toJson<int>(allowConnectReq),
       'recoveryType': serializer.toJson<String?>(recoveryType),
-      'invitationCount': serializer.toJson<int>(invitationCount),
     };
   }
 
@@ -496,7 +464,6 @@ class IdentityData extends DataClass implements Insertable<IdentityData> {
     int? autoSync,
     int? allowConnectReq,
     Value<String?> recoveryType = const Value.absent(),
-    int? invitationCount,
   }) => IdentityData(
     identityId: identityId ?? this.identityId,
     displayName: displayName ?? this.displayName,
@@ -510,7 +477,6 @@ class IdentityData extends DataClass implements Insertable<IdentityData> {
     autoSync: autoSync ?? this.autoSync,
     allowConnectReq: allowConnectReq ?? this.allowConnectReq,
     recoveryType: recoveryType.present ? recoveryType.value : this.recoveryType,
-    invitationCount: invitationCount ?? this.invitationCount,
   );
   IdentityData copyWithCompanion(IdentityCompanion data) {
     return IdentityData(
@@ -542,9 +508,6 @@ class IdentityData extends DataClass implements Insertable<IdentityData> {
       recoveryType: data.recoveryType.present
           ? data.recoveryType.value
           : this.recoveryType,
-      invitationCount: data.invitationCount.present
-          ? data.invitationCount.value
-          : this.invitationCount,
     );
   }
 
@@ -562,8 +525,7 @@ class IdentityData extends DataClass implements Insertable<IdentityData> {
           ..write('passportVersion: $passportVersion, ')
           ..write('autoSync: $autoSync, ')
           ..write('allowConnectReq: $allowConnectReq, ')
-          ..write('recoveryType: $recoveryType, ')
-          ..write('invitationCount: $invitationCount')
+          ..write('recoveryType: $recoveryType')
           ..write(')'))
         .toString();
   }
@@ -582,7 +544,6 @@ class IdentityData extends DataClass implements Insertable<IdentityData> {
     autoSync,
     allowConnectReq,
     recoveryType,
-    invitationCount,
   );
   @override
   bool operator ==(Object other) =>
@@ -599,8 +560,7 @@ class IdentityData extends DataClass implements Insertable<IdentityData> {
           other.passportVersion == this.passportVersion &&
           other.autoSync == this.autoSync &&
           other.allowConnectReq == this.allowConnectReq &&
-          other.recoveryType == this.recoveryType &&
-          other.invitationCount == this.invitationCount);
+          other.recoveryType == this.recoveryType);
 }
 
 class IdentityCompanion extends UpdateCompanion<IdentityData> {
@@ -616,7 +576,6 @@ class IdentityCompanion extends UpdateCompanion<IdentityData> {
   final Value<int> autoSync;
   final Value<int> allowConnectReq;
   final Value<String?> recoveryType;
-  final Value<int> invitationCount;
   final Value<int> rowid;
   const IdentityCompanion({
     this.identityId = const Value.absent(),
@@ -631,7 +590,6 @@ class IdentityCompanion extends UpdateCompanion<IdentityData> {
     this.autoSync = const Value.absent(),
     this.allowConnectReq = const Value.absent(),
     this.recoveryType = const Value.absent(),
-    this.invitationCount = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   IdentityCompanion.insert({
@@ -647,7 +605,6 @@ class IdentityCompanion extends UpdateCompanion<IdentityData> {
     this.autoSync = const Value.absent(),
     this.allowConnectReq = const Value.absent(),
     this.recoveryType = const Value.absent(),
-    this.invitationCount = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : identityId = Value(identityId),
        displayName = Value(displayName);
@@ -664,7 +621,6 @@ class IdentityCompanion extends UpdateCompanion<IdentityData> {
     Expression<int>? autoSync,
     Expression<int>? allowConnectReq,
     Expression<String>? recoveryType,
-    Expression<int>? invitationCount,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -680,7 +636,6 @@ class IdentityCompanion extends UpdateCompanion<IdentityData> {
       if (autoSync != null) 'auto_sync': autoSync,
       if (allowConnectReq != null) 'allow_connect_req': allowConnectReq,
       if (recoveryType != null) 'recovery_type': recoveryType,
-      if (invitationCount != null) 'invitation_count': invitationCount,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -698,7 +653,6 @@ class IdentityCompanion extends UpdateCompanion<IdentityData> {
     Value<int>? autoSync,
     Value<int>? allowConnectReq,
     Value<String?>? recoveryType,
-    Value<int>? invitationCount,
     Value<int>? rowid,
   }) {
     return IdentityCompanion(
@@ -714,7 +668,6 @@ class IdentityCompanion extends UpdateCompanion<IdentityData> {
       autoSync: autoSync ?? this.autoSync,
       allowConnectReq: allowConnectReq ?? this.allowConnectReq,
       recoveryType: recoveryType ?? this.recoveryType,
-      invitationCount: invitationCount ?? this.invitationCount,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -758,9 +711,6 @@ class IdentityCompanion extends UpdateCompanion<IdentityData> {
     if (recoveryType.present) {
       map['recovery_type'] = Variable<String>(recoveryType.value);
     }
-    if (invitationCount.present) {
-      map['invitation_count'] = Variable<int>(invitationCount.value);
-    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -782,7 +732,6 @@ class IdentityCompanion extends UpdateCompanion<IdentityData> {
           ..write('autoSync: $autoSync, ')
           ..write('allowConnectReq: $allowConnectReq, ')
           ..write('recoveryType: $recoveryType, ')
-          ..write('invitationCount: $invitationCount, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -11286,7 +11235,6 @@ typedef $$IdentityTableCreateCompanionBuilder = IdentityCompanion Function({
   Value<int> autoSync,
   Value<int> allowConnectReq,
   Value<String?> recoveryType,
-  Value<int> invitationCount,
   Value<int> rowid,
 });
 typedef $$IdentityTableUpdateCompanionBuilder = IdentityCompanion Function({
@@ -11302,7 +11250,6 @@ typedef $$IdentityTableUpdateCompanionBuilder = IdentityCompanion Function({
   Value<int> autoSync,
   Value<int> allowConnectReq,
   Value<String?> recoveryType,
-  Value<int> invitationCount,
   Value<int> rowid,
 });
 
@@ -11437,11 +11384,6 @@ class $$IdentityTableFilterComposer
 
   ColumnFilters<String> get recoveryType => $composableBuilder(
     column: $table.recoveryType,
-    builder: (column) => ColumnFilters(column),
-  );
-
-  ColumnFilters<int> get invitationCount => $composableBuilder(
-    column: $table.invitationCount,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -11589,11 +11531,6 @@ class $$IdentityTableOrderingComposer
     column: $table.recoveryType,
     builder: (column) => ColumnOrderings(column),
   );
-
-  ColumnOrderings<int> get invitationCount => $composableBuilder(
-    column: $table.invitationCount,
-    builder: (column) => ColumnOrderings(column),
-  );
 }
 
 class $$IdentityTableAnnotationComposer
@@ -11654,11 +11591,6 @@ class $$IdentityTableAnnotationComposer
 
   GeneratedColumn<String> get recoveryType => $composableBuilder(
     column: $table.recoveryType,
-    builder: (column) => column,
-  );
-
-  GeneratedColumn<int> get invitationCount => $composableBuilder(
-    column: $table.invitationCount,
     builder: (column) => column,
   );
 
@@ -11782,7 +11714,6 @@ class $$IdentityTableTableManager
                 Value<int> autoSync = const Value.absent(),
                 Value<int> allowConnectReq = const Value.absent(),
                 Value<String?> recoveryType = const Value.absent(),
-                Value<int> invitationCount = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => IdentityCompanion(
                 identityId: identityId,
@@ -11797,7 +11728,6 @@ class $$IdentityTableTableManager
                 autoSync: autoSync,
                 allowConnectReq: allowConnectReq,
                 recoveryType: recoveryType,
-                invitationCount: invitationCount,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -11814,7 +11744,6 @@ class $$IdentityTableTableManager
                 Value<int> autoSync = const Value.absent(),
                 Value<int> allowConnectReq = const Value.absent(),
                 Value<String?> recoveryType = const Value.absent(),
-                Value<int> invitationCount = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => IdentityCompanion.insert(
                 identityId: identityId,
@@ -11829,7 +11758,6 @@ class $$IdentityTableTableManager
                 autoSync: autoSync,
                 allowConnectReq: allowConnectReq,
                 recoveryType: recoveryType,
-                invitationCount: invitationCount,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0

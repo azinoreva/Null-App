@@ -145,16 +145,6 @@ class IdentityDao extends DatabaseAccessor<AppDatabase>
     }
   }
 
-  /// Updates the invitation count.
-  Future<void> setInvitationCount(int invitationCount) async {
-    final current = await getCurrentIdentityOrNull();
-    if (current != null) {
-      await (update(db.identity)
-            ..where((t) => t.identityId.equals(current.identityId)))
-          .write(IdentityCompanion(invitationCount: Value(invitationCount)));
-    }
-  }
-
   /// Generic method to update arbitrary fields using a companion.
   /// Use this when you need to update multiple fields at once.
   Future<void> updateIdentityFields(IdentityCompanion companion) async {

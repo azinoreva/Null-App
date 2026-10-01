@@ -20,7 +20,6 @@ class Identity extends Table {
   IntColumn get autoSync => integer().withDefault(const Constant(0))();
   IntColumn get allowConnectReq => integer().withDefault(const Constant(0))();
   TextColumn get recoveryType => text().nullable()();
-  IntColumn get invitationCount => integer().withDefault(const Constant(1))();
 
   @override
   Set<Column> get primaryKey => {identityId};

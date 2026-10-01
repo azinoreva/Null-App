@@ -78,7 +78,6 @@ void main() async {
     unawaited(taskQueue.queueTask(
       functionName: 'checkDhDrops',
       args: const [],
-      serverId: MainServerClient.serverId,
     ));
   }
 }

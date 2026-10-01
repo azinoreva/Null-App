@@ -34,7 +34,6 @@ class CreateUserPostprocessResponse {
   final String securityToken;
   final int schemaVersion;
   final String recoveryType;
-  final int invitationCount;
   final String passport;
 
   CreateUserPostprocessResponse({
@@ -43,7 +42,6 @@ class CreateUserPostprocessResponse {
     required this.securityToken,
     required this.schemaVersion,
     required this.recoveryType,
-    required this.invitationCount,
     required this.passport
   });
 
@@ -54,7 +52,6 @@ class CreateUserPostprocessResponse {
       securityToken: json['security_token'] as String,
       schemaVersion: json['schema_version'] as int,
       recoveryType: json['recovery_type'] as String,
-      invitationCount: json['invitation_count'] as int,
       passport: json['passport'] as String
     );
   }

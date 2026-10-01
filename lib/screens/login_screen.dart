@@ -155,7 +155,6 @@ class _LoginScreenState extends State<LoginScreen> {
                 autoSync: 0,
                 allowConnectReq: 0,
                 recoveryType: null,
-                invitationCount: 1,
               ),
       );
               await const IdentityCrypto().ensureIdentityKey(database: database);
