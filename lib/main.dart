@@ -56,6 +56,11 @@ void main() async {
   appTaskQueue = taskQueue;
   appTaskQueueRef = taskQueue;
   final prefs = await SharedPreferences.getInstance();
+  if ((prefs.getBool('is_logged_in') ?? false) &&
+      await database.identityDao.getCurrentIdentityOrNull() == null) {
+    await prefs.setBool('is_logged_in', false);
+    await prefs.setBool('has_signed_up', true);
+  }
   runApp(
     ProviderScope(
       overrides: [

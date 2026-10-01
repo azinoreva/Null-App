@@ -567,10 +567,9 @@ class UpdatesFeedNotifier extends AsyncNotifier<UpdatesFeedState> {
     _settings!.addListener(_onSettingsChanged);
     ref.onDispose(() => _settings?.removeListener(_onSettingsChanged));
 
-    // Seed from the Hive cache so the feed renders immediately (and offline);
-    // the background refresh replaces it with fresh data once it lands.
+    // Seed from the Hive cache so the feed renders immediately (and offline).
+    // UpdatesScreen triggers a refresh whenever the route is entered.
     final cached = _cache.load();
-    _scheduleBackgroundRefresh();
     if (cached.isEmpty) return const UpdatesFeedState(isRefreshing: true);
     return UpdatesFeedState(
       posts: cached.map(_toPostData).toList(),
@@ -597,13 +596,6 @@ class UpdatesFeedNotifier extends AsyncNotifier<UpdatesFeedState> {
       if (a[i] != b[i]) return false;
     }
     return true;
-  }
-
-  void _scheduleBackgroundRefresh() {
-    // Defer to after this build so state updates never happen mid-build.
-    Future<void>.delayed(Duration.zero, () async {
-      await refresh();
-    });
   }
 
   /// Reloads the feed from the first page, using the current tags as the

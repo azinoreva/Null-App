@@ -15,6 +15,7 @@ import '../engine/functions_list.dart';
 import '../engine/functions/settings/settings.dart';
 import '../engine/database/init_db.dart';
 import '../engine/database/app_database.dart';
+import '../engine/crypto/chat/identity_crypto.dart';
 import '../engine/network/main_server_client.dart';
 import '../engine/securestore/password_verifier.dart';
 import '../engine/network/server_error_exception.dart';
@@ -157,6 +158,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 invitationCount: 1,
               ),
       );
+              await const IdentityCrypto().ensureIdentityKey(database: database);
       await LocalPasswordVerifier.save(password);
 
       final prefs = await SharedPreferences.getInstance();

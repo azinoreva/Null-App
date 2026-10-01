@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -28,6 +30,7 @@ class _UpdatesScreenState extends ConsumerState<UpdatesScreen> {
   @override
   void initState() {
     super.initState();
+    unawaited(ref.read(updatesFeedProvider.notifier).refresh());
     _scrollController.addListener(_handleScroll);
   }
 

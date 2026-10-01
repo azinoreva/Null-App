@@ -1,0 +1,160 @@
+import 'dart:async';
+
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../../engine/functions/servers/connect_serverfxn.dart' as server_connect;
+import '../../engine/network/api_client.dart';
+import '../../engine/network/auth_failure_handler.dart';
+import '../../engine/network/servers/servers.dart' as server_directory;
+import '../../state/providers.dart';
+import '../../widgets/app_theme.dart';
+import '../modals/server_list_modal.dart';
+import 'settings_widgets.dart';
+
+/// "Servers" leaf page: the networks and groups you are connected to.
+class ServersSettingsScreen extends ConsumerWidget {
+  const ServersSettingsScreen({super.key});
+
+  Future<void> _showConnectedServers(
+    BuildContext context,
+    WidgetRef ref,
+  ) async {
+    final serverList = ref.read(serverListProvider);
+    await serverList.init();
+    if (!context.mounted) return;
+
+    final servers =
+        serverList.servers.map((s) => ServerInfo.fromJson(s.toJson())).toList();
+
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => ServersListModal(
+        servers: servers,
+        action: ServerAction.disconnect,
+        onServerAction: (server) => _disconnectServer(ref, server),
+      ),
+    );
+  }
+
+  Future<void> _disconnectServer(WidgetRef ref, ServerInfo server) async {
+    final serverList = ref.read(serverListProvider);
+    await serverList.removeServer(server.serverId);
+    await ApiClient.unregisterServer(server.serverId);
+
+    // The shared server list notifies the SSE supervisor, which drops that
+    // server's subscription (see ServerConnectionService._syncToServerList).
+  }
+
+  Future<void> _showAddServer(BuildContext context, WidgetRef ref) async {
+    try {
+      final directory = server_directory.ServerDirectoryService();
+      final response = await directory.getServers();
+
+      final byId = {for (final s in response.servers) s.serverId: s};
+      final servers =
+          response.servers.map((s) => ServerInfo.fromJson(s.toJson())).toList();
+
+      if (!context.mounted) return;
+      showModalBottomSheet<void>(
+        context: context,
+        isScrollControlled: true,
+        backgroundColor: Colors.transparent,
+        builder: (context) => ServersListModal(
+          servers: servers,
+          action: ServerAction.connect,
+          title: 'Add a Server',
+          subtitle: 'Servers available to connect',
+          emptyMessage: 'No servers available',
+          onServerAction: (server) =>
+              _connectServer(context, ref, server, full: byId[server.serverId]),
+        ),
+      );
+    } catch (error) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not load servers: $error')),
+      );
+    }
+  }
+
+  Future<void> _connectServer(
+    BuildContext context,
+    WidgetRef ref,
+    ServerInfo server, {
+    server_directory.ServerInfo? full,
+  }) async {
+    // The modal only carries the four display fields; pull the full config
+    // from the directory response so nothing is lost when persisting.
+    if (full == null) return;
+
+    final serverList = ref.read(serverListProvider);
+    await serverList.init();
+
+    if (serverList.getServer(full.serverId) == null) {
+      await serverList.addServer(full.toConfig());
+    }
+
+    await ApiClient.registerServer(
+      serverId: full.serverId,
+      onAuthFailure: () {
+        unawaited(redirectToLogin());
+      },
+    );
+
+    // Exchange the passport saved at signup for this server's token pair.
+    final result = await server_connect.connectServerUsingPassport(
+      serverId: full.serverId,
+      database: ref.read(appDatabaseProvider),
+    );
+
+    if (!context.mounted) return;
+    final messenger = ScaffoldMessenger.of(context);
+    final message = switch (result.outcome) {
+      server_connect.ServerConnectOutcome.success =>
+        'Connected to ${full.serverName}.',
+      server_connect.ServerConnectOutcome.noPassport =>
+        'No passport found. Sign up again to obtain one.',
+      server_connect.ServerConnectOutcome.noIdentity =>
+        'No local identity found. Sign up again.',
+      server_connect.ServerConnectOutcome.failed =>
+        result.errorMessage != null
+            ? 'Could not connect: ${result.errorMessage}'
+            : 'Could not connect to the server.',
+    };
+    messenger.showSnackBar(SnackBar(content: Text(message)));
+
+    // Adding to the shared server list notifies the SSE supervisor, which
+    // registers the connection automatically (ServerConnectionService).
+  }
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final theme =
+        Theme.of(context).extension<AppColorScheme>() ?? AppColorScheme.dark;
+
+    return SettingsScaffold(
+      icon: Icons.dns_outlined,
+      title: 'Servers',
+      children: [
+        SettingsNavRow(
+          theme: theme,
+          icon: Icons.dns_outlined,
+          title: 'Connected Servers',
+          subtitle: 'View your active server connections.',
+          onTap: () => unawaited(_showConnectedServers(context, ref)),
+        ),
+        SettingsNavRow(
+          theme: theme,
+          icon: Icons.add_circle_outline,
+          title: 'Add a Server',
+          subtitle: 'Join a new network or group.',
+          onTap: () => unawaited(_showAddServer(context, ref)),
+          isAccent: true,
+        ),
+      ],
+    );
+  }
+}
