@@ -1,7 +1,6 @@
 // lib/services/connection_identity_service.dart
 import 'dart:io';
 import 'dart:math';
-import 'dart:typed_data';
 import 'dart:ui' as ui;
 
 import 'package:barcode/barcode.dart';

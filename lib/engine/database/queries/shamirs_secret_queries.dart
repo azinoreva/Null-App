@@ -11,7 +11,6 @@
 import 'package:drift/drift.dart';
 import '../app_database.dart';
 
-import '../app_database.dart';
 import '../tables/shamirs_secret.dart';
 
 part 'shamirs_secret_queries.g.dart';

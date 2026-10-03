@@ -12,7 +12,7 @@ typedef SoundErrorHandler = void Function(Object error, StackTrace stack);
 /// Respects [AppSettings.messageSound] — if the user has turned sounds off,
 /// [play] is a no-op unless you pass `force: true`.
 class MessageSound {
-  MessageSound._({SoundErrorHandler? onError}) : _onError = onError;
+  MessageSound._({SoundErrorHandler? onError}) : _onError = onError ?? _ignore;
 
   static final MessageSound instance = MessageSound._();
 

@@ -42,7 +42,7 @@ class SendContactReboundService {
    
 
     final response = await _dio.post(
-      '/api/connections/send_contact_rebound',
+      '/api/send_contact_rebound',
       options: Options(
         headers: {
           'accept': 'application/json',

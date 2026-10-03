@@ -2,7 +2,6 @@ import 'package:drift/drift.dart';
 import '../app_database.dart';
 
 import '../tables/networks.dart';
-import '../tables/contacts.dart';
 
 part 'network_queries.g.dart';
 

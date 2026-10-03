@@ -666,7 +666,9 @@ class UpdatesFeedNotifier extends AsyncNotifier<UpdatesFeedState> {
         if (!ApiClient.isRegistered(serverId)) {
           await ApiClient.registerServer(
             serverId: serverId,
-            onAuthFailure: () => unawaited(redirectToLogin()),
+            // Updates come from peer servers, each with its own token pair;
+            // one of them refusing must not sign the user out of the app.
+            onAuthFailure: serverAuthFailureCallbackFor(serverId),
           );
         }
 
@@ -729,10 +731,7 @@ class UpdatesFeedNotifier extends AsyncNotifier<UpdatesFeedState> {
       final updates = await _loadPage(reset: false);
       if (updates.isEmpty) {
         state = AsyncData(
-          current.copyWith(
-            isLoadingMore: false,
-            hasMore: _hasMoreServers,
-          ),
+          current.copyWith(isLoadingMore: false, hasMore: _hasMoreServers),
         );
         return;
       }

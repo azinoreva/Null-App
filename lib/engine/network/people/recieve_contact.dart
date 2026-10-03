@@ -58,7 +58,7 @@ class GetContactService {
     required String contactKey,
   }) async {
     final response = await _dio.post(
-      '/api/connections/get_contact',
+      '/api/get_contact',
       options: Options(
         headers: {
           'accept': 'application/json',

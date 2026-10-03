@@ -55,18 +55,20 @@ Future<void> sendTypedMessageTask(
   final replyTo = args.length > 6 ? args[6] as String? : null;
 
   final previous = _typedSendTails[conversationId] ?? Future<void>.value();
-  final current = previous.catchError((_) {}).then(
-    (_) => _sendTypedMessageTask(
-      conversationId,
-      messageType,
-      payloadJson,
-      serverId,
-      messageId,
-      logicalId,
-      replyTo,
-      database,
-    ),
-  );
+  final current = previous
+      .catchError((_) {})
+      .then(
+        (_) => _sendTypedMessageTask(
+          conversationId,
+          messageType,
+          payloadJson,
+          serverId,
+          messageId,
+          logicalId,
+          replyTo,
+          database,
+        ),
+      );
   _typedSendTails[conversationId] = current;
   try {
     await current;
@@ -94,14 +96,15 @@ Future<void> _sendTypedMessageTask(
   if (!ApiClient.isRegistered(serverId)) {
     await ApiClient.registerServer(
       serverId: serverId,
-      onAuthFailure: () {
-        unawaited(redirectToLogin());
-      },
+      // The message is going to a peer server, which holds its own token pair;
+      // its refusal costs this conversation, not the user's session.
+      onAuthFailure: serverAuthFailureCallbackFor(serverId),
     );
   }
 
-  final session =
-      await database.sessionsDao.getSessionByConversationId(conversationId);
+  final session = await database.sessionsDao.getSessionByConversationId(
+    conversationId,
+  );
   if (session?.status != 2) {
     throw StateError('Handshake is not established for $conversationId.');
   }
@@ -243,9 +246,7 @@ Future<SendMessageResponse> sendTypedMessage(
     nonce = Uint8List.fromList(
       base64Url.decode(encryptedWire['nonce'] as String),
     );
-    mac = Uint8List.fromList(
-      base64Url.decode(encryptedWire['mac'] as String),
-    );
+    mac = Uint8List.fromList(base64Url.decode(encryptedWire['mac'] as String));
     decryptedText = plaintextJson;
   } else {
     final envelope = ControlEnvelope(

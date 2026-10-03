@@ -14,6 +14,7 @@ import 'dart:convert';
 import 'package:dio/dio.dart';
 
 import '../../database/app_database.dart'; // AppDatabase, IdentityDao, IdentityData
+import '../../crypto/chat/identity_crypto.dart'; // IdentityCrypto
 import '../../crypto/shamirs/password_vault.dart'; // createPasswordVault, VaultResult
 import '../../network/auth/register.dart'; // registerNewUser
 import '../../network/server_error_exception.dart';
@@ -81,7 +82,9 @@ class RegistrationResult {
 ///    can be handed to trusted contacts later; this call only stores
 ///    them locally.
 /// 4. Makes the one network call, `POST /api/create-new-user-postprocess`,
-///    sending the encrypted payload as `encrypted_blob`.
+///    sending the encrypted payload as `encrypted_blob` and the base64url
+///    Ed25519 identity public key as `public_key` (the server signs the
+///    account's passport against it).
 /// 5. Saves the returned `securityToken` to secure storage.
 /// 6. Saves the returned `passport` to secure storage.
 /// 7. Writes an `Identity` row to the local database from the response,
@@ -99,8 +102,9 @@ class RegistrationResult {
 ///
 /// Every step is wrapped individually: if something fails partway
 /// through, [RegistrationResult.failed] reports which step
-/// (`encrypt_and_split`, `save_vault`, `network_call`,
-/// `save_security_token`, `save_passport`, or `save_identity`) and why.
+/// (`generate_identity_key`, `encrypt_and_split`, `save_vault`,
+/// `network_call`, `save_security_token`, `save_passport`, or
+/// `save_identity`) and why.
 /// Steps completed before the failure are NOT rolled back — e.g. a
 /// failure in `save_identity` still leaves the vault, token, passport,
 /// and server-side user in place. A subsequent call (without
@@ -123,6 +127,19 @@ Future<RegistrationResult> registerNewUser({
       }
       // Partial or no local state: fall through and run the full flow,
       // overwriting whatever partial state exists.
+    }
+
+    // 0. The Ed25519 identity keypair must exist before signup, because the
+    // server signs the account's passport against the public key we send.
+    final String publicKey;
+    try {
+      const identityCrypto = IdentityCrypto();
+      if (await identityCrypto.loadPrivateKey() == null) {
+        await identityCrypto.generateIdentityKey();
+      }
+      publicKey = base64UrlEncode(await identityCrypto.loadPublicKey());
+    } catch (e) {
+      return RegistrationResult.failed('generate_identity_key', e.toString());
     }
 
     // 1 & 2. Generate the key, encrypt the password, split the key.
@@ -149,6 +166,7 @@ Future<RegistrationResult> registerNewUser({
         pin: pin,
         password: password,
         encryptedBlob: encryptedBlob,
+        publicKey: publicKey,
       );
     } on ServerErrorException catch (e) {
       return RegistrationResult.failed('network_call', e.message);
@@ -187,6 +205,10 @@ Future<RegistrationResult> registerNewUser({
         // No shares have been handed to trusted contacts yet at
         // registration time.
         shamirNumber: 0,
+        // The Ed25519 key above is the passport/signing identity and stays
+        // in secure storage only. This column holds the X25519 DH key
+        // shared in contact cards, which IdentityCrypto.ensureIdentityKey
+        // writes on the next app start.
         publicKey: null,
         passportVersion: response.schemaVersion,
         autoSync: 0,

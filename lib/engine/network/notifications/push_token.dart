@@ -2,7 +2,7 @@ import 'package:dio/dio.dart';
 
 import '../api_client.dart';
 
-/// Represents the response of POST /api/account/push-notification-token
+/// Represents the response of POST /api/push-notification-token
 class PushNotificationTokenResponse {
   final String status;
   final String message;
@@ -49,7 +49,7 @@ class PushNotificationService {
     required String token,
   }) async {
     final response = await _dio.post(
-      '/api/account/push-notification-token',
+      '/api/push-notification-token',
       options: Options(
         headers: {
           'accept': 'application/json',

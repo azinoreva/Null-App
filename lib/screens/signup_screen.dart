@@ -5,7 +5,6 @@ import '../widgets/app_theme.dart';
 import '../widgets/buttons/send_button.dart' as send;
 import '../widgets/inputs/input_field.dart';
 import '../widgets/inputs/african_country_dropdown.dart';
-import '../widgets/buttons/transparent_button.dart';
 import '../widgets/display/icon.dart';
 import '../engine/database/init_db.dart';
 import '../engine/functions/auth/registerfxn.dart';

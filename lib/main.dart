@@ -25,18 +25,18 @@ import 'state/providers.dart';
 import 'engine/functions/settings/settings.dart';
 import 'utils/server_list.dart';
 
-/// App-wide handle on the SSE supervisor started once the user is logged in,
-/// so other code (screens, providers) can inspect connection statuses or
-/// register SSE event handlers.
+/// App-wide handle on the server-socket supervisor started once the user is
+/// logged in, so other code (screens, providers) can inspect connection
+/// statuses or reach the underlying hub.
 ServerConnectionService? appServerConnections;
 
-/// The newest [TaskQueue] created at startup; used to (re)start the SSE
-/// supervisor outside of [main] (e.g. right after a login).
+/// The newest [TaskQueue] created at startup; used to (re)start the server
+/// socket supervisor outside of [main] (e.g. right after a login).
 TaskQueue? appTaskQueue;
 
-/// The app's single server-list instance, shared between the SSE supervisor
+/// The app's single server-list instance, shared between the socket supervisor
 /// and the settings screen so connecting/disconnecting a server stays in
-/// sync with the live subscriptions.
+/// sync with the live connections.
 final ServerListService appServerList = ServerListService();
 
 void main() async {
@@ -74,21 +74,20 @@ void main() async {
   );
 
   if (prefs.getBool('is_logged_in') ?? false) {
-    unawaited(startSseConnections());
-    unawaited(taskQueue.queueTask(
-      functionName: 'checkDhDrops',
-      args: const [],
-    ));
+    unawaited(startServerConnections());
+    unawaited(
+      taskQueue.queueTask(functionName: 'checkDhDrops', args: const []),
+    );
   }
 }
 
-/// Loads the persisted server list and keeps every listed server's SSE
-/// subscription connected for the lifetime of the app.
+/// Loads the persisted server list and keeps every listed server's WebSocket
+/// open for the lifetime of the app.
 ///
 /// Idempotent: reuses the running [appServerConnections] supervisor when one
 /// exists (e.g. a second login), and rebuilds it if it was torn down (e.g.
 /// after a logout).
-Future<void> startSseConnections() async {
+Future<void> startServerConnections() async {
   final taskQueue = appTaskQueue;
   if (taskQueue == null) return;
   appServerConnections ??= ServerConnectionService(

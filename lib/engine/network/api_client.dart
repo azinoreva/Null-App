@@ -61,6 +61,11 @@ class ApiClient {
 
   static bool isRegistered(String serverId) => _clients.containsKey(serverId);
 
+  /// True when a request opted out of the bearer-token/401-refresh chain via
+  /// `Options(extra: {'skipAuth': true})`.
+  static bool _isSkipped(RequestOptions options) =>
+      options.extra['skipAuth'] == true;
+
   /// Registers a server, creating a Dio instance for it with its own
   /// request/response interceptors for auth. Safe to call again for the
   /// same [serverId] (e.g. to update its baseUrl) — this replaces the
@@ -87,15 +92,22 @@ class ApiClient {
         baseUrl: resolvedBaseUrl,
         connectTimeout: connectTimeout,
         receiveTimeout: receiveTimeout,
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: {'Content-Type': 'application/json'},
       ),
     );
 
     dio.interceptors.add(
       InterceptorsWrapper(
         onRequest: (options, handler) async {
+          // Requests that carry their own credential (e.g. the passport /
+          // challenge-answer handshake in enter_server.dart) opt out with
+          // `extra: {'skipAuth': true}`. They must not receive a bearer token
+          // — and, more importantly, must not go through the 401 chain below,
+          // which would log the user out over a refused passport.
+          if (_isSkipped(options)) {
+            handler.next(options);
+            return;
+          }
           final accessToken = await getAccessToken(serverId);
           if (accessToken != null) {
             options.headers['Authorization'] = 'Bearer $accessToken';
@@ -103,6 +115,11 @@ class ApiClient {
           handler.next(options);
         },
         onError: (DioException error, handler) async {
+          if (_isSkipped(error.requestOptions)) {
+            handler.next(error);
+            return;
+          }
+
           final statusCode = error.response?.statusCode;
 
           if (statusCode != null && statusCode >= 400 && statusCode != 401) {
@@ -178,8 +195,7 @@ class ApiClient {
   // --- Token storage, scoped per server ---------------------------------
 
   static String _accessTokenKey(String serverId) => 'access_token_$serverId';
-  static String _refreshTokenKey(String serverId) =>
-      'refresh_token_$serverId';
+  static String _refreshTokenKey(String serverId) => 'refresh_token_$serverId';
 
   /// Reads [serverId]'s access token from secure storage, or null if not
   /// signed in to that server.
@@ -198,10 +214,7 @@ class ApiClient {
     required String refreshToken,
   }) async {
     await _storage.write(key: _accessTokenKey(serverId), value: accessToken);
-    await _storage.write(
-      key: _refreshTokenKey(serverId),
-      value: refreshToken,
-    );
+    await _storage.write(key: _refreshTokenKey(serverId), value: refreshToken);
   }
 
   /// Refreshes [serverId]'s access token via that server's `/api/refresh`
@@ -281,8 +294,8 @@ class ApiClient {
     final map = data is Map
         ? data
         : data is String && data.isNotEmpty
-            ? _tryDecodeJson(data)
-            : null;
+        ? _tryDecodeJson(data)
+        : null;
     if (map != null) {
       final detail = map['detail'];
       if (detail != null && detail.toString().isNotEmpty) {

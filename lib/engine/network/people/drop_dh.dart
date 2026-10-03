@@ -26,7 +26,7 @@ class DhDropService {
     required String dhEncNonce,
   }) async {
     await _dio.post(
-      '/api/connections/dh-drop',
+      '/api/dh-drop',
       options: Options(
         headers: {
           'accept': 'application/json',

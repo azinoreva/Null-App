@@ -51,7 +51,7 @@ class CheckDhDropsService {
   /// by MainServerClient's interceptors.
   Future<List<DhDrop>> checkDhDrops() async {
     final response = await _dio.post(
-      '/api/connections/check_dh_drops',
+      '/api/check_dh_drops',
       options: Options(
         headers: {
           'accept': 'application/json',

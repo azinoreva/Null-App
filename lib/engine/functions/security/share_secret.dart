@@ -19,9 +19,7 @@ import 'package:drift/drift.dart' show Value;
 import '../../database/app_database.dart'; // AppDatabase
 import '../../crypto/shamirs/password_vault.dart'; // VaultResult
 import '../../crypto/shamirs/shamir_secret.dart' show Share;
-import '../../database/queries/shamirs_secret_queries.dart'; // ShamirsSecretDao, ShamirsSecret, ShamirsSecretCompanion
 import '../../crypto/shamirs/vault_secrets.dart'; // getVaultFromSecureStorage, saveVaultToSecureStorage, kShamirSecretStorageKey
-import '../../database/app_database.dart' show IdentityCompanion; // for the shamirNumber update
 
 // Total shares a vault is split into (see _shamirTotalShares in
 // password_vault.dart) — used to bound the shamirNumber counter below.

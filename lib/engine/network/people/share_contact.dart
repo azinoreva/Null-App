@@ -73,7 +73,7 @@ class SendContactService {
     );
 
     final response = await _dio.post(
-      '/api/connections/send_contact',
+      '/api/send_contact',
       options: Options(
         headers: {
           'accept': 'application/json',

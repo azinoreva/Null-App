@@ -110,6 +110,7 @@ class UserRegistrationService {
     required String pin,
     required String password,
     required String encryptedBlob,
+    required String publicKey,
   }) async {
     final response = await _client.post(
       '/api/create-new-user-postprocess',
@@ -124,6 +125,7 @@ class UserRegistrationService {
         'pin': pin,
         'password': password,
         'encrypted_blob': encryptedBlob,
+        'public_key': publicKey,
       },
     );
 

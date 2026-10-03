@@ -3,7 +3,8 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../engine/functions/servers/connect_serverfxn.dart' as server_connect;
+import '../../engine/functions/servers/connect_serverfxn.dart'
+    as server_connect;
 import '../../engine/network/api_client.dart';
 import '../../engine/network/auth_failure_handler.dart';
 import '../../engine/network/servers/servers.dart' as server_directory;
@@ -24,8 +25,9 @@ class ServersSettingsScreen extends ConsumerWidget {
     await serverList.init();
     if (!context.mounted) return;
 
-    final servers =
-        serverList.servers.map((s) => ServerInfo.fromJson(s.toJson())).toList();
+    final servers = serverList.servers
+        .map((s) => ServerInfo.fromJson(s.toJson()))
+        .toList();
 
     showModalBottomSheet<void>(
       context: context,
@@ -54,8 +56,9 @@ class ServersSettingsScreen extends ConsumerWidget {
       final response = await directory.getServers();
 
       final byId = {for (final s in response.servers) s.serverId: s};
-      final servers =
-          response.servers.map((s) => ServerInfo.fromJson(s.toJson())).toList();
+      final servers = response.servers
+          .map((s) => ServerInfo.fromJson(s.toJson()))
+          .toList();
 
       if (!context.mounted) return;
       showModalBottomSheet<void>(
@@ -74,9 +77,9 @@ class ServersSettingsScreen extends ConsumerWidget {
       );
     } catch (error) {
       if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Could not load servers: $error')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Could not load servers: $error')));
     }
   }
 
@@ -99,9 +102,10 @@ class ServersSettingsScreen extends ConsumerWidget {
 
     await ApiClient.registerServer(
       serverId: full.serverId,
-      onAuthFailure: () {
-        unawaited(redirectToLogin());
-      },
+      // A server added here is a peer with its own token pair; the passport
+      // exchange below is what earns it one. Refusing us must not log the
+      // user out of the app.
+      onAuthFailure: serverAuthFailureCallbackFor(full.serverId),
     );
 
     // Exchange the passport saved at signup for this server's token pair.
@@ -119,6 +123,15 @@ class ServersSettingsScreen extends ConsumerWidget {
         'No passport found. Sign up again to obtain one.',
       server_connect.ServerConnectOutcome.noIdentity =>
         'No local identity found. Sign up again.',
+      server_connect.ServerConnectOutcome.noIdentityKey =>
+        'Your identity key is missing, so the server could not verify you. '
+            'Sign up again.',
+      server_connect.ServerConnectOutcome.challengeExpired =>
+        'The server challenge expired before it could be answered. Try again.',
+      server_connect.ServerConnectOutcome.passportRejected =>
+        result.errorMessage != null
+            ? 'Could not connect: ${result.errorMessage}'
+            : 'The server rejected your passport.',
       server_connect.ServerConnectOutcome.failed =>
         result.errorMessage != null
             ? 'Could not connect: ${result.errorMessage}'

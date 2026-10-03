@@ -20,7 +20,7 @@ class ServerInfo {
   final String serverName;
   final String serverUrl;
   final ServerType serverType;
-  final int maxPayload;          // max text length for a post message
+  final int maxPayload; // max text length for a post message
   final String colour;
   final String about;
   final List<String>? categories; // backend: Optional[List[Categories]]
@@ -71,44 +71,41 @@ class ServerInfo {
   }
 
   Map<String, dynamic> toJson() => {
-        'serverId': serverId,
-        'serverName': serverName,
-        'serverUrl': serverUrl,
-        'serverType': serverType.toJson(),
-        'maxPayload': maxPayload,
-        'colour': colour,
-        'about': about,
-        'annotated': annotated,
-        'disabled': disabled,
-        'location': location,
-        'categories': categories,
-        'media': media?.toJson(),
-      };
+    'serverId': serverId,
+    'serverName': serverName,
+    'serverUrl': serverUrl,
+    'serverType': serverType.toJson(),
+    'maxPayload': maxPayload,
+    'colour': colour,
+    'about': about,
+    'annotated': annotated,
+    'disabled': disabled,
+    'location': location,
+    'categories': categories,
+    'media': media?.toJson(),
+  };
 
   /// The persistable form of this server. Both models carry the same
   /// fields, so nothing is dropped on the way into the local list.
   ServerConfig toConfig() => ServerConfig(
-        serverId: serverId,
-        serverName: serverName,
-        serverUrl: serverUrl,
-        serverType: serverType,
-        maxPayload: maxPayload,
-        colour: colour,
-        about: about,
-        annotated: annotated,
-        disabled: disabled,
-        location: location,
-        categories: categories,
-        media: media,
-      );
+    serverId: serverId,
+    serverName: serverName,
+    serverUrl: serverUrl,
+    serverType: serverType,
+    maxPayload: maxPayload,
+    colour: colour,
+    about: about,
+    annotated: annotated,
+    disabled: disabled,
+    location: location,
+    categories: categories,
+    media: media,
+  );
 
   @override
   String toString() =>
       'ServerInfo(serverId: $serverId, serverName: $serverName, serverUrl: $serverUrl)';
 }
-
-
-
 
 class ServerListResponse {
   final List<ServerInfo> servers;
@@ -134,11 +131,7 @@ class ServerDirectoryService {
   Future<ServerListResponse> getServers() async {
     final response = await MainServerClient.dio.get(
       '/api/servers',
-      options: Options(
-        headers: {
-          'accept': 'application/json',
-        },
-      ),
+      options: Options(headers: {'accept': 'application/json'}),
     );
 
     return ServerListResponse.fromJson(response.data as Map<String, dynamic>);
@@ -151,9 +144,15 @@ class ServerDirectoryService {
   ///
   /// Note: registering a server here only creates its Dio client — it does
   /// NOT by itself give that server valid tokens. You still need to obtain
-  /// and save an access/refresh token pair for each new server (e.g. via
-  /// your credentials exchange flow) before requests to it will succeed;
-  /// until then, its requests will 401 and immediately hit [onAuthFailure].
+  /// and save an access/refresh token pair for each new server (e.g. via the
+  /// passport/challenge exchange in connectServerUsingPassport) before requests
+  /// to it will succeed; until then, its requests will 401 and hit
+  /// [onAuthFailureFor].
+  ///
+  /// Servers from the directory are peers, so their auth failure must never
+  /// sign the user out — only the main server's can. [onAuthFailureFor] is
+  /// still passed in per server so the caller can decide; use
+  /// [serverAuthFailureCallbackFor] to get the standard behaviour.
   ///
   /// Returns the list of servers that were (re-)registered.
   Future<List<ServerInfo>> discoverAndRegisterServers({
@@ -181,5 +180,3 @@ class ServerDirectoryService {
     return result.servers;
   }
 }
-
-

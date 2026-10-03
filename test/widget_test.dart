@@ -8,6 +8,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'package:null_app/engine/functions/settings/settings.dart';
 import 'package:null_app/main.dart';
 import 'package:null_app/screens/signup_screen.dart';
 
@@ -18,6 +19,7 @@ void main() {
       'is_logged_in': false,
       'has_signed_up': false,
     });
+    await AppSettings.init();
 
     await tester.pumpWidget(const MyApp());
     await tester.pump();

@@ -142,12 +142,19 @@ class TaskPayload {
     required this.functionArgs,
     required this.blobs,
     this.taskData,
+    this.serverId,
   });
 
   final String taskId;
   final List<dynamic> functionArgs;
   final List<Uint8List?> blobs;
   final String? taskData;
+
+  /// Which server this task belongs to, when it was queued against one.
+  ///
+  /// Incoming message tasks need it to acknowledge receipt back to the server
+  /// that delivered the message once it has been persisted locally.
+  final String? serverId;
 
   dynamic operator [](int index) => functionArgs[index];
 
@@ -348,6 +355,7 @@ class _EngineWorker {
       functionName: row.functionName,
       functionArgsJson: row.functionArgs,
       taskData: row.taskData,
+      serverId: row.serverId,
       blobs: [
         row.blobparam1,
         row.blobparam2,
@@ -397,6 +405,7 @@ class _EngineWorker {
           functionArgs: decodedArgs,
           blobs: task.blobs,
           taskData: task.taskData,
+          serverId: task.serverId,
         );
         definition.databaseExecutor!(payload, database).then(
           (_) => finish(_WorkerResult.success(task.taskId)),
@@ -418,6 +427,7 @@ class _EngineWorker {
         functionArgsJson: task.functionArgsJson,
         blobs: task.blobs,
         taskData: task.taskData,
+        serverId: task.serverId,
         replyPort: replyPort.sendPort,
       ),
       onError: errorPort.sendPort,
@@ -489,6 +499,7 @@ class _TaskClaim {
     required this.functionArgsJson,
     required this.blobs,
     required this.taskData,
+    required this.serverId,
   });
 
   final String taskId;
@@ -496,6 +507,7 @@ class _TaskClaim {
   final String functionArgsJson;
   final List<Uint8List?> blobs;
   final String? taskData;
+  final String? serverId;
 }
 
 class _RunningWorker {
@@ -519,6 +531,7 @@ class _WorkerRequest {
     required this.blobs,
     required this.taskData,
     required this.replyPort,
+    required this.serverId,
   });
 
   final String taskId;
@@ -526,6 +539,7 @@ class _WorkerRequest {
   final String functionArgsJson;
   final List<Uint8List?> blobs;
   final String? taskData;
+  final String? serverId;
   final SendPort replyPort;
 }
 
@@ -567,6 +581,7 @@ void _workerEntryPoint(_WorkerRequest req) async {
       functionArgs: decodedArgs,
       blobs: req.blobs,
       taskData: req.taskData,
+      serverId: req.serverId,
     );
 
     final executor = definition.executor;

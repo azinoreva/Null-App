@@ -6,29 +6,29 @@ import '../../utils/server_list.dart';
 import '../task_queue.dart';
 import 'api_client.dart';
 import 'auth_failure_handler.dart';
-import 'chats/sse_connect.dart';
+import 'chats/ws_connect.dart';
 
-/// Live link state for one server's SSE subscription.
-enum SseStatus {
+/// Live link state for one server's WebSocket connection.
+enum WsStatus {
   /// The connection is being (re)opened.
   connecting,
 
-  /// The stream is open and receiving events.
+  /// The socket is open and able to push messages.
   connected,
 
-  /// The stream dropped; the watchdog will bring it back.
+  /// The socket dropped; the watchdog will bring it back.
   reconnecting,
 
   /// The server is not currently watched.
   idle,
 }
 
-/// Ties the persisted [ServerListService] to the app's live SSE subscriptions.
+/// Ties the persisted [ServerListService] to the app's live server sockets.
 ///
 /// On [start] it loads the server list, registers every server with
-/// [ApiClient], and opens an [SseHub] subscription for each one. Afterwards it
+/// [ApiClient], and opens a [WsHub] socket for each one. Afterwards it
 /// keeps in step with the list (servers added later get connected, removed
-/// ones get dropped) and runs a watchdog so no server's stream is ever left
+/// ones get dropped) and runs a watchdog so no server's socket is ever left
 /// down for long — the underlying hub reconnects each connection with its own
 /// exponential backoff, and [statuses] lets the UI reflect all of it.
 ///
@@ -38,15 +38,14 @@ enum SseStatus {
 ///   serverList: ServerListService(),
 ///   taskQueue: taskQueue,
 /// );
-/// await service.start(); // load list + connect every server's SSE
-/// service.statuses;       // Map<serverId, SseStatus>
+/// await service.start(); // load list + open every server's socket
+/// service.statuses;       // Map<serverId, WsStatus>
 /// ```
 class ServerConnectionService extends ChangeNotifier {
   ServerConnectionService({
     required this._serverList,
     required this._taskQueue,
-    Future<void> Function()? onAuthFailure,
-  }) : _onAuthFailure = onAuthFailure ?? redirectToLogin;
+  });
 
   /// How often the watchdog re-checks the list and re-opens anything that
   /// slipped through (the hub also reconnects internally on its own cadence).
@@ -54,42 +53,41 @@ class ServerConnectionService extends ChangeNotifier {
 
   final ServerListService _serverList;
   final TaskQueue _taskQueue;
-  final Future<void> Function() _onAuthFailure;
 
-  SseHub? _hub;
+  WsHub? _hub;
   bool _started = false;
   Timer? _watchdog;
 
-  final Map<String, SseStatus> _statuses = {};
+  final Map<String, WsStatus> _statuses = {};
 
   /// Live connection status per server id.
-  Map<String, SseStatus> get statuses => Map.unmodifiable(_statuses);
+  Map<String, WsStatus> get statuses => Map.unmodifiable(_statuses);
 
-  /// The underlying hub (null until [start]); useful for registering SSE
-  /// event handlers, e.g. `service.hub?.on('message', ...)`.
-  SseHub? get hub => _hub;
+  /// The underlying hub (null until [start]); useful for pushing messages
+  /// over a server's socket, e.g. `service.hub?.send(serverId, message)`.
+  WsHub? get hub => _hub;
 
-  /// Loads the server list and opens an SSE subscription for every server in
-  /// it, then keeps them alive. Safe to call once.
+  /// Loads the server list and opens a socket for every server in it, then
+  /// keeps them alive. Safe to call once.
   Future<void> start() async {
     if (_started) return;
     _started = true;
 
     await _serverList.init();
 
-    final hub = SseHub(taskQueue: _taskQueue);
+    final hub = WsHub(taskQueue: _taskQueue);
     _hub = hub;
 
     hub.onConnected((serverId) {
-      _statuses[serverId] = SseStatus.connected;
+      _statuses[serverId] = WsStatus.connected;
       notifyListeners();
     });
     hub.onDisconnected((serverId) {
-      _statuses[serverId] = SseStatus.reconnecting;
+      _statuses[serverId] = WsStatus.reconnecting;
       notifyListeners();
     });
     hub.onError((serverId, error) {
-      _statuses[serverId] = SseStatus.reconnecting;
+      _statuses[serverId] = WsStatus.reconnecting;
       notifyListeners();
     });
 
@@ -141,17 +139,27 @@ class ServerConnectionService extends ChangeNotifier {
     for (final server in wanted.values) {
       if (hub.activeServerIds.contains(server.serverId)) continue;
 
+      // Server ids are arbitrary, so this is the one place that knows which
+      // of them is the main server. It decides two things downstream: which
+      // token pair the socket uses, and whether a refusal here may sign the
+      // user out (only the main server's may).
+      final isMainServer = isMainServerId(server.serverId);
+
       if (!ApiClient.isRegistered(server.serverId)) {
         await ApiClient.registerServer(
           serverId: server.serverId,
-          onAuthFailure: () => unawaited(_onAuthFailure()),
+          onAuthFailure: serverAuthFailureCallbackFor(server.serverId),
         );
       }
 
-      _statuses[server.serverId] = SseStatus.connecting;
+      _statuses[server.serverId] = WsStatus.connecting;
       notifyListeners();
 
-      await hub.addServer(server.serverId, server.serverUrl);
+      await hub.addServer(
+        server.serverId,
+        server.serverUrl,
+        isMainServer: isMainServer,
+      );
     }
   }
 

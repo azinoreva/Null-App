@@ -20,7 +20,7 @@ class ClearDhInboxService {
   /// by MainServerClient's interceptors.
   Future<bool> clearDhInbox() async {
     final response = await _dio.post(
-      '/api/connections/clear_dh_inbox',
+      '/api/clear_dh_inbox',
       options: Options(
         headers: {
           'accept': 'application/json',

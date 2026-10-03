@@ -36,7 +36,7 @@ class Sessions extends Table {
   BlobColumn get symmetricKey => blob().nullable()();
 
   // 1 once we have successfully dropped our ephemeral public key into the
-  // contact's server-side inbox (/api/connections/dh-drop). Lets the
+    // contact's server-side inbox (/api/dh-drop). Lets the
   // drop/check flow distinguish "we haven't dropped yet" from "we dropped
   // but never completed", without re-dropping on every retry.
   IntColumn get dropSent =>

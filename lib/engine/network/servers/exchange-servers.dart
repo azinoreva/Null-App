@@ -2,7 +2,7 @@ import 'package:dio/dio.dart';
 
 import '../api_client.dart';
 
-/// Represents the payload sent to POST /exchange-servers.
+/// Represents the payload sent to POST /api/exchange-servers.
 class UserIdRequest {
   final String userId;
 
@@ -40,7 +40,7 @@ class ExchangeServersService {
     required String userId,
   }) async {
     final response = await ApiClient.instance(serverId).post(
-      '/exchange-servers',
+      '/api/exchange-servers',
       options: Options(
         headers: {
           'accept': 'application/json',

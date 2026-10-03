@@ -81,7 +81,7 @@ Future<IncomingMessageResult> handlePin({
     rawMessage: ctx.rawMessage,
   );
   if (await syncStateDao.getSyncStateById(ctx.conversationId) != null) {
-    await syncStateDao.setPinned(ctx.conversationId, 1);
+    await syncStateDao.setPinned(ctx.conversationId, pinned: 1);
   }
   return IncomingMessageResult(
     type: MessageType.pin,
@@ -108,7 +108,7 @@ Future<IncomingMessageResult> handleUnpin({
     rawMessage: ctx.rawMessage,
   );
   if (await syncStateDao.getSyncStateById(ctx.conversationId) != null) {
-    await syncStateDao.setPinned(ctx.conversationId, 0);
+    await syncStateDao.setPinned(ctx.conversationId, pinned: 0);
   }
   return IncomingMessageResult(
     type: MessageType.unpin,

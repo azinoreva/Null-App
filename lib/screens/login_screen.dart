@@ -157,7 +157,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 recoveryType: null,
               ),
       );
-              await const IdentityCrypto().ensureIdentityKey(database: database);
+      await const IdentityCrypto().ensureIdentityKey(database: database);
       await LocalPasswordVerifier.save(password);
 
       final prefs = await SharedPreferences.getInstance();
@@ -165,7 +165,7 @@ class _LoginScreenState extends State<LoginScreen> {
       await prefs.setBool('is_logged_in', true);
       await prefs.setString(_savedPhoneNumberKey, _fullPhoneNumber);
 
-      unawaited(startSseConnections());
+      unawaited(startServerConnections());
 
       if (!mounted) return;
       Navigator.of(context).pushAndRemoveUntil(

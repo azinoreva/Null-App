@@ -1,6 +1,7 @@
 // module name: send_chat_message
 
 import 'dart:convert';
+
 import 'package:uuid/uuid.dart';
 import 'package:drift/drift.dart';
 
@@ -26,9 +27,9 @@ Future<void> sendQueuedChatMessage(
 ) async {
   final conversationId = args[0] as String;
   final previous = _sendTails[conversationId] ?? Future<void>.value();
-  final current = previous.catchError((_) {}).then(
-    (_) => _sendQueuedChatMessage(args, database),
-  );
+  final current = previous
+      .catchError((_) {})
+      .then((_) => _sendQueuedChatMessage(args, database));
   _sendTails[conversationId] = current;
   try {
     await current;
@@ -57,9 +58,9 @@ Future<void> _sendQueuedChatMessage(
   if (!ApiClient.isRegistered(serverId)) {
     await ApiClient.registerServer(
       serverId: serverId,
-      onAuthFailure: () async {
-        await redirectToLogin();
-      },
+      // Peer server, own token pair — a refusal here must not sign the user
+      // out of the app.
+      onAuthFailure: serverAuthFailureCallbackFor(serverId),
     );
   }
 

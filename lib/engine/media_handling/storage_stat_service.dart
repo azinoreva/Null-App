@@ -95,7 +95,7 @@ class StorageStatsService {
 
   static Future<int> _getDeviceTotalBytes() async {
     try {
-      final totalMB = await DiskSpacePlus.getTotalDiskSpace; // MB, per disk_space_plus
+      final totalMB = await DiskSpacePlus().getTotalDiskSpace; // MB, per disk_space_plus
       if (totalMB == null) return 0;
       return (totalMB * 1024 * 1024).round();
     } catch (_) {

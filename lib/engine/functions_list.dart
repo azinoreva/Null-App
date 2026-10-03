@@ -20,6 +20,7 @@ import 'database/queries/tasks_queries.dart';
 import 'engine.dart';
 import 'task_queue.dart';
 import 'network/servers/servers.dart';
+import 'network/chats/message_ack.dart';
 import 'crypto/shamirs/vault_secrets.dart';
 import 'functions/auth/loginfxn.dart' as auth_login;
 import 'functions/auth/registerfxn.dart' as auth_register;
@@ -115,10 +116,8 @@ final Map<String, dynamic> functionRegistry = {
     ),
 };
 
-Future<void> _sendChatMessageTask(
-  TaskPayload payload,
-  AppDatabase database,
-) => chat_send.sendQueuedChatMessage(payload.functionArgs, database);
+Future<void> _sendChatMessageTask(TaskPayload payload, AppDatabase database) =>
+    chat_send.sendQueuedChatMessage(payload.functionArgs, database);
 
 Future<void> _receiveQueuedMessageTask(
   TaskPayload payload,
@@ -139,10 +138,31 @@ Future<void> _receiveQueuedMessageTask(
   }
   final identityCrypto = const IdentityCrypto();
 
+  final serverId = payload.serverId;
+
+  void ackPersisted() {
+    // The server keeps its copy until we say we've stored ours. Only reached
+    // once the message is durably in the local database.
+    if (serverId == null) return;
+    ReceivedMessageAcks.instance.record(serverId, messageId);
+  }
+
+  // Delivery is at-least-once: a message that arrived but wasn't acknowledged
+  // before the app died comes back on the next connect. `messageId` is the
+  // primary key and `insertMessage` is a plain insert, so replaying one we
+  // already stored would fail this task forever and the server would never get
+  // its copy released. Treat "already stored" as done.
+  if (await database.messagesDao.getMessageById(messageId) != null) {
+    ackPersisted();
+    return;
+  }
+
   if (messageType == MessageType.exchange.value) {
     // The message-type-0 signature handshake was retired in favor of the
     // main-server DH-drop flow. Any stale envelopes still arriving are
-    // dropped on the floor instead of failing the receive task.
+    // dropped on the floor instead of failing the receive task. The drop is
+    // deliberate and terminal, so the server's copy is released too.
+    ackPersisted();
     return;
   }
 
@@ -165,6 +185,11 @@ Future<void> _receiveQueuedMessageTask(
     logicalId: logicalId,
     rawMessage: rawMessage,
   );
+
+  // Persisted: tell the server it can stop holding this message. Nothing above
+  // this line acks, so a decryption or insert failure leaves the message
+  // queued server-side and it is delivered again.
+  ackPersisted();
 }
 
 class FunctionsList {
@@ -607,9 +632,11 @@ class FunctionsList {
   static Future<dynamic> connectServerUsingPassport({
     required String serverId,
     required AppDatabase database,
+    String? invitePin,
   }) => server_connect.connectServerUsingPassport(
     serverId: serverId,
     database: database,
+    invitePin: invitePin,
   );
 
   //other

@@ -2,7 +2,7 @@ import 'package:dio/dio.dart';
 
 import '../api_client.dart';
 
-/// Represents the response of POST /api/account/push-notification-token
+/// Represents the response of POST /api/push-notification-token
 class PushNotificationTokenResponse {
   final String status;
   final String message;
@@ -41,7 +41,7 @@ enum PushNotificationType {
   String get wireValue => name;
 }
 
-/// Represents the response of POST /api/account/send_push_notification.
+/// Represents the response of POST /api/send_push_notification.
 ///
 /// No response body was shown for this endpoint, so this assumes the same
 /// {status, message} shape as the token-update endpoint above. If the real
@@ -81,7 +81,7 @@ class PushNotificationService {
     required String token,
   }) async {
     final response = await _dio.post(
-      '/api/account/push-notification-token',
+      '/api/push-notification-token',
       options: Options(
         headers: {
           'accept': 'application/json',
@@ -113,7 +113,7 @@ class PushNotificationService {
     String? message,
   }) async {
     final response = await _dio.post(
-      '/api/account/send_push_notification',
+      '/api/send_push_notification',
       options: Options(
         headers: {
           'accept': 'application/json',

@@ -2,7 +2,7 @@ import 'package:dio/dio.dart';
 
 import '../api_client.dart';
 
-/// Represents the payload sent to POST /add-servers.
+/// Represents the payload sent to POST /api/add-servers.
 class Servers {
   final List<String> serverIds;
 
@@ -15,7 +15,7 @@ class Servers {
   }
 }
 
-/// Represents the response of POST /add-servers,
+/// Represents the response of POST /api/add-servers,
 /// i.e. { "message": "Servers saved successfully" }
 class AddServersResponse {
   final String message;
@@ -30,7 +30,7 @@ class AddServersResponse {
 }
 
 class AddServersService {
-  /// Sends a list of [serverIds] to POST /add-servers.
+  /// Sends a list of [serverIds] to POST /api/add-servers.
   ///
   /// Auth (Bearer access token) and refresh-on-401 are handled automatically
   /// by ApiClient's interceptors, where applicable.
@@ -39,7 +39,7 @@ class AddServersService {
     required List<String> serverIds,
   }) async {
     final response = await ApiClient.instance(serverId).post(
-      '/add-servers',
+      '/api/add-servers',
       options: Options(
         headers: {
           'accept': 'application/json',

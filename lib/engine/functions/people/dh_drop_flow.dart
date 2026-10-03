@@ -5,8 +5,8 @@
 //
 //   1. When a contact is received, seal our fresh ephemeral X25519 public
 //      key to the contact's long-term X25519 public key and POST it to
-//      /api/connections/dh-drop (recipient_id = the contact's user id).
-//   2. After a short wait, /api/connections/check_dh_drops pulls whatever
+//      /api/dh-drop (recipient_id = the contact's user id).
+//   2. After a short wait, /api/check_dh_drops pulls whatever
 //      the contact sealed back to us (their own ephemeral public key).
 //      That endpoint atomically fetches-and-clears the inbox, so each drop
 //      is delivered exactly once.
@@ -124,7 +124,7 @@ Future<void> ensureDhDropForContact({
   }
 }
 
-/// Polls /api/connections/check_dh_drops (atomic fetch-and-clear) and lets
+/// Polls /api/check_dh_drops (atomic fetch-and-clear) and lets
 /// every drop from a known contact complete its session — dropping ours back
 /// first when we haven't done so.
 Future<void> checkPendingDhDrops({required AppDatabase database}) async {

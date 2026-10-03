@@ -2,7 +2,7 @@ import 'package:dio/dio.dart';
 
 import '../api_client.dart';
 
-/// Represents the response of POST /api/account/change-password
+/// Represents the response of POST /api/change-password
 class ChangePasswordResponse {
   final String message;
 
@@ -42,7 +42,7 @@ class AccountService {
     required String newPassword,
   }) async {
     final response = await _dio.post(
-      '/api/account/change-password',
+      '/api/change-password',
       options: Options(
         headers: {
           'accept': 'application/json',
