@@ -27,14 +27,17 @@ class _ContactsScreenState extends ConsumerState<ContactsScreen> {
   @override
   void initState() {
     super.initState();
-    // Give any DH drops that landed while we were away a chance to complete
-    // (picks up the peer's ephemeral key and brings the ratchet up).
-    unawaited(
-      ref.read(taskQueueProvider).queueTask(
-            functionName: 'checkDhDrops',
-            args: const [],
-          ),
-    );
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      // Give any DH drops that landed while we were away a chance to complete
+      // (picks up the peer's ephemeral key and brings the ratchet up).
+      unawaited(
+        ref.read(taskQueueProvider).queueTask(
+              functionName: 'checkDhDrops',
+              args: const [],
+            ),
+      );
+    });
   }
 
   @override

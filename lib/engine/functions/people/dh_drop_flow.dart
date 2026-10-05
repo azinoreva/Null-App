@@ -39,6 +39,7 @@ import '../../crypto/chat/key_exchange.dart';
 import '../../crypto/chat/null_crypto.dart';
 import '../../crypto/chat/ratchet_store.dart';
 import '../../database/app_database.dart';
+import '../../network/main_server_client.dart';
 import '../../network/people/drop_dh.dart';
 import '../../network/people/pick_dh.dart';
 
@@ -78,6 +79,8 @@ Future<void> runCheckDhDropsTask(
   List<dynamic> args,
   AppDatabase database,
 ) async {
+  // Complete the queued poll once auth expiry has cleared the token.
+  if (await MainServerClient.getAccessToken() == null) return;
   await checkPendingDhDrops(database: database);
 }
 
@@ -130,6 +133,7 @@ Future<void> ensureDhDropForContact({
 Future<void> checkPendingDhDrops({required AppDatabase database}) async {
   final identity = await database.identityDao.getCurrentIdentityOrNull();
   if (identity == null) return;
+  if (await MainServerClient.getAccessToken() == null) return;
 
   // Unsealing drops needs our X25519 identity key — ensure it exists before
   // consuming the inbox (check_dh_drops clears it server-side).

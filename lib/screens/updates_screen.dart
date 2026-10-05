@@ -30,7 +30,10 @@ class _UpdatesScreenState extends ConsumerState<UpdatesScreen> {
   @override
   void initState() {
     super.initState();
-    unawaited(ref.read(updatesFeedProvider.notifier).refresh());
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      unawaited(ref.read(updatesFeedProvider.notifier).refresh());
+    });
     _scrollController.addListener(_handleScroll);
   }
 

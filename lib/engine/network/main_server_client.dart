@@ -30,6 +30,7 @@ class MainServerClient {
   // Prevents multiple simultaneous refresh calls when several requests
   // fail with 401 at once.
   static Completer<String?>? _refreshCompleter;
+  static Future<void>? _sessionExpiryFuture;
 
   /// The id of the main/authority server, from `SERVER` in `.env`
   /// (defaults to `server_1`).
@@ -126,8 +127,22 @@ class MainServerClient {
       path == '/api/sign-in' || path == '/api/refresh';
 
   static Future<void> _expireSession() async {
-    await clearTokens();
-    await redirectToLogin();
+    final inFlight = _sessionExpiryFuture;
+    if (inFlight != null) {
+      await inFlight;
+      return;
+    }
+
+    final expiry = () async {
+      await clearTokens();
+      await redirectToLogin();
+    }();
+    _sessionExpiryFuture = expiry;
+    try {
+      await expiry;
+    } finally {
+      _sessionExpiryFuture = null;
+    }
   }
 
   // --- Token storage (the main-server login credentials) ----------------
