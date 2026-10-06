@@ -11,9 +11,8 @@ import '../../widgets/buttons/send_button.dart';
 class FriendRequestModal extends StatefulWidget {
   final String avatarUrl;
   final String name;
-  final String username;
-  final String message;
-  final String timeText;
+  final String title;
+  final String bio;
   final Future<void> Function() onAccept;
   final Future<void> Function() onDecline;
   final VoidCallback? onClose;
@@ -22,9 +21,8 @@ class FriendRequestModal extends StatefulWidget {
     super.key,
     required this.avatarUrl,
     required this.name,
-    required this.username,
-    required this.message,
-    required this.timeText,
+    required this.title,
+    required this.bio,
     required this.onAccept,
     required this.onDecline,
     this.onClose,
@@ -100,7 +98,7 @@ class _FriendRequestModalState extends State<FriendRequestModal> {
           ),
           const SizedBox(height: 20.0),
 
-          // Avatar + name + handle
+          // Avatar + name + title
           Center(
             child: Column(
               children: [
@@ -127,7 +125,7 @@ class _FriendRequestModalState extends State<FriendRequestModal> {
                 ),
                 const SizedBox(height: 2.0),
                 Text(
-                  '@${widget.username}',
+                  widget.title,
                   style: AppTypography.getTextStyle(
                     context,
                     AppTextType.body,
@@ -139,40 +137,23 @@ class _FriendRequestModalState extends State<FriendRequestModal> {
           ),
           const SizedBox(height: 20.0),
 
-          // Message
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(14.0),
-            decoration: BoxDecoration(
-              color: theme.border.withAlpha(70),
-              borderRadius: BorderRadius.circular(14.0),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  '"${widget.message}"',
-                  style: AppTypography.getTextStyle(
-                    context,
-                    AppTextType.body,
-                    color: theme.textInputColor,
-                  ).copyWith(fontStyle: FontStyle.italic),
+          if (widget.bio.trim().isNotEmpty)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(14.0),
+              decoration: BoxDecoration(
+                color: theme.border.withAlpha(70),
+                borderRadius: BorderRadius.circular(14.0),
+              ),
+              child: Text(
+                widget.bio,
+                style: AppTypography.getTextStyle(
+                  context,
+                  AppTextType.body,
+                  color: theme.textInputColor,
                 ),
-                const SizedBox(height: 10.0),
-                Align(
-                  alignment: Alignment.centerRight,
-                  child: Text(
-                    widget.timeText,
-                    style: AppTypography.getTextStyle(
-                      context,
-                      AppTextType.tiny,
-                      color: AppColors.mutedSlate,
-                    ),
-                  ),
-                ),
-              ],
+              ),
             ),
-          ),
           const SizedBox(height: 20.0),
 
           // Accept / Decline

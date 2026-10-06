@@ -58,6 +58,17 @@ class ReceivedContact {
       avatar: json['avatar'] as String?,
     );
   }
+
+  Map<String, dynamic> toJson() => {
+        'contact_id': contactId,
+        'server_id': serverId,
+        'nickname': nickname,
+        'title': title,
+        'bio': bio,
+        'public_key': publicKey,
+        'dh_public_key': dhPublicKey,
+        'avatar': avatar,
+      };
 }
 
 class CheckContactService {
@@ -82,6 +93,7 @@ class CheckContactService {
     final response = await _dio.post(
       '/api/check_contact',
       options: Options(
+        receiveTimeout: const Duration(seconds: 10),
         headers: {
           'accept': 'application/json',
           'Content-Type': 'application/json',

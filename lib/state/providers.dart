@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:typed_data';
 
+import 'package:drift/drift.dart' show Value;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../engine/database/app_database.dart';
@@ -11,6 +13,8 @@ import '../engine/network/api_client.dart';
 import '../engine/network/auth_failure_handler.dart';
 import '../engine/network/updates/check_updates.dart';
 import '../engine/network/updates/updates_cache.dart';
+import '../engine/network/people/pick_contact.dart';
+import '../engine/network/people/pending_contacts_cache.dart';
 import '../engine/database/queries/contacts_queries.dart';
 import '../engine/database/queries/conversations_queries.dart';
 import '../engine/database/queries/group_members_queries.dart';
@@ -54,13 +58,19 @@ class PostData {
 /// [displayName] follows the same "Name - Title" convention used by
 /// [ContactCard] (e.g. "Alice Johnson - Product Designer").
 class ContactData {
+  final String contactId;
+  final String serverId;
   final String avatarUrl;
   final String displayName;
+  final String bio;
   final int isOnline;
 
   const ContactData({
+    required this.contactId,
+    required this.serverId,
     required this.avatarUrl,
     required this.displayName,
+    required this.bio,
     required this.isOnline,
   });
 
@@ -796,10 +806,13 @@ class ContactsNotifier extends AsyncNotifier<List<ContactData>> {
 
   ContactData _toContactData(Contact contact) {
     return ContactData(
+      contactId: contact.contactId,
+      serverId: contact.serverId,
       avatarUrl: _avatarUrlFor(contact),
       displayName: (contact.nickname?.trim().isNotEmpty ?? false)
           ? contact.nickname!.trim()
           : contact.contactId,
+      bio: contact.bio ?? '',
       isOnline: contact.isOnline,
     );
   }
@@ -814,5 +827,76 @@ class ContactsNotifier extends AsyncNotifier<List<ContactData>> {
     }
     return 'https://api.dicebear.com/7.x/avataaars/png?seed='
         '${Uri.encodeComponent(contact.contactId)}&size=128';
+  }
+}
+
+final pendingContactsProvider =
+    AsyncNotifierProvider<PendingContactsNotifier, List<ReceivedContact>>(
+      PendingContactsNotifier.new,
+    );
+
+class PendingContactsNotifier extends AsyncNotifier<List<ReceivedContact>> {
+  final _cache = PendingContactsCacheService.instance;
+
+  @override
+  Future<List<ReceivedContact>> build() async => _cache.load();
+
+  Future<void> checkInbox() async {
+    try {
+      final received = await const CheckContactService().checkContact();
+      if (received.isEmpty) return;
+      await _cache.save(received);
+      final current = state.value ?? const <ReceivedContact>[];
+      final merged = <String, ReceivedContact>{
+        for (final contact in current) contact.contactId: contact,
+        for (final contact in received) contact.contactId: contact,
+      };
+      state = AsyncData(merged.values.toList(growable: false));
+    } catch (_) {
+      state = AsyncData(state.value ?? _cache.load());
+    }
+  }
+
+  Future<void> accept(ReceivedContact contact) async {
+    Uint8List? avatar;
+    if (contact.avatar != null && contact.avatar!.isNotEmpty) {
+      avatar = Uint8List.fromList(base64Decode(contact.avatar!));
+    }
+    final displayName = contact.title.trim().isEmpty
+        ? contact.nickname
+        : '${contact.nickname} - ${contact.title}';
+    final now = DateTime.now().millisecondsSinceEpoch;
+    final database = ref.read(appDatabaseProvider);
+    await database
+        .into(database.contacts)
+        .insertOnConflictUpdate(
+          ContactsCompanion.insert(
+            contactId: contact.contactId,
+            nickname: Value(displayName),
+            avatar: Value(avatar),
+            bio: Value(contact.bio),
+            publicKey: Value(contact.publicKey),
+            connectionStatus: 2,
+            serverId: contact.serverId,
+            createdAt: now,
+            updatedAt: now,
+            conversationId: const Value(null),
+          ),
+        );
+    await _cache.remove(contact.contactId);
+    _removeFromState(contact.contactId);
+  }
+
+  Future<void> decline(ReceivedContact contact) async {
+    await _cache.remove(contact.contactId);
+    _removeFromState(contact.contactId);
+  }
+
+  void _removeFromState(String contactId) {
+    state = AsyncData(
+      (state.value ?? const <ReceivedContact>[])
+          .where((contact) => contact.contactId != contactId)
+          .toList(growable: false),
+    );
   }
 }

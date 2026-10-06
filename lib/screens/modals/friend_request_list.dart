@@ -7,20 +7,24 @@ import 'friend_request.dart';
 /// [FriendRequestModal] for it - so "View" can hand the full picture
 /// straight over without re-fetching anything.
 class FriendRequestData {
+  final String contactId;
+  final String serverId;
+  final String publicKey;
+  final String? dhPublicKey;
   final String avatarUrl;
   final String name;
-  final String username;
-  final String message;
-  final String receivedLabel; // e.g. "2 hours ago" - shown in the list row
-  final String messageTimeLabel; // e.g. "10:26 AM" - shown in the detail modal
+  final String title;
+  final String bio;
 
   const FriendRequestData({
+    required this.contactId,
+    required this.serverId,
+    required this.publicKey,
+    this.dhPublicKey,
     required this.avatarUrl,
     required this.name,
-    required this.username,
-    required this.message,
-    required this.receivedLabel,
-    required this.messageTimeLabel,
+    required this.title,
+    required this.bio,
   });
 }
 
@@ -85,9 +89,8 @@ class _FriendRequestsListModalState extends State<FriendRequestsListModal> {
         child: FriendRequestModal(
           avatarUrl: request.avatarUrl,
           name: request.name,
-          username: request.username,
-          message: request.message,
-          timeText: request.messageTimeLabel,
+          title: request.title,
+          bio: request.bio,
           onAccept: () async {
             await widget.onAcceptRequest(request);
             if (mounted) setState(() => _requests.remove(request));
@@ -301,7 +304,7 @@ class _FriendRequestRow extends StatelessWidget {
                   ).copyWith(fontWeight: FontWeight.bold),
                 ),
                 Text(
-                  request.receivedLabel,
+                  request.title,
                   style: AppTypography.getTextStyle(
                     context,
                     AppTextType.tiny,
