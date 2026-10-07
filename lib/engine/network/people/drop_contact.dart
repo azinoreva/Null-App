@@ -5,8 +5,8 @@ import '../main_server_client.dart';
 
 /// The contact being dropped. Mirrors the server's `Contact` model.
 ///
-/// The server adds `contact_id` (the sender's user id) and `server_id`
-/// itself, so don't send those.
+/// The server adds `contact_id` (the sender's user id) itself, so don't
+/// send that; `servers` carries the sender's own server list.
 class Contact {
   static const int maxNicknameLength = 50;
   static const int maxTitleLength = 100;
@@ -34,13 +34,17 @@ class Contact {
   /// The avatar of the contact (encoded string, max 29000 chars).
   final String? avatar;
 
+  final List<String> servers;
+
   const Contact({
     required this.nickname,
     required this.title,
     required this.bio,
     required this.publicKey,
+    required this.servers,
     this.dhPublicKey,
     this.avatar,
+    
   });
 
   /// Throws [ArgumentError] if any field exceeds the server's limits, so
@@ -69,6 +73,8 @@ class Contact {
         'title': title,
         'bio': bio,
         'public_key': publicKey,
+        'servers': servers,
+        
         if (dhPublicKey != null) 'dh_public_key': dhPublicKey,
         if (avatar != null) 'avatar': avatar,
       };

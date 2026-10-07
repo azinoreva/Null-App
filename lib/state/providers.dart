@@ -59,7 +59,7 @@ class PostData {
 /// [ContactCard] (e.g. "Alice Johnson - Product Designer").
 class ContactData {
   final String contactId;
-  final String serverId;
+  final List<String> servers;
   final String avatarUrl;
   final String displayName;
   final String bio;
@@ -67,7 +67,7 @@ class ContactData {
 
   const ContactData({
     required this.contactId,
-    required this.serverId,
+    required this.servers,
     required this.avatarUrl,
     required this.displayName,
     required this.bio,
@@ -646,13 +646,18 @@ class UpdatesFeedNotifier extends AsyncNotifier<UpdatesFeedState> {
     }
   }
 
+  /// The servers the updates feed pulls from: the normal list first, then
+  /// the extra servers. Updates are plain HTTP requests, so they work
+  /// against a server that has no websocket of its own.
   Future<List<String>> _serverIds() async {
     final serverList = ref.read(serverListProvider);
     await serverList.init();
-    return serverList.servers
-        .map((server) => server.serverId)
-        .where((serverId) => serverId.isNotEmpty)
-        .toList(growable: false);
+    return <String>{
+      for (final server in serverList.servers)
+        if (server.serverId.isNotEmpty) server.serverId,
+      for (final server in serverList.extraServers)
+        if (server.serverId.isNotEmpty) server.serverId,
+    }.toList(growable: false);
   }
 
   Future<List<Update>> _loadPage({required bool reset}) async {
@@ -807,7 +812,7 @@ class ContactsNotifier extends AsyncNotifier<List<ContactData>> {
   ContactData _toContactData(Contact contact) {
     return ContactData(
       contactId: contact.contactId,
-      serverId: contact.serverId,
+      servers: contact.servers,
       avatarUrl: _avatarUrlFor(contact),
       displayName: (contact.nickname?.trim().isNotEmpty ?? false)
           ? contact.nickname!.trim()
@@ -877,7 +882,7 @@ class PendingContactsNotifier extends AsyncNotifier<List<ReceivedContact>> {
             bio: Value(contact.bio),
             publicKey: Value(contact.publicKey),
             connectionStatus: 2,
-            serverId: contact.serverId,
+            servers: contact.servers,
             createdAt: now,
             updatedAt: now,
             conversationId: const Value(null),

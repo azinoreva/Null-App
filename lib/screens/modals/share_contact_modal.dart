@@ -170,13 +170,11 @@ const Color _kMutedText = Color(0xFF9096A1);
 class ShareContactModal extends StatefulWidget {
   final AppDatabase database;
   final TaskQueue taskQueue;
-  final String mainServerId;
 
   const ShareContactModal({
     super.key,
     required this.database,
     required this.taskQueue,
-    this.mainServerId = 'server_1',
   });
 
   @override
@@ -201,7 +199,6 @@ class _ShareContactModalState extends State<ShareContactModal> {
     _exchange = sendMyContact(
       database: widget.database,
       taskQueue: widget.taskQueue,
-      mainServerId: widget.mainServerId,
     );
     _exchange.then((result) {
       final svg = ConnectionIdentityService.qrSvgForPayload(result.shareQRSVG);

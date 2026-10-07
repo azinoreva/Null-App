@@ -18,6 +18,7 @@ import '../../network/server_error_exception.dart';
 import '../../network/people/share_contact.dart';
 import '../../task_queue.dart';
 import '../../network/chats/send_message.dart';
+import '../../../utils/server_list.dart';
 
 const _uuid = Uuid();
 
@@ -40,10 +41,13 @@ final Map<String, Map<String, dynamic>> temporaryContact = {};
 ///
 /// Completing the peer-side exchange happens in the background so a contact
 /// that has not been claimed yet cannot block the share UI.
+///
+/// The servers advertised with the share (and stored by whoever scans it)
+/// are read from SharedPreferences — the normal, websocket-connected list
+/// (`ServerListService`, added whenever the user joins a server).
 Future<SendMyContactResult> sendMyContact({
   required AppDatabase database,
   required TaskQueue taskQueue,
-  required String mainServerId,
   Duration receiveDelay = const Duration(seconds: 2),
 }) async {
   final identity = await database.identityDao.getCurrentIdentityOrNull();
@@ -64,12 +68,16 @@ Future<SendMyContactResult> sendMyContact({
       ? nameParts.skip(1).join(' - ').trim()
       : '';
 
+  final servers = await ServerListService.readServerIds();
+  final primaryServerId = await ServerListService.primaryServerIdFor(servers);
+
   final shared = await SendContactService().sendContact(
     nickname: nickname,
     title: title,
     bio: identity.bio ?? '',
     publicKey: publicKey,
     avatar: identity.avatar ?? '',
+    servers: servers,
   );
 
   final secretKey = await AesGcm.with256bits().newSecretKey();
@@ -89,7 +97,7 @@ Future<SendMyContactResult> sendMyContact({
     _pollForReceivedContact(
       database: database,
       taskQueue: taskQueue,
-      mainServerId: mainServerId,
+      primaryServerId: primaryServerId,
       contactKey: '${shared.contactKey}R',
       symmetricKey: symmetricKey,
       previewState: previewState,
@@ -107,7 +115,7 @@ Future<SendMyContactResult> sendMyContact({
 Future<void> _pollForReceivedContact({
   required AppDatabase database,
   required TaskQueue taskQueue,
-  required String mainServerId,
+  required String primaryServerId,
   required String contactKey,
   required Uint8List symmetricKey,
   required RatchetState previewState,
@@ -138,7 +146,14 @@ Future<void> _pollForReceivedContact({
 
     if (received == null) return;
 
-    await _saveReceivedContact(database, received, localServerId: mainServerId);
+    // The contact's own servers first; fall back to the primary of our
+    // normal server list when they published none.
+    final contactServers = received.servers.isNotEmpty
+        ? received.servers
+        : [primaryServerId];
+    final conversationServerId = contactServers.first;
+
+    await _saveReceivedContact(database, received, servers: contactServers);
     final conversationId = received.contactId;
     final now = DateTime.now().millisecondsSinceEpoch;
     await database.conversationsDao.upsertConversation(
@@ -152,7 +167,7 @@ Future<void> _pollForReceivedContact({
         pinned: 0,
         archived: 0,
         draft: null,
-        serverId: mainServerId,
+        serverId: conversationServerId,
         createdAt: now,
         updatedAt: now,
         sound: null,
@@ -167,8 +182,8 @@ Future<void> _pollForReceivedContact({
     // the QR above is no longer consumed by this side.
     await taskQueue.queueTask(
       functionName: 'ensureDhFlow',
-      args: [conversationId, mainServerId],
-      serverId: mainServerId,
+      args: [conversationId, conversationServerId],
+      serverId: conversationServerId,
     );
   } catch (_) {
     // Background completion must never surface an error over the share UI.
@@ -186,7 +201,7 @@ Map<String, dynamic> _ratchetStateJson(RatchetState state) => {
 Future<void> _saveReceivedContact(
   AppDatabase database,
   ContactInfo contact, {
-  required String localServerId,
+  required List<String> servers,
 }) async {
   Uint8List? avatar;
   if (contact.avatar != null && contact.avatar!.isNotEmpty) {
@@ -202,7 +217,7 @@ Future<void> _saveReceivedContact(
           bio: Value(contact.bio),
           publicKey: Value(contact.publicKey),
           connectionStatus: 1,
-          serverId: localServerId,
+          servers: servers,
           createdAt: DateTime.now().millisecondsSinceEpoch,
           updatedAt: DateTime.now().millisecondsSinceEpoch,
           conversationId: Value(contact.contactId),
@@ -238,7 +253,8 @@ Future<SendMessageResponse> sendContactDetails(
     'bio': identity.bio,
     'avatar': identity.avatar, // assumed already stored as a base64 string
     'public_key': publicKey,
-    'server_id': serverId,
+    // The servers we're on, as persisted in SharedPreferences.
+    'servers': await ServerListService.readServerIds(),
   };
   final identityCardJson = jsonEncode(identityCard);
 
@@ -304,7 +320,8 @@ Future<SendMessageResponse> sendContactDetailsBack(
     'nickname': identity.displayName,
     'bio': identity.bio,
     'avatar': identity.avatar,
-    'server_id': serverId,
+    // The servers we're on, as persisted in SharedPreferences.
+    'servers': await ServerListService.readServerIds(),
   };
   final identityCardJson = jsonEncode(identityCard);
 

@@ -8,6 +8,7 @@ import 'package:drift/drift.dart';
 import '../../database/app_database.dart';
 import '../../database/queries/contacts_queries.dart';
 import '../../crypto/chat/asymetric_encryption.dart'; // decryptMessage
+import '../../network/people/wire_servers.dart';
 import '../../media_handling/string_to_blob.dart';
 
 /// Takes an incoming encrypted identity-card message, decrypts it with
@@ -33,7 +34,7 @@ Future<void> receiveContactDetails(
   final nickname = identityCard['nickname'] as String?;
   final bio = identityCard['bio'] as String?;
   final avatarBase64 = identityCard['avatar'] as String?;
-  final serverId = identityCard['server_id'] as String;
+  final servers = readServersFromJson(identityCard);
 
   Uint8List? avatarBlob;
   if (avatarBase64 != null) {
@@ -48,7 +49,7 @@ Future<void> receiveContactDetails(
     avatar: Value(avatarBlob),
     bio: Value(bio),
     publicKey: Value(contactPublicKey),
-    serverId: serverId,
+    servers: servers,
     connectionStatus: 1, // pending
     createdAt: now,
     updatedAt: now,

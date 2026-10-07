@@ -9,6 +9,7 @@ import '../../engine/network/api_client.dart';
 import '../../engine/network/auth_failure_handler.dart';
 import '../../engine/network/servers/servers.dart' as server_directory;
 import '../../state/providers.dart';
+import '../../utils/server_list.dart';
 import '../../widgets/app_theme.dart';
 import '../modals/server_list_modal.dart';
 import 'settings_widgets.dart';
@@ -97,7 +98,17 @@ class ServersSettingsScreen extends ConsumerWidget {
     await serverList.init();
 
     if (serverList.getServer(full.serverId) == null) {
-      await serverList.addServer(full.toConfig());
+      try {
+        await serverList.addServer(full.toConfig());
+      } on ServerListException catch (error) {
+        // The normal list is capped at ServerListService.maxServers — at
+        // the cap the user has to join the server as an extra one instead.
+        if (!context.mounted) return;
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(error.message)));
+        return;
+      }
     }
 
     await ApiClient.registerServer(

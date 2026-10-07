@@ -2,11 +2,12 @@
 import 'package:dio/dio.dart';
 
 import '../main_server_client.dart';
+import 'wire_servers.dart';
 
 /// A single contact found in the caller's inbox.
 ///
 /// This is the server's `Contact` model plus the two fields the server
-/// stamps on at drop time (`contact_id` and `server_id`).
+/// stamps on at drop time (`contact_id` and the sender's `servers`).
 class ReceivedContact {
   /// The user id of whoever dropped this contact. Set by the server from
   /// the sender's JWT, so it can be trusted as the sender's identity.
@@ -14,7 +15,7 @@ class ReceivedContact {
 
   /// The server id the sender dropped from (relevant in multi-server
   /// setups).
-  final String serverId;
+  final List<String> servers;
 
   /// The name of the contact.
   final String nickname;
@@ -37,7 +38,7 @@ class ReceivedContact {
 
   const ReceivedContact({
     required this.contactId,
-    required this.serverId,
+    required this.servers,
     required this.nickname,
     required this.title,
     required this.bio,
@@ -49,7 +50,7 @@ class ReceivedContact {
   factory ReceivedContact.fromJson(Map<String, dynamic> json) {
     return ReceivedContact(
       contactId: json['contact_id'] as String,
-      serverId: json['server_id'] as String,
+      servers: readServersFromJson(json),
       nickname: json['nickname'] as String,
       title: json['title'] as String,
       bio: json['bio'] as String,
@@ -61,7 +62,7 @@ class ReceivedContact {
 
   Map<String, dynamic> toJson() => {
         'contact_id': contactId,
-        'server_id': serverId,
+        'servers': servers,
         'nickname': nickname,
         'title': title,
         'bio': bio,

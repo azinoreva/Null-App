@@ -8,7 +8,7 @@ import 'friend_request.dart';
 /// straight over without re-fetching anything.
 class FriendRequestData {
   final String contactId;
-  final String serverId;
+  final List<String> servers;
   final String publicKey;
   final String? dhPublicKey;
   final String avatarUrl;
@@ -18,7 +18,7 @@ class FriendRequestData {
 
   const FriendRequestData({
     required this.contactId,
-    required this.serverId,
+    required this.servers,
     required this.publicKey,
     this.dhPublicKey,
     required this.avatarUrl,

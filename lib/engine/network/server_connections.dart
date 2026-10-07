@@ -119,7 +119,9 @@ class ServerConnectionService extends ChangeNotifier {
     final hub = _hub;
     if (hub == null || !_started) return;
 
-    // Only servers with a real URL are connectable.
+    // Only servers with a real URL are connectable. This deliberately
+    // reads the *normal* list: extra servers are never socketed here — they
+    // are polled over HTTP for updates instead.
     final wanted = <String, ServerConfig>{
       for (final server in _serverList.servers)
         if (server.serverUrl.trim().isNotEmpty) server.serverId: server,

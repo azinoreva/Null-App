@@ -24,6 +24,7 @@ class DhDropService {
     required String recipientId,
     required String dhEncKey,
     required String dhEncNonce,
+    required List<String> servers
   }) async {
     await _dio.post(
       '/api/dh-drop',
@@ -37,6 +38,8 @@ class DhDropService {
         'recipient_id': recipientId,
         'dh_enc_key': dhEncKey,
         'dh_enc_nonce': dhEncNonce,
+        'servers': servers,
+
       },
     );
   }

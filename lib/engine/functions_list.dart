@@ -489,7 +489,7 @@ class FunctionsList {
     Uint8List? avatar,
     String? bio,
     String? publicKey,
-    required String serverId,
+    required List<String> servers,
     int connectionStatus = 1,
   }) => contacts.saveContact(
     contactsDao,
@@ -498,7 +498,7 @@ class FunctionsList {
     avatar: avatar,
     bio: bio,
     publicKey: publicKey,
-    serverId: serverId,
+    servers: servers,
     connectionStatus: connectionStatus,
   );
 
@@ -529,12 +529,10 @@ class FunctionsList {
   static Future<contact_details.SendMyContactResult> sendMyContact({
     required AppDatabase database,
     required TaskQueue taskQueue,
-    required String mainServerId,
     Duration receiveDelay = const Duration(seconds: 2),
   }) => contact_details.sendMyContact(
     database: database,
     taskQueue: taskQueue,
-    mainServerId: mainServerId,
     receiveDelay: receiveDelay,
   );
 

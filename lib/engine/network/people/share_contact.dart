@@ -63,6 +63,7 @@ class SendContactService {
     required String bio,
     required String publicKey,
     required String avatar,
+    required List<String> servers,
     int expiresInSeconds = defaultExpirySeconds,
     bool oneTime = false,
   }) async {
@@ -89,6 +90,7 @@ class SendContactService {
           'avatar': avatar,
         },
         'expires_in': clampedExpiry,
+        'servers': servers,
         'one_time': oneTime,
       },
     );

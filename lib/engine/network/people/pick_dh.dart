@@ -2,6 +2,7 @@
 import 'package:dio/dio.dart';
 
 import '../main_server_client.dart';
+import 'wire_servers.dart';
 
 /// A single pending dh key drop found in the caller's inbox.
 class DhDrop {
@@ -17,13 +18,13 @@ class DhDrop {
 
   /// The server id the sender dropped from (relevant in multi-server
   /// setups).
-  final String serverId;
+  final List<String> servers;
 
   const DhDrop({
     required this.senderId,
     required this.dhEncKey,
     required this.dhEncNonce,
-    required this.serverId,
+    required this.servers,
   });
 
   factory DhDrop.fromJson(Map<String, dynamic> json) {
@@ -31,7 +32,7 @@ class DhDrop {
       senderId: json['sender_id'] as String,
       dhEncKey: json['dh_enc_key'] as String,
       dhEncNonce: json['dh_enc_nonce'] as String,
-      serverId: json['server_id'] as String,
+      servers: readServersFromJson(json),
     );
   }
 }

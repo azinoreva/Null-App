@@ -105,7 +105,7 @@ class AppDatabase extends _$AppDatabase {
   }
 
   @override
-  int get schemaVersion => 7;
+  int get schemaVersion => 8;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -134,6 +134,18 @@ class AppDatabase extends _$AppDatabase {
       if (from < 7) {
         await customStatement(
           'ALTER TABLE identity DROP COLUMN invitation_count;',
+        );
+      }
+      if (from < 8) {
+        // contacts.server_id (one server) became contacts.servers (a JSON
+        // list of up to 8 servers), and the unused main_server_id column is
+        // gone. Existing single-id values stay readable because
+        // ServersConverter falls back to wrapping a bare string.
+        await customStatement(
+          'ALTER TABLE contacts RENAME COLUMN server_id TO servers;',
+        );
+        await customStatement(
+          'ALTER TABLE contacts DROP COLUMN main_server_id;',
         );
       }
     },

@@ -13,7 +13,7 @@ Future<void> saveContact(
   Uint8List? avatar,
   String? bio,
   String? publicKey,
-  required String serverId,
+  required List<String> servers,
   int connectionStatus = 1,  // assumed default: 1 = pending
 }) async {
   final now = DateTime.now().millisecondsSinceEpoch;
@@ -24,7 +24,7 @@ Future<void> saveContact(
     avatar: Value(avatar),
     bio: Value(bio),
     publicKey: Value(publicKey),
-    serverId: serverId,
+    servers: servers,
     connectionStatus: connectionStatus,
     createdAt: now,
     updatedAt: now,

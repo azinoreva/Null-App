@@ -42,6 +42,7 @@ import '../../database/app_database.dart';
 import '../../network/main_server_client.dart';
 import '../../network/people/drop_dh.dart';
 import '../../network/people/pick_dh.dart';
+import '../../../utils/server_list.dart';
 
 const _uuid = Uuid();
 
@@ -175,7 +176,7 @@ Future<void> _processDrop(AppDatabase database, DhDrop drop) async {
   await _ensureConversation(
     database,
     contactId,
-    contact.serverId,
+    await ServerListService.primaryServerIdFor(contact.servers),
   );
 
   // Our own ephemeral private key: either already stored (we dropped first)
@@ -209,7 +210,7 @@ Future<void> _processDrop(AppDatabase database, DhDrop drop) async {
   await _completeDh(
     database: database,
     contactId: contactId,
-    serverId: contact.serverId,
+    serverId: await ServerListService.primaryServerIdFor(contact.servers),
     sharedSecret: sharedSecret,
   );
 }
@@ -294,6 +295,8 @@ Future<void> _dropEphemeralKeyTo({
     recipientId: recipientId,
     dhEncKey: sealed,
     dhEncNonce: _randomNonce(),
+    // The servers we're on, as persisted in SharedPreferences.
+    servers: await ServerListService.readServerIds(),
   );
 }
 

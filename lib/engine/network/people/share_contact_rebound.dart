@@ -36,7 +36,8 @@ class SendContactReboundService {
     required String bio,
     required String publicKey,
     required String avatar,
-    required String contactKey
+    required String contactKey,
+    required List<String> servers
    
   }) async {
    
@@ -56,6 +57,7 @@ class SendContactReboundService {
           'public_key': publicKey,
           'avatar': avatar,
           'contact_key': contactKey,
+          'servers': servers
       },
     );
 

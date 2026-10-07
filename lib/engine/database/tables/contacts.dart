@@ -1,6 +1,49 @@
+import 'dart:convert';
+
 import 'package:drift/drift.dart';
 
 import 'conversations.dart'; // for foreign key reference
+
+/// Maps a contact's server list to the JSON text stored in
+/// `contacts.servers`.
+///
+/// Rows written before multi-server support held a bare server id, so
+/// [fromSql] falls back to wrapping an unparsable value as a single-element
+/// list instead of failing to read the row.
+class ServersConverter extends TypeConverter<List<String>, String>
+    with JsonTypeConverter2<List<String>, String, Object?> {
+  const ServersConverter();
+
+  @override
+  String toSql(List<String> value) => jsonEncode(value);
+
+  @override
+  List<String> fromSql(String fromDb) => _decode(fromDb);
+
+  @override
+  Object? toJson(List<String> value) => value;
+
+  @override
+  List<String> fromJson(Object? json) {
+    if (json is List) return json.map((e) => e.toString()).toList();
+    if (json is String) return _decode(json);
+    return <String>[];
+  }
+
+  static List<String> _decode(String raw) {
+    if (raw.isEmpty) return <String>[];
+    try {
+      final decoded = jsonDecode(raw);
+      if (decoded is List) return decoded.map((e) => e.toString()).toList();
+      if (decoded is String) {
+        return decoded.isEmpty ? <String>[] : [decoded];
+      }
+    } on FormatException {
+      // Legacy value: a bare server id written before the list migration.
+    }
+    return [raw];
+  }
+}
 
 /// Drift table definition for the `Contacts` table.
 ///
@@ -25,9 +68,10 @@ class Contacts extends Table {
 
   IntColumn get connectionStatus => integer()();
 
-  TextColumn get serverId => text()();
-  TextColumn get mainServerId=> text().nullable()();
-  // This is the main server_id the contact is linked to. So this is only added when the contact does switch servers.
+  /// The servers this contact is on (a user has at most 8), stored as JSON
+  /// text. Replaces the single `server_id` column; rows written before the
+  /// change are read back as a one-element list by [ServersConverter].
+  TextColumn get servers => text().map(const ServersConverter())();
 
   // Unix epoch milliseconds.
   IntColumn get createdAt => integer()();

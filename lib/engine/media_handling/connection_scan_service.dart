@@ -31,6 +31,7 @@ import '../database/app_database.dart';
 import '../network/people/recieve_contact.dart';
 import '../network/people/share_contact_rebound.dart';
 import '../task_queue.dart';
+import '../../utils/server_list.dart';
 
 /// What a successfully-completed scan pairing leaves you with.
 class ReceiveContactResult {
@@ -70,7 +71,6 @@ Future<String?> scanImageFile(String imagePath) async {
 Future<ReceiveContactResult> receiveContact({
   required AppDatabase database,
   required TaskQueue taskQueue,
-  String mainServerId = 'server_1',
   required String scannedValue,
   bool isManualPin = false,
 }) async {
@@ -91,7 +91,15 @@ Future<ReceiveContactResult> receiveContact({
   final received = await GetContactService()
       .getContact(contactKey: contactKey);
 
-  await _saveReceivedContact(database, received, localServerId: mainServerId);
+  // Our own servers (the persisted normal list) — published back with our card.
+  final localServers = await ServerListService.readServerIds();
+  // The contact's servers; fall back to our primary when they published none.
+  final contactServers = received.servers.isNotEmpty
+      ? received.servers
+      : [await ServerListService.primaryServerIdFor(localServers)];
+  final conversationServerId = contactServers.first;
+
+  await _saveReceivedContact(database, received, servers: contactServers);
 
   final conversationId = received.contactId;
   final now = DateTime.now().millisecondsSinceEpoch;
@@ -106,7 +114,7 @@ Future<ReceiveContactResult> receiveContact({
       pinned: 0,
       archived: 0,
       draft: null,
-      serverId: mainServerId,
+      serverId: conversationServerId,
       createdAt: now,
       updatedAt: now,
       sound: null,
@@ -128,6 +136,7 @@ Future<ReceiveContactResult> receiveContact({
     publicKey: publicKey,
     avatar: identity.avatar ?? '',
     contactKey: '${contactKey}R',
+    servers: localServers,
   );
 
   // Encrypted messaging is established through the main-server DH-drop flow
@@ -135,8 +144,8 @@ Future<ReceiveContactResult> receiveContact({
   // pick up theirs, ratchet up). No QR session-state pass-through anymore.
   await taskQueue.queueTask(
     functionName: 'ensureDhFlow',
-    args: [received.contactId, mainServerId],
-    serverId: mainServerId,
+    args: [received.contactId, conversationServerId],
+    serverId: conversationServerId,
   );
 
   return ReceiveContactResult(
@@ -172,7 +181,7 @@ String _extractContactKey(String raw) {
 Future<void> _saveReceivedContact(
   AppDatabase database,
   ContactInfo contact, {
-  required String localServerId,
+  required List<String> servers,
 }) async {
   Uint8List? avatar;
   if (contact.avatar != null && contact.avatar!.isNotEmpty) {
@@ -188,7 +197,7 @@ Future<void> _saveReceivedContact(
           bio: Value(contact.bio),
           publicKey: Value(contact.publicKey),
           connectionStatus: 1,
-          serverId: localServerId,
+          servers: servers,
           createdAt: DateTime.now().millisecondsSinceEpoch,
           updatedAt: DateTime.now().millisecondsSinceEpoch,
           conversationId: Value(contact.contactId),

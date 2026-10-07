@@ -2,6 +2,7 @@
 import 'package:dio/dio.dart';
 
 import '../main_server_client.dart';
+import 'wire_servers.dart';
 
 class ContactInfo {
   final String nickname;
@@ -13,7 +14,7 @@ class ContactInfo {
   final String? avatar;
 
   final String contactId;
-  final String serverId;
+  final List<String> servers;
 
   const ContactInfo({
     required this.nickname,
@@ -22,7 +23,7 @@ class ContactInfo {
     required this.publicKey,
     this.avatar,
     required this.contactId,
-    required this.serverId,
+    required this.servers,
   });
 
   factory ContactInfo.fromJson(Map<String, dynamic> json) {
@@ -33,7 +34,7 @@ class ContactInfo {
       publicKey: json['public_key'] as String,
       avatar: json['avatar'] as String?,
       contactId: json['contact_id'] as String,
-      serverId: json['server_id'] as String,
+      servers: readServersFromJson(json),
     );
   }
 }
@@ -43,11 +44,11 @@ class GetContactService {
 
   const GetContactService();
 
-  /// Looks up a contact's profile info by [contactKey].
-  ///
-  /// Returns the contact's nickname, title, bio, public key, optional avatar,
-  /// plus resolved [ContactInfo.contactId] and [ContactInfo.serverId]
-  /// identifying the underlying account.
+/// Looks up a contact's profile info by [contactKey].
+///
+/// Returns the contact's nickname, title, bio, public key, optional avatar,
+/// plus resolved [ContactInfo.contactId] and [ContactInfo.servers]
+/// identifying the underlying account.
   ///
   /// Errors (404 for an unknown/expired/consumed key, 429 for rate limiting)
   /// surface as [DioException]s from MainServerClient.

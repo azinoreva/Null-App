@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../state/providers.dart';
 import '../engine/database/app_database.dart';
+import '../utils/server_list.dart';
 import '../widgets/app_theme.dart';
 import '../widgets/display/contact_card.dart';
 import '../widgets/display/navigation.dart';
@@ -100,8 +101,118 @@ class _ContactsScreenState extends ConsumerState<ContactsScreen> {
     await _selectNetwork(networkId);
   }
 
+  Future<void> _showNetworkActions(ContactsNetworkData network) async {
+    final action = await showModalBottomSheet<_NetworkAction>(
+      context: context,
+      builder: (sheetContext) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.edit_outlined),
+              title: const Text('Edit Network'),
+              onTap: () => Navigator.pop(sheetContext, _NetworkAction.edit),
+            ),
+            ListTile(
+              leading: const Icon(Icons.delete_outline),
+              title: const Text('Delete Network'),
+              onTap: () => Navigator.pop(sheetContext, _NetworkAction.delete),
+            ),
+          ],
+        ),
+      ),
+    );
+    switch (action) {
+      case _NetworkAction.edit:
+        await _editNetwork(network);
+      case _NetworkAction.delete:
+        await _deleteNetwork(network);
+      case null:
+        break;
+    }
+  }
+
+  Future<void> _editNetwork(ContactsNetworkData network) async {
+    final controller = TextEditingController(text: network.networkName);
+    final name = await showDialog<String>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Edit Network'),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          textCapitalization: TextCapitalization.words,
+          decoration: const InputDecoration(hintText: 'Network name'),
+          onSubmitted: (value) => Navigator.pop(dialogContext, value.trim()),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () =>
+                Navigator.pop(dialogContext, controller.text.trim()),
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+    controller.dispose();
+    if (name == null || name.isEmpty || !mounted) return;
+
+    await ref
+        .read(appDatabaseProvider)
+        .contactsNetworkDao
+        .updateNetwork(
+          network.copyWith(
+            networkName: name,
+            updatedAt: DateTime.now().millisecondsSinceEpoch,
+          ),
+        );
+    await _loadNetworks();
+  }
+
+  Future<void> _deleteNetwork(ContactsNetworkData network) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Delete Network?'),
+        content: Text(
+          'Delete ${network.networkName} and remove all of its members?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    await network_functions.deleteNetworkAndMembers(
+      ref.read(appDatabaseProvider).contactsNetworkDao,
+      ref.read(appDatabaseProvider).contactNetworkMembersDao,
+      network.networkId,
+    );
+    if (_selectedNetworkId == network.networkId) {
+      await _selectNetwork(null);
+    }
+    await _loadNetworks();
+  }
+
   Future<void> _openContactChat(ContactData contact) async {
     final database = ref.read(appDatabaseProvider);
+    // Conversations and the DH task still key off a single server id:
+    // use the contact's first known server, falling back to our own list.
+    final primaryServerId = await ServerListService.primaryServerIdFor(
+      contact.servers,
+    );
     final conversation = await database.conversationsDao.getConversationById(
       contact.contactId,
     );
@@ -118,7 +229,7 @@ class _ContactsScreenState extends ConsumerState<ContactsScreen> {
           pinned: 0,
           archived: 0,
           draft: null,
-          serverId: contact.serverId,
+          serverId: primaryServerId,
           createdAt: now,
           updatedAt: now,
           sound: null,
@@ -127,15 +238,13 @@ class _ContactsScreenState extends ConsumerState<ContactsScreen> {
         ),
       );
     }
-    final taskServer = await database.serversDao.getServerById(
-      contact.serverId,
-    );
+    final taskServer = await database.serversDao.getServerById(primaryServerId);
     await ref
         .read(taskQueueProvider)
         .queueTask(
           functionName: 'ensureDhFlow',
-          args: [contact.contactId, contact.serverId],
-          serverId: taskServer == null ? null : contact.serverId,
+          args: [contact.contactId, primaryServerId],
+          serverId: taskServer == null ? null : primaryServerId,
         );
     if (!mounted) return;
     await Navigator.of(context).push(
@@ -256,6 +365,7 @@ class _ContactsScreenState extends ConsumerState<ContactsScreen> {
           networks: _networks,
           selectedNetworkId: _selectedNetworkId,
           onNetworkSelected: _selectNetwork,
+          onLongPressNetwork: _showNetworkActions,
           onCreateNetwork: _createNetwork,
           pendingContacts: pendingContacts,
           onOpenPendingContacts: () => _openPendingContacts(pendingContacts),
@@ -350,6 +460,15 @@ class _ContactsScreenState extends ConsumerState<ContactsScreen> {
               title: const Text('Add to Network'),
               onTap: () => Navigator.pop(sheetContext, _ContactAction.network),
             ),
+            if (_selectedNetworkId != null)
+              ListTile(
+                leading: const Icon(Icons.playlist_remove_outlined),
+                title: const Text('Remove from Network'),
+                onTap: () => Navigator.pop(
+                  sheetContext,
+                  _ContactAction.removeFromNetwork,
+                ),
+              ),
             ListTile(
               leading: const Icon(Icons.delete_outline),
               title: const Text('Delete contact'),
@@ -364,11 +483,23 @@ class _ContactsScreenState extends ConsumerState<ContactsScreen> {
         await _editContact(contact);
       case _ContactAction.network:
         await _addContactToNetwork(contact);
+      case _ContactAction.removeFromNetwork:
+        await _removeContactFromNetwork(contact);
       case _ContactAction.delete:
         await _deleteContact(contact);
       case null:
         break;
     }
+  }
+
+  Future<void> _removeContactFromNetwork(ContactData contact) async {
+    final networkId = _selectedNetworkId;
+    if (networkId == null) return;
+    await ref
+        .read(appDatabaseProvider)
+        .contactNetworkMembersDao
+        .removeMember(networkId, contact.contactId);
+    await _selectNetwork(networkId);
   }
 
   Future<void> _editContact(ContactData contact) async {
@@ -473,7 +604,7 @@ class _ContactsScreenState extends ConsumerState<ContactsScreen> {
         : 'data:image/png;base64,${contact.avatar}';
     return FriendRequestData(
       contactId: contact.contactId,
-      serverId: contact.serverId,
+      servers: contact.servers,
       publicKey: contact.publicKey,
       dhPublicKey: contact.dhPublicKey,
       avatarUrl: avatarUrl,
@@ -489,7 +620,7 @@ class _ContactsScreenState extends ConsumerState<ContactsScreen> {
         : null;
     return ReceivedContact(
       contactId: request.contactId,
-      serverId: request.serverId,
+      servers: request.servers,
       nickname: request.name,
       title: request.title,
       bio: request.bio,
@@ -500,7 +631,9 @@ class _ContactsScreenState extends ConsumerState<ContactsScreen> {
   }
 }
 
-enum _ContactAction { edit, network, delete }
+enum _ContactAction { edit, network, removeFromNetwork, delete }
+
+enum _NetworkAction { edit, delete }
 
 /// Contacts list screen: title row, search field, and a floating add-contact button,
 /// and an alphabetically-grouped contact list built entirely from [contacts].
@@ -512,6 +645,7 @@ class ContactsListScreen extends StatefulWidget {
   final List<ContactsNetworkData> networks;
   final String? selectedNetworkId;
   final ValueChanged<String?>? onNetworkSelected;
+  final Future<void> Function(ContactsNetworkData network)? onLongPressNetwork;
   final VoidCallback? onCreateNetwork;
   final List<ReceivedContact> pendingContacts;
   final VoidCallback? onOpenPendingContacts;
@@ -526,6 +660,7 @@ class ContactsListScreen extends StatefulWidget {
     this.networks = const [],
     this.selectedNetworkId,
     this.onNetworkSelected,
+    this.onLongPressNetwork,
     this.onCreateNetwork,
     this.pendingContacts = const [],
     this.onOpenPendingContacts,
@@ -730,6 +865,9 @@ class _ContactsListScreenState extends State<ContactsListScreen> {
                               widget.selectedNetworkId == network.networkId,
                           onPressed: () =>
                               widget.onNetworkSelected?.call(network.networkId),
+                          onLongPress: widget.onLongPressNetwork == null
+                              ? null
+                              : () => widget.onLongPressNetwork!(network),
                         ),
                     ],
                   ),
@@ -781,12 +919,14 @@ class _NetworkFilterButton extends StatelessWidget {
   final bool selected;
   final String? tooltip;
   final VoidCallback onPressed;
+  final VoidCallback? onLongPress;
 
   const _NetworkFilterButton({
     required this.label,
     required this.selected,
     this.tooltip,
     required this.onPressed,
+    this.onLongPress,
   });
 
   @override
@@ -804,27 +944,30 @@ class _NetworkFilterButton extends StatelessWidget {
         child: SizedBox(
           width: isCreateButton ? 42.0 : null,
           height: 42.0,
-          child: TextButton(
-            onPressed: onPressed,
-            style: TextButton.styleFrom(
-              foregroundColor: selected
-                  ? theme.primaryGreen
-                  : AppColors.mutedSlate,
-              backgroundColor: selected
-                  ? theme.primaryGreen.withAlpha(35)
-                  : theme.border.withAlpha(90),
-              shape: isCreateButton
-                  ? const CircleBorder()
-                  : const StadiumBorder(),
-              padding: isCreateButton
-                  ? EdgeInsets.zero
-                  : const EdgeInsets.symmetric(horizontal: 14.0),
-            ),
-            child: Text(
-              displayLabel.isEmpty ? '?' : displayLabel,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(fontWeight: FontWeight.w700),
+          child: GestureDetector(
+            onLongPress: onLongPress,
+            child: TextButton(
+              onPressed: onPressed,
+              style: TextButton.styleFrom(
+                foregroundColor: selected
+                    ? theme.primaryGreen
+                    : AppColors.mutedSlate,
+                backgroundColor: selected
+                    ? theme.primaryGreen.withAlpha(35)
+                    : theme.border.withAlpha(90),
+                shape: isCreateButton
+                    ? const CircleBorder()
+                    : const StadiumBorder(),
+                padding: isCreateButton
+                    ? EdgeInsets.zero
+                    : const EdgeInsets.symmetric(horizontal: 14.0),
+              ),
+              child: Text(
+                displayLabel.isEmpty ? '?' : displayLabel,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(fontWeight: FontWeight.w700),
+              ),
             ),
           ),
         ),
