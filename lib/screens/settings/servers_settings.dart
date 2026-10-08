@@ -26,9 +26,14 @@ class ServersSettingsScreen extends ConsumerWidget {
     await serverList.init();
     if (!context.mounted) return;
 
-    final servers = serverList.servers
-        .map((s) => ServerInfo.fromJson(s.toJson()))
-        .toList();
+    final servers = [
+      for (final server in serverList.servers)
+        ServerInfo.fromJson(server.toJson()),
+      // Extras are full peers too — same cards, same disconnect flow; the
+      // only difference is they're never given a websocket.
+      for (final server in serverList.extraServers)
+        ServerInfo.fromJson(server.toJson(), isExtra: true),
+    ];
 
     showModalBottomSheet<void>(
       context: context,
@@ -44,7 +49,10 @@ class ServersSettingsScreen extends ConsumerWidget {
 
   Future<void> _disconnectServer(WidgetRef ref, ServerInfo server) async {
     final serverList = ref.read(serverListProvider);
-    await serverList.removeServer(server.serverId);
+    // Whichever list it lives in — normal first, then extra.
+    if (!await serverList.removeServer(server.serverId)) {
+      await serverList.removeExtraServer(server.serverId);
+    }
     await ApiClient.unregisterServer(server.serverId);
 
     // The shared server list notifies the SSE supervisor, which drops that
@@ -97,12 +105,21 @@ class ServersSettingsScreen extends ConsumerWidget {
     final serverList = ref.read(serverListProvider);
     await serverList.init();
 
-    if (serverList.getServer(full.serverId) == null) {
+    // Join the normal list while there's room; once it's full the server is
+    // joined as an extra one. Either way it is a real peer from here on —
+    // ApiClient registration and the passport exchange below are identical,
+    // and only ServerConnectionService skips the websocket for extras.
+    var joinedAsExtra = serverList.getExtraServer(full.serverId) != null;
+    if (!joinedAsExtra && serverList.getServer(full.serverId) == null) {
+      final config = full.toConfig();
       try {
-        await serverList.addServer(full.toConfig());
+        if (serverList.canJoinExtraServers) {
+          await serverList.addExtraServer(config);
+          joinedAsExtra = true;
+        } else {
+          await serverList.addServer(config);
+        }
       } on ServerListException catch (error) {
-        // The normal list is capped at ServerListService.maxServers — at
-        // the cap the user has to join the server as an extra one instead.
         if (!context.mounted) return;
         ScaffoldMessenger.of(
           context,
@@ -129,7 +146,10 @@ class ServersSettingsScreen extends ConsumerWidget {
     final messenger = ScaffoldMessenger.of(context);
     final message = switch (result.outcome) {
       server_connect.ServerConnectOutcome.success =>
-        'Connected to ${full.serverName}.',
+        joinedAsExtra
+            ? 'Connected to ${full.serverName} as an extra server '
+                  '(updates only, no websocket).'
+            : 'Connected to ${full.serverName}.',
       server_connect.ServerConnectOutcome.noPassport =>
         'No passport found. Sign up again to obtain one.',
       server_connect.ServerConnectOutcome.noIdentity =>

@@ -36,6 +36,11 @@ class ServerInfo {
   /// Never null - an absent category list simply reads as empty.
   final List<String> categories;
 
+  /// True for a server joined from the *extra* list: it is a full peer
+  /// (directory entry, passport/token pair, HTTP calls) but is never given
+  /// a websocket, so the card says so.
+  final bool isExtra;
+
   const ServerInfo({
     required this.serverId,
     required this.serverName,
@@ -46,11 +51,13 @@ class ServerInfo {
     this.disabled = false,
     this.location,
     this.categories = const [],
+    this.isExtra = false,
   });
 
   /// Safe to call with the full server object; anything not listed here is
-  /// ignored.
-  factory ServerInfo.fromJson(Map<String, dynamic> json) {
+  /// ignored. Directory payloads carry no [isExtra] flag - it is set by the
+  /// caller for servers coming out of the extra list.
+  factory ServerInfo.fromJson(Map<String, dynamic> json, {bool isExtra = false}) {
     return ServerInfo(
       serverId: json['serverId'] as String? ?? '',
       serverName: json['serverName'] as String? ?? '',
@@ -64,6 +71,7 @@ class ServerInfo {
               ?.whereType<String>()
               .toList() ??
           const [],
+      isExtra: isExtra,
     );
   }
 
@@ -426,6 +434,27 @@ class _ServerCardState extends State<_ServerCard> {
                             color: theme.textInputColor,
                           ).copyWith(fontWeight: FontWeight.bold),
                         ),
+                        if (server.isExtra) ...[
+                          const SizedBox(height: 4.0),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 6.0,
+                              vertical: 2.0,
+                            ),
+                            decoration: BoxDecoration(
+                              color: theme.primaryGreen.withAlpha(35),
+                              borderRadius: BorderRadius.circular(6.0),
+                            ),
+                            child: Text(
+                              'Extra server · HTTP only',
+                              style: AppTypography.getTextStyle(
+                                context,
+                                AppTextType.tiny,
+                                color: theme.primaryGreen,
+                              ).copyWith(fontSize: 10.0),
+                            ),
+                          ),
+                        ],
                         const SizedBox(height: 2.0),
                         Text(
                           server.serverUrl,

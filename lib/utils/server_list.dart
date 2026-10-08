@@ -160,9 +160,11 @@ class ServerListException implements Exception {
 ///    [ServerListService.maxServers] entries, and the only one the websocket
 ///    hub connects to (`ServerConnectionService`);
 ///  * the extra list ([extraServers], key `extra_server_list`) — joinable
-///    once the normal list is full ([canJoinExtraServers]). Extras never get
-///    a socket: they exist to be polled over HTTP, so the updates feed pulls
-///    from the normal list *and* this one.
+///    once the normal list is full ([canJoinExtraServers]). An extra server
+///    is a full peer — directory entry, `ApiClient` registration, passport
+///    exchange, HTTP calls — the only difference is it never gets a
+///    websocket (`ServerConnectionService` reads the normal list), which is
+///    why the updates feed polls the normal list *and* this one.
 ///
 /// Usage:
 ///   final service = ServerListService();
