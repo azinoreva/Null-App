@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../engine/functions/servers/connect_serverfxn.dart'
     as server_connect;
+import '../../engine/functions/servers/serverfxn.dart' as server_database;
 import '../../engine/network/api_client.dart';
 import '../../engine/network/auth_failure_handler.dart';
 import '../../engine/network/servers/servers.dart' as server_directory;
@@ -121,9 +122,8 @@ class ServersSettingsScreen extends ConsumerWidget {
         }
       } on ServerListException catch (error) {
         if (!context.mounted) return;
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(error.message)));
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(error.message)));
         return;
       }
     }
@@ -137,9 +137,13 @@ class ServersSettingsScreen extends ConsumerWidget {
     );
 
     // Exchange the passport saved at signup for this server's token pair.
+    final database = ref.read(appDatabaseProvider);
+    if (await database.serversDao.getServerById(full.serverId) == null) {
+      await server_database.createServer(database.serversDao, server: full);
+    }
     final result = await server_connect.connectServerUsingPassport(
-      serverId: full.serverId,
       database: ref.read(appDatabaseProvider),
+      serverId: full.serverId,
     );
 
     if (!context.mounted) return;

@@ -4,7 +4,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 
+import '../engine/functions/servers/serverfxn.dart' as server_database;
+import '../engine/network/servers/servers.dart' as server_directory;
 import '../state/providers.dart';
+import '../utils/server_list.dart';
 import '../widgets/chats/chat_bubble_component.dart';
 import '../widgets/chats/chat_input_component.dart';
 
@@ -88,9 +91,12 @@ class _ChattingState extends ConsumerState<Chatting> {
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
 
-    final messagesAsync = ref.watch(chatMessagesProvider(widget.conversationId));
-    final syncState =
-        ref.watch(conversationSyncStateProvider(widget.conversationId));
+    final messagesAsync = ref.watch(
+      chatMessagesProvider(widget.conversationId),
+    );
+    final syncState = ref.watch(
+      conversationSyncStateProvider(widget.conversationId),
+    );
     final draft = syncState.value?.draft ?? '';
 
     return Scaffold(
@@ -128,6 +134,28 @@ class _ChattingState extends ConsumerState<Chatting> {
     }
 
     try {
+      final database = ref.read(appDatabaseProvider);
+      if (await database.serversDao.getServerById(conversation.serverId) ==
+          null) {
+        // Older installations stored connected servers only in the local
+        // server list. Recreate the database row before inserting an FK-backed
+        // task.
+        final config = await ServerListService.lookup(conversation.serverId);
+        if (config != null) {
+          await server_database.createServer(
+            database.serversDao,
+            server: server_directory.ServerInfo.fromJson(config.toJson()),
+          );
+        }
+      }
+
+      if (await database.serversDao.getServerById(conversation.serverId) ==
+          null) {
+        throw StateError(
+          'The server is not available locally. Reconnect it before sending.',
+        );
+      }
+
       final session = await ref
           .read(appDatabaseProvider)
           .sessionsDao
@@ -135,14 +163,18 @@ class _ChattingState extends ConsumerState<Chatting> {
       final handshakeRequired = session?.status != 2;
 
       if (handshakeRequired) {
-        await ref.read(taskQueueProvider).queueTask(
+        await ref
+            .read(taskQueueProvider)
+            .queueTask(
               functionName: 'ensureDhFlow',
               args: [widget.conversationId, conversation.serverId],
               serverId: conversation.serverId,
             );
       }
 
-      await ref.read(taskQueueProvider).queueTask(
+      await ref
+          .read(taskQueueProvider)
+          .queueTask(
             functionName: 'sendChatMessage',
             args: [
               widget.conversationId,
@@ -168,13 +200,13 @@ class _ChattingState extends ConsumerState<Chatting> {
   Widget _buildHeader(BuildContext context, ColorScheme colorScheme) {
     final initials = widget.displayName.isNotEmpty
         ? widget.displayName
-            .trim()
-            .split(' ')
-            .where((w) => w.isNotEmpty)
-            .map((w) => w[0])
-            .take(2)
-            .join()
-            .toUpperCase()
+              .trim()
+              .split(' ')
+              .where((w) => w.isNotEmpty)
+              .map((w) => w[0])
+              .take(2)
+              .join()
+              .toUpperCase()
         : (_isGroup ? 'G' : 'U');
 
     return Container(
@@ -183,8 +215,11 @@ class _ChattingState extends ConsumerState<Chatting> {
       child: Row(
         children: [
           IconButton(
-            icon: Icon(Icons.arrow_back_ios_new_rounded,
-                color: colorScheme.onSurface, size: 20),
+            icon: Icon(
+              Icons.arrow_back_ios_new_rounded,
+              color: colorScheme.onSurface,
+              size: 20,
+            ),
             onPressed: () => Navigator.maybePop(context),
           ),
           const SizedBox(width: 4),
@@ -214,8 +249,7 @@ class _ChattingState extends ConsumerState<Chatting> {
                     decoration: BoxDecoration(
                       color: _statusColor(),
                       shape: BoxShape.circle,
-                      border:
-                          Border.all(color: colorScheme.surface, width: 2),
+                      border: Border.all(color: colorScheme.surface, width: 2),
                     ),
                   ),
                 ),
@@ -257,8 +291,10 @@ class _ChattingState extends ConsumerState<Chatting> {
             ),
           ),
           IconButton(
-            icon: const Icon(Icons.notifications_none_rounded,
-                color: Colors.green),
+            icon: const Icon(
+              Icons.notifications_none_rounded,
+              color: Colors.green,
+            ),
             onPressed: () {},
           ),
           IconButton(
