@@ -96,4 +96,56 @@ void main() {
       expect(await ServerListService.lookup('server_missing'), isNull);
     });
   });
+
+  group('ServerListService.pickSendServers', () {
+    setUp(() {
+      SharedPreferences.setMockInitialValues({});
+    });
+
+    Future<void> seedMine(List<String> ids) async {
+      final service = ServerListService();
+      await service.init();
+      for (final id in ids) {
+        await service.addServer(_server(id));
+      }
+    }
+
+    test('a shared server is used for both roles', () async {
+      await seedMine(['mine_1', 'shared', 'mine_2']);
+      final picked =
+          await ServerListService.pickSendServers(['contact_a', 'shared']);
+      expect(picked.transport, 'shared');
+      expect(picked.target, 'shared');
+    });
+
+    test('a random shared server wins among several matches', () async {
+      await seedMine(['shared_1', 'shared_2', 'mine_1']);
+      for (var i = 0; i < 20; i++) {
+        final picked =
+            await ServerListService.pickSendServers(['shared_1', 'shared_2']);
+        expect(picked.transport, picked.target);
+        expect(['shared_1', 'shared_2'], contains(picked.transport));
+      }
+    });
+
+    test('no shared server: target is a contact server, transport ours',
+        () async {
+      await seedMine(['mine_1', 'mine_2']);
+      for (var i = 0; i < 20; i++) {
+        final picked = await ServerListService.pickSendServers(
+          ['contact_a', 'contact_b'],
+        );
+        expect(['contact_a', 'contact_b'], contains(picked.target));
+        expect(['mine_1', 'mine_2'], contains(picked.transport));
+        expect(['mine_1', 'mine_2'], isNot(contains(picked.target)));
+      }
+    });
+
+    test('empty conversation servers fall back to our own list', () async {
+      await seedMine(['mine_1', 'mine_2']);
+      final picked = await ServerListService.pickSendServers(const []);
+      expect(['mine_1', 'mine_2'], contains(picked.transport));
+      expect(['mine_1', 'mine_2'], contains(picked.target));
+    });
+  });
 }

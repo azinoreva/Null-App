@@ -6,6 +6,7 @@ import 'tables/servers.dart';
 import 'tables/conversations.dart';
 import 'tables/messages.dart';
 import 'tables/contacts.dart';
+import 'tables/servers_converter.dart';
 import 'tables/networks.dart';
 import 'tables/groups.dart';
 import 'tables/group_members.dart';
@@ -105,7 +106,7 @@ class AppDatabase extends _$AppDatabase {
   }
 
   @override
-  int get schemaVersion => 8;
+  int get schemaVersion => 9;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -146,6 +147,15 @@ class AppDatabase extends _$AppDatabase {
         );
         await customStatement(
           'ALTER TABLE contacts DROP COLUMN main_server_id;',
+        );
+      }
+      if (from < 9) {
+        // conversations.server_id (a single server) became
+        // conversations.servers (a JSON list of up to 8 servers), mirroring
+        // contacts.servers. The column stays TEXT; ServersConverter reads the
+        // old single id back as a one-element list.
+        await customStatement(
+          'ALTER TABLE conversations RENAME COLUMN server_id TO servers;',
         );
       }
     },

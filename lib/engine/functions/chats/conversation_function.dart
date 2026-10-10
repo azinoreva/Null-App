@@ -7,7 +7,7 @@ Future<void> createConversation(
   ConversationsDao dao, {
   required String conversationId,
   required int conversationType,
-  required String serverId,
+  required List<String> servers,
   String? lastMessageId,
   int? lastMessageTime,
 }) async {
@@ -16,7 +16,7 @@ Future<void> createConversation(
   final companion = ConversationsCompanion.insert(
     conversationId: conversationId,
     conversationType: conversationType,
-    serverId: serverId,
+    servers: servers,
     lastMessageId: Value(lastMessageId),
     lastMessageTime: Value(lastMessageTime),
     unreadCount: const Value(0),
@@ -44,7 +44,7 @@ Future<void> updateConversationFields(
   int? pinned,
   int? archived,
   String? draft,
-  String? serverId,
+  List<String>? servers,
   String? sound,
   int? badge,
   int? vibration,
@@ -65,7 +65,7 @@ Future<void> updateConversationFields(
     pinned: pinned != null ? Value(pinned) : const Value.absent(),
     archived: archived != null ? Value(archived) : const Value.absent(),
     draft: draft != null ? Value(draft) : const Value.absent(),
-    serverId: serverId != null ? Value(serverId) : const Value.absent(),
+    servers: servers != null ? Value(servers) : const Value.absent(),
     sound: sound != null ? Value(sound) : const Value.absent(),
     badge: badge != null ? Value(badge) : const Value.absent(),
     vibration: vibration != null ? Value(vibration) : const Value.absent(),

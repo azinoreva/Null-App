@@ -20,9 +20,9 @@ import 'package:cryptography/cryptography.dart';
 ///   4. Package [ephemeral public key | nonce | ciphertext | MAC] together
 ///      and Base64-encode it as the single output string.
 ///
-/// [publicKey] must be the recipient's X25519 public key, Base64-encoded
-/// (32 raw bytes before encoding) — matching the format your app already
-/// uses for stored public keys.
+/// [publicKey] must be the recipient's X25519 public key, Base64url-encoded
+/// (32 raw bytes before encoding) — matching the format your app uses for
+/// stored public keys.
 ///
 /// Returns a single Base64 string containing everything needed to
 /// decrypt on the recipient's side, safe to drop straight into the
@@ -39,7 +39,7 @@ Future<String> encryptMessage({
   final ephemeralPublicKey = await ephemeralKeyPair.extractPublicKey();
 
   // 2. Recipient's public key, from the Base64 string passed in.
-  final recipientPublicKeyBytes = base64Decode(publicKey);
+  final recipientPublicKeyBytes = base64Url.decode(publicKey);
   if (recipientPublicKeyBytes.length != 32) {
     throw FormatException('Recipient public key must be 32 bytes.');
   }

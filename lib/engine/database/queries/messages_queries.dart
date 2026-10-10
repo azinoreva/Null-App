@@ -1,7 +1,9 @@
 import 'package:drift/drift.dart';
+
 import '../app_database.dart';
 
 import '../tables/messages.dart';
+import '../tables/sync_state.dart';
 
 part 'messages_queries.g.dart';
 
@@ -37,7 +39,19 @@ class MessagesDao extends DatabaseAccessor<AppDatabase>
 
   // Insert a new message.
   Future<int> insertMessage(Insertable<Message> message) =>
-      into(db.messages).insert(message);
+      db.transaction(() async {
+        final inserted = await into(db.messages).insertReturning(message);
+        await (update(db.syncState)
+              ..where((t) => t.conversationId.equals(inserted.conversationId)))
+            .write(
+              SyncStateCompanion(
+                lastMessageId: Value(inserted.messageId),
+                lastMessage: Value(inserted.decryptedMessage),
+                updatedAt: Value(inserted.timestamp),
+              ),
+            );
+        return 1;
+      });
 
   // Insert multiple messages in a batch (atomic).
   Future<void> insertMessages(List<Insertable<Message>> messages) =>
@@ -61,9 +75,7 @@ class MessagesDao extends DatabaseAccessor<AppDatabase>
     String? decryptedMessage,
   ) async {
     await (update(db.messages)..where((t) => t.messageId.equals(messageId)))
-        .write(
-          MessagesCompanion(decryptedMessage: Value(decryptedMessage)),
-        );
+        .write(MessagesCompanion(decryptedMessage: Value(decryptedMessage)));
   }
 
   // Delete a message by ID.

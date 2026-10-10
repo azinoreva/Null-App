@@ -114,7 +114,7 @@ Future<ReceiveContactResult> receiveContact({
       pinned: 0,
       archived: 0,
       draft: null,
-      serverId: conversationServerId,
+      servers: contactServers,
       createdAt: now,
       updatedAt: now,
       sound: null,

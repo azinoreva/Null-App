@@ -29,6 +29,9 @@ import '../../database/queries/messages_queries.dart';
 import '../../network/api_client.dart';
 import '../../network/auth_failure_handler.dart';
 import '../../network/chats/send_message.dart';
+import '../../network/servers/servers.dart' as server_directory;
+import '../../../utils/server_list.dart';
+import '../servers/serverfxn.dart' as server_database;
 import 'message_types.dart';
 import 'wire_protocol.dart';
 
@@ -83,15 +86,40 @@ Future<void> _sendTypedMessageTask(
   String conversationId,
   int messageTypeValue,
   String payloadJson,
-  String serverId,
+  String serverIdHint,
   String messageId,
   String logicalId,
   String? replyTo,
   AppDatabase database,
 ) async {
-  final server = await database.serversDao.getServerById(serverId);
+  // Where the message is posted vs. where it is destined (see the chat send
+  // path): shared servers coincide; otherwise we forward through one of our
+  // own servers to a target the contact is on.
+  final conversation = await database.conversationsDao.getConversationById(
+    conversationId,
+  );
+  final conversationServers = conversation?.servers ?? const <String>[];
+  final sendServers = await ServerListService.pickSendServers(
+    conversationServers,
+  );
+  final serverId = sendServers.transport;
+
+  var server = await database.serversDao.getServerById(serverId);
   if (server == null || server.serverUrl.isEmpty) {
-    throw StateError('No URL is stored for server $serverId.');
+    final config = await ServerListService.lookup(serverId) ??
+        (serverIdHint.isEmpty
+            ? null
+            : await ServerListService.lookup(serverIdHint));
+    if (config != null) {
+      await server_database.createServer(
+        database.serversDao,
+        server: server_directory.ServerInfo.fromJson(config.toJson()),
+      );
+      server = await database.serversDao.getServerById(serverId);
+    }
+    if (server == null || server.serverUrl.isEmpty) {
+      throw StateError('No URL is stored for server $serverId.');
+    }
   }
   if (!ApiClient.isRegistered(serverId)) {
     await ApiClient.registerServer(
@@ -140,6 +168,7 @@ Future<void> _sendTypedMessageTask(
     messageType: type,
     payload: payload,
     serverId: serverId,
+    targetServerId: sendServers.target,
     messageId: messageId,
     logicalId: logicalId,
     replyTo: replyTo,
@@ -164,6 +193,7 @@ Future<SendMessageResponse> sendTypedMessage(
   required MessageType messageType,
   required Map<String, dynamic> payload,
   required String serverId,
+  String? targetServerId,
   String? messageId,
   String? logicalId,
   String? replyTo,
@@ -199,7 +229,7 @@ Future<SendMessageResponse> sendTypedMessage(
       'mac': base64UrlEncode(existing.mac),
       'sender_sequence': existing.senderSequence,
     });
-    return _post(
+return _post(
       service,
       recipients,
       existing.messageId,
@@ -209,7 +239,8 @@ Future<SendMessageResponse> sendTypedMessage(
       wirePayload,
       existing.messageOrder,
       existing.senderSequence,
-      'none', // top-level API field, distinct from the crypto nonce in wirePayload
+      'none',
+      targetServerId: targetServerId,
     );
   }
 
@@ -295,6 +326,7 @@ Future<SendMessageResponse> sendTypedMessage(
     messageOrder,
     senderSequence,
     'none',
+    targetServerId: targetServerId,
   );
 }
 
@@ -308,8 +340,9 @@ Future<SendMessageResponse> _post(
   String wireMessage,
   int messageOrder,
   int senderSequence,
-  String nonce,
-) {
+  String nonce, {
+  String? targetServerId,
+}) {
   return service.sendMessage(
     recipientIds: recipients,
     messageId: messageId,
@@ -320,5 +353,6 @@ Future<SendMessageResponse> _post(
     messageOrder: messageOrder,
     nonce: nonce,
     senderSequence: senderSequence,
+    serverId: targetServerId ?? service.serverId,
   );
 }

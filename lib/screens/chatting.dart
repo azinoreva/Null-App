@@ -126,21 +126,26 @@ class _ChattingState extends ConsumerState<Chatting> {
         .getConversationById(widget.conversationId);
     if (!mounted) return;
 
-    if (conversation == null || conversation.serverId.isEmpty) {
+    if (conversation == null || conversation.servers.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('This conversation has no server.')),
+        const SnackBar(content: Text('This conversation has no servers.')),
       );
       return;
     }
 
     try {
       final database = ref.read(appDatabaseProvider);
-      if (await database.serversDao.getServerById(conversation.serverId) ==
-          null) {
+      // The DH handshake still keys off a single server: the contact's first
+      // one (falling back to our own list). Message sends re-derive the
+      // transport/target from conversation.servers when they run.
+      final primaryServerId = await ServerListService.primaryServerIdFor(
+        conversation.servers,
+      );
+      if (await database.serversDao.getServerById(primaryServerId) == null) {
         // Older installations stored connected servers only in the local
         // server list. Recreate the database row before inserting an FK-backed
         // task.
-        final config = await ServerListService.lookup(conversation.serverId);
+        final config = await ServerListService.lookup(primaryServerId);
         if (config != null) {
           await server_database.createServer(
             database.serversDao,
@@ -149,8 +154,7 @@ class _ChattingState extends ConsumerState<Chatting> {
         }
       }
 
-      if (await database.serversDao.getServerById(conversation.serverId) ==
-          null) {
+      if (await database.serversDao.getServerById(primaryServerId) == null) {
         throw StateError(
           'The server is not available locally. Reconnect it before sending.',
         );
@@ -167,8 +171,8 @@ class _ChattingState extends ConsumerState<Chatting> {
             .read(taskQueueProvider)
             .queueTask(
               functionName: 'ensureDhFlow',
-              args: [widget.conversationId, conversation.serverId],
-              serverId: conversation.serverId,
+              args: [widget.conversationId, primaryServerId],
+              serverId: primaryServerId,
             );
       }
 
@@ -179,11 +183,11 @@ class _ChattingState extends ConsumerState<Chatting> {
             args: [
               widget.conversationId,
               text,
-              conversation.serverId,
+              primaryServerId,
               _uuid.v4(),
               _uuid.v4(),
             ],
-            serverId: conversation.serverId,
+            serverId: primaryServerId,
           );
 
       await ref

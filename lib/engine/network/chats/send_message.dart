@@ -63,6 +63,12 @@ class SendMessageService {
 
   /// Sends a message to one or more recipients within a conversation.
   ///
+  /// [serverId] is the server the message is destined for (written into the
+  /// request body); the class's own id is only the server the request is
+  /// actually posted to. They differ when we forward through one of our own
+  /// servers to a contact we share no server with — the receiving server
+  /// routes the message on to [serverId].
+  ///
   /// Auth (Bearer access token) and refresh-on-401 are handled automatically
   /// by ApiClient's interceptors.
   Future<SendMessageResponse> sendMessage({
@@ -75,6 +81,7 @@ class SendMessageService {
     required int messageOrder,
     required String nonce,
     required int senderSequence,
+    required String serverId,
   }) async {
     final response = await _dio.post(
       '/api/message',
@@ -86,6 +93,7 @@ class SendMessageService {
       ),
       data: {
         'recipient_ids': recipientIds.map((r) => r.toJson()).toList(),
+        'serverId': serverId,
         'messageId': messageId,
         'logicalId': logicalId,
         'conversationId': conversationId,

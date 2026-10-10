@@ -15,6 +15,9 @@ import '../../crypto/chat/ratchet_store.dart';
 import '../../network/api_client.dart';
 import '../../network/auth_failure_handler.dart';
 import '../../network/chats/send_message.dart'; // SendMessageService, MessageRecipient, SendMessageResponse
+import '../../network/servers/servers.dart' as server_directory;
+import '../../../utils/server_list.dart';
+import '../servers/serverfxn.dart' as server_database;
 
 const _uuid = Uuid();
 final Map<String, Future<void>> _sendTails = {};
@@ -46,13 +49,41 @@ Future<void> _sendQueuedChatMessage(
 ) async {
   final conversationId = args[0] as String;
   final plaintext = args[1] as String;
-  final serverId = args[2] as String;
+  final serverIdHint = args.length > 2 ? args[2] as String : '';
   final messageId = args[3] as String;
   final logicalId = args[4] as String;
 
-  final server = await database.serversDao.getServerById(serverId);
+  // Where the message is actually posted vs. where it is destined. When we
+  // share a server with the conversation's contact the two coincide; when we
+  // don't, we send through one of our own servers and the receiving server
+  // forwards it on to the target.
+  final conversation = await database.conversationsDao.getConversationById(
+    conversationId,
+  );
+  final conversationServers = conversation?.servers ?? const <String>[];
+  final sendServers = await ServerListService.pickSendServers(
+    conversationServers,
+  );
+  final serverId = sendServers.transport;
+
+  var server = await database.serversDao.getServerById(serverId);
   if (server == null || server.serverUrl.isEmpty) {
-    throw StateError('No URL is stored for server $serverId.');
+    // The picked transport may not have a database row yet; recreate it from
+    // the persisted server list, falling back to the queued hint server.
+    final config = await ServerListService.lookup(serverId) ??
+        (serverIdHint.isEmpty
+            ? null
+            : await ServerListService.lookup(serverIdHint));
+    if (config != null) {
+      await server_database.createServer(
+        database.serversDao,
+        server: server_directory.ServerInfo.fromJson(config.toJson()),
+      );
+      server = await database.serversDao.getServerById(serverId);
+    }
+    if (server == null || server.serverUrl.isEmpty) {
+      throw StateError('No URL is stored for server $serverId.');
+    }
   }
 
   if (!ApiClient.isRegistered(serverId)) {
@@ -100,6 +131,7 @@ Future<void> _sendQueuedChatMessage(
     conversationId: conversationId,
     plaintext: plaintext,
     serverId: serverId,
+    targetServerId: sendServers.target,
     messageId: messageId,
     logicalId: logicalId,
   );
@@ -121,6 +153,7 @@ Future<SendMessageResponse> sendChatMessage(
   required String conversationId, // == contactId
   required String plaintext,
   required String serverId,
+  String? targetServerId,
   String? messageId,
   String? logicalId,
 }) async {
@@ -163,6 +196,7 @@ Future<SendMessageResponse> sendChatMessage(
       messageOrder: existing.messageOrder,
       nonce: 'none',
       senderSequence: existing.senderSequence,
+      serverId: targetServerId ?? serverId,
     );
   }
 
@@ -235,5 +269,6 @@ Future<SendMessageResponse> sendChatMessage(
     messageOrder: encrypted.chainIndex,
     nonce: 'none', // top-level API field, distinct from the real crypto nonce packed inside wirePayload
     senderSequence: senderSequence,
+    serverId: targetServerId ?? serverId,
   );
 }

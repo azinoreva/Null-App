@@ -148,6 +148,7 @@ class SyncStatesNotifier extends AsyncNotifier<List<SyncStateData>> {
   @override
   Future<List<SyncStateData>> build() async {
     final dao = ref.watch(syncStateDaoProvider);
+    await _materializeConversationProjections(dao);
     final ready = Completer<void>();
 
     _subscription = dao.watchAllSyncStates().listen(
@@ -165,6 +166,56 @@ class SyncStatesNotifier extends AsyncNotifier<List<SyncStateData>> {
 
     await ready.future;
     return state.value ?? const [];
+  }
+
+  Future<void> _materializeConversationProjections(SyncStateDao syncDao) async {
+    final database = ref.read(appDatabaseProvider);
+    final conversations = await database.conversationsDao.getAllConversations();
+
+    for (final conversation in conversations) {
+      final latest = await database.messagesDao.getLatestMessage(
+        conversation.conversationId,
+      );
+      String displayName = conversation.conversationId;
+      String? avatar;
+      var status = 0;
+
+      if (conversation.conversationType == 0) {
+        final contact = await database.contactsDao.getContactByConversationId(
+          conversation.conversationId,
+        );
+        if (contact != null) {
+          displayName = contact.nickname?.trim().isNotEmpty == true
+              ? contact.nickname!.trim()
+              : contact.contactId;
+          avatar = contact.avatar == null
+              ? null
+              : 'data:image/png;base64,${base64Encode(contact.avatar!)}';
+          status = contact.isOnline;
+        }
+      } else {
+        final group = await database.groupsDao.getGroupById(
+          conversation.conversationId,
+        );
+        if (group != null) {
+          displayName = group.groupName;
+          avatar = group.avatar == null
+              ? null
+              : 'data:image/png;base64,${base64Encode(group.avatar!)}';
+        }
+      }
+
+      await syncDao.upsertConversationProjection(
+        conversationId: conversation.conversationId,
+        conversationType: conversation.conversationType,
+        displayName: displayName,
+        avatar: avatar,
+        status: status,
+        lastMessageId: latest?.messageId ?? conversation.lastMessageId,
+        lastMessage: latest?.decryptedMessage,
+        updatedAt: latest?.timestamp ?? conversation.updatedAt,
+      );
+    }
   }
 
   SyncStateDao get _dao => ref.read(syncStateDaoProvider);

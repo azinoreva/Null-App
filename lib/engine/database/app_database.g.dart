@@ -1864,17 +1864,15 @@ class $ConversationsTable extends Conversations
     type: DriftSqlType.string,
     requiredDuringInsert: false,
   );
-  static const VerificationMeta _serverIdMeta = const VerificationMeta(
-    'serverId',
-  );
   @override
-  late final GeneratedColumn<String> serverId = GeneratedColumn<String>(
-    'server_id',
-    aliasedName,
-    false,
-    type: DriftSqlType.string,
-    requiredDuringInsert: true,
-  );
+  late final GeneratedColumnWithTypeConverter<List<String>, String> servers =
+      GeneratedColumn<String>(
+        'servers',
+        aliasedName,
+        false,
+        type: DriftSqlType.string,
+        requiredDuringInsert: true,
+      ).withConverter<List<String>>($ConversationsTable.$converterservers);
   static const VerificationMeta _createdAtMeta = const VerificationMeta(
     'createdAt',
   );
@@ -1941,7 +1939,7 @@ class $ConversationsTable extends Conversations
     pinned,
     archived,
     draft,
-    serverId,
+    servers,
     createdAt,
     updatedAt,
     sound,
@@ -2033,14 +2031,6 @@ class $ConversationsTable extends Conversations
         draft.isAcceptableOrUnknown(data['draft']!, _draftMeta),
       );
     }
-    if (data.containsKey('server_id')) {
-      context.handle(
-        _serverIdMeta,
-        serverId.isAcceptableOrUnknown(data['server_id']!, _serverIdMeta),
-      );
-    } else if (isInserting) {
-      context.missing(_serverIdMeta);
-    }
     if (data.containsKey('created_at')) {
       context.handle(
         _createdAtMeta,
@@ -2120,10 +2110,12 @@ class $ConversationsTable extends Conversations
         DriftSqlType.string,
         data['${effectivePrefix}draft'],
       ),
-      serverId: attachedDatabase.typeMapping.read(
-        DriftSqlType.string,
-        data['${effectivePrefix}server_id'],
-      )!,
+      servers: $ConversationsTable.$converterservers.fromSql(
+        attachedDatabase.typeMapping.read(
+          DriftSqlType.string,
+          data['${effectivePrefix}servers'],
+        )!,
+      ),
       createdAt: attachedDatabase.typeMapping.read(
         DriftSqlType.int,
         data['${effectivePrefix}created_at'],
@@ -2151,6 +2143,9 @@ class $ConversationsTable extends Conversations
   $ConversationsTable createAlias(String alias) {
     return $ConversationsTable(attachedDatabase, alias);
   }
+
+  static JsonTypeConverter2<List<String>, String, Object?> $converterservers =
+      const ServersConverter();
 }
 
 class Conversation extends DataClass implements Insertable<Conversation> {
@@ -2163,7 +2158,12 @@ class Conversation extends DataClass implements Insertable<Conversation> {
   final int pinned;
   final int archived;
   final String? draft;
-  final String serverId;
+
+  /// The servers the contact of this conversation is on (a user has at most
+  /// 8), stored as JSON text. Mirrors [Contacts.servers] and is used to pick
+  /// where a message is routed. Rows written before multi-server support held
+  /// a bare server id, read back by [ServersConverter] as a one-element list.
+  final List<String> servers;
   final int createdAt;
   final int updatedAt;
   final String? sound;
@@ -2179,7 +2179,7 @@ class Conversation extends DataClass implements Insertable<Conversation> {
     required this.pinned,
     required this.archived,
     this.draft,
-    required this.serverId,
+    required this.servers,
     required this.createdAt,
     required this.updatedAt,
     this.sound,
@@ -2204,7 +2204,11 @@ class Conversation extends DataClass implements Insertable<Conversation> {
     if (!nullToAbsent || draft != null) {
       map['draft'] = Variable<String>(draft);
     }
-    map['server_id'] = Variable<String>(serverId);
+    {
+      map['servers'] = Variable<String>(
+        $ConversationsTable.$converterservers.toSql(servers),
+      );
+    }
     map['created_at'] = Variable<int>(createdAt);
     map['updated_at'] = Variable<int>(updatedAt);
     if (!nullToAbsent || sound != null) {
@@ -2232,7 +2236,7 @@ class Conversation extends DataClass implements Insertable<Conversation> {
       draft: draft == null && nullToAbsent
           ? const Value.absent()
           : Value(draft),
-      serverId: Value(serverId),
+      servers: Value(servers),
       createdAt: Value(createdAt),
       updatedAt: Value(updatedAt),
       sound: sound == null && nullToAbsent
@@ -2258,7 +2262,9 @@ class Conversation extends DataClass implements Insertable<Conversation> {
       pinned: serializer.fromJson<int>(json['pinned']),
       archived: serializer.fromJson<int>(json['archived']),
       draft: serializer.fromJson<String?>(json['draft']),
-      serverId: serializer.fromJson<String>(json['serverId']),
+      servers: $ConversationsTable.$converterservers.fromJson(
+        serializer.fromJson<Object?>(json['servers']),
+      ),
       createdAt: serializer.fromJson<int>(json['createdAt']),
       updatedAt: serializer.fromJson<int>(json['updatedAt']),
       sound: serializer.fromJson<String?>(json['sound']),
@@ -2279,7 +2285,9 @@ class Conversation extends DataClass implements Insertable<Conversation> {
       'pinned': serializer.toJson<int>(pinned),
       'archived': serializer.toJson<int>(archived),
       'draft': serializer.toJson<String?>(draft),
-      'serverId': serializer.toJson<String>(serverId),
+      'servers': serializer.toJson<Object?>(
+        $ConversationsTable.$converterservers.toJson(servers),
+      ),
       'createdAt': serializer.toJson<int>(createdAt),
       'updatedAt': serializer.toJson<int>(updatedAt),
       'sound': serializer.toJson<String?>(sound),
@@ -2298,7 +2306,7 @@ class Conversation extends DataClass implements Insertable<Conversation> {
     int? pinned,
     int? archived,
     Value<String?> draft = const Value.absent(),
-    String? serverId,
+    List<String>? servers,
     int? createdAt,
     int? updatedAt,
     Value<String?> sound = const Value.absent(),
@@ -2318,7 +2326,7 @@ class Conversation extends DataClass implements Insertable<Conversation> {
     pinned: pinned ?? this.pinned,
     archived: archived ?? this.archived,
     draft: draft.present ? draft.value : this.draft,
-    serverId: serverId ?? this.serverId,
+    servers: servers ?? this.servers,
     createdAt: createdAt ?? this.createdAt,
     updatedAt: updatedAt ?? this.updatedAt,
     sound: sound.present ? sound.value : this.sound,
@@ -2346,7 +2354,7 @@ class Conversation extends DataClass implements Insertable<Conversation> {
       pinned: data.pinned.present ? data.pinned.value : this.pinned,
       archived: data.archived.present ? data.archived.value : this.archived,
       draft: data.draft.present ? data.draft.value : this.draft,
-      serverId: data.serverId.present ? data.serverId.value : this.serverId,
+      servers: data.servers.present ? data.servers.value : this.servers,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
       sound: data.sound.present ? data.sound.value : this.sound,
@@ -2367,7 +2375,7 @@ class Conversation extends DataClass implements Insertable<Conversation> {
           ..write('pinned: $pinned, ')
           ..write('archived: $archived, ')
           ..write('draft: $draft, ')
-          ..write('serverId: $serverId, ')
+          ..write('servers: $servers, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt, ')
           ..write('sound: $sound, ')
@@ -2388,7 +2396,7 @@ class Conversation extends DataClass implements Insertable<Conversation> {
     pinned,
     archived,
     draft,
-    serverId,
+    servers,
     createdAt,
     updatedAt,
     sound,
@@ -2408,7 +2416,7 @@ class Conversation extends DataClass implements Insertable<Conversation> {
           other.pinned == this.pinned &&
           other.archived == this.archived &&
           other.draft == this.draft &&
-          other.serverId == this.serverId &&
+          other.servers == this.servers &&
           other.createdAt == this.createdAt &&
           other.updatedAt == this.updatedAt &&
           other.sound == this.sound &&
@@ -2426,7 +2434,7 @@ class ConversationsCompanion extends UpdateCompanion<Conversation> {
   final Value<int> pinned;
   final Value<int> archived;
   final Value<String?> draft;
-  final Value<String> serverId;
+  final Value<List<String>> servers;
   final Value<int> createdAt;
   final Value<int> updatedAt;
   final Value<String?> sound;
@@ -2443,7 +2451,7 @@ class ConversationsCompanion extends UpdateCompanion<Conversation> {
     this.pinned = const Value.absent(),
     this.archived = const Value.absent(),
     this.draft = const Value.absent(),
-    this.serverId = const Value.absent(),
+    this.servers = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
     this.sound = const Value.absent(),
@@ -2461,7 +2469,7 @@ class ConversationsCompanion extends UpdateCompanion<Conversation> {
     this.pinned = const Value.absent(),
     this.archived = const Value.absent(),
     this.draft = const Value.absent(),
-    required String serverId,
+    required List<String> servers,
     required int createdAt,
     required int updatedAt,
     this.sound = const Value.absent(),
@@ -2470,7 +2478,7 @@ class ConversationsCompanion extends UpdateCompanion<Conversation> {
     this.rowid = const Value.absent(),
   }) : conversationId = Value(conversationId),
        conversationType = Value(conversationType),
-       serverId = Value(serverId),
+       servers = Value(servers),
        createdAt = Value(createdAt),
        updatedAt = Value(updatedAt);
   static Insertable<Conversation> custom({
@@ -2483,7 +2491,7 @@ class ConversationsCompanion extends UpdateCompanion<Conversation> {
     Expression<int>? pinned,
     Expression<int>? archived,
     Expression<String>? draft,
-    Expression<String>? serverId,
+    Expression<String>? servers,
     Expression<int>? createdAt,
     Expression<int>? updatedAt,
     Expression<String>? sound,
@@ -2501,7 +2509,7 @@ class ConversationsCompanion extends UpdateCompanion<Conversation> {
       if (pinned != null) 'pinned': pinned,
       if (archived != null) 'archived': archived,
       if (draft != null) 'draft': draft,
-      if (serverId != null) 'server_id': serverId,
+      if (servers != null) 'servers': servers,
       if (createdAt != null) 'created_at': createdAt,
       if (updatedAt != null) 'updated_at': updatedAt,
       if (sound != null) 'sound': sound,
@@ -2521,7 +2529,7 @@ class ConversationsCompanion extends UpdateCompanion<Conversation> {
     Value<int>? pinned,
     Value<int>? archived,
     Value<String?>? draft,
-    Value<String>? serverId,
+    Value<List<String>>? servers,
     Value<int>? createdAt,
     Value<int>? updatedAt,
     Value<String?>? sound,
@@ -2539,7 +2547,7 @@ class ConversationsCompanion extends UpdateCompanion<Conversation> {
       pinned: pinned ?? this.pinned,
       archived: archived ?? this.archived,
       draft: draft ?? this.draft,
-      serverId: serverId ?? this.serverId,
+      servers: servers ?? this.servers,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       sound: sound ?? this.sound,
@@ -2579,8 +2587,10 @@ class ConversationsCompanion extends UpdateCompanion<Conversation> {
     if (draft.present) {
       map['draft'] = Variable<String>(draft.value);
     }
-    if (serverId.present) {
-      map['server_id'] = Variable<String>(serverId.value);
+    if (servers.present) {
+      map['servers'] = Variable<String>(
+        $ConversationsTable.$converterservers.toSql(servers.value),
+      );
     }
     if (createdAt.present) {
       map['created_at'] = Variable<int>(createdAt.value);
@@ -2615,7 +2625,7 @@ class ConversationsCompanion extends UpdateCompanion<Conversation> {
           ..write('pinned: $pinned, ')
           ..write('archived: $archived, ')
           ..write('draft: $draft, ')
-          ..write('serverId: $serverId, ')
+          ..write('servers: $servers, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt, ')
           ..write('sound: $sound, ')
@@ -11718,7 +11728,7 @@ class $$IdentityTableTableManager
           withReferenceMapper: (p0) => p0
               .map(
                 (e) => (
-                  e.readTable(table),
+                  e.readTable<$IdentityTable, IdentityData>(table),
                   $$IdentityTableReferences(db, table, e),
                 ),
               )
@@ -12337,7 +12347,7 @@ class $$ServersTableTableManager
           withReferenceMapper: (p0) => p0
               .map(
                 (e) => (
-                  e.readTable(table),
+                  e.readTable<$ServersTable, Server>(table),
                   $$ServersTableReferences(db, table, e),
                 ),
               )
@@ -12396,7 +12406,7 @@ typedef $$ConversationsTableCreateCompanionBuilder =
       Value<int> pinned,
       Value<int> archived,
       Value<String?> draft,
-      required String serverId,
+      required List<String> servers,
       required int createdAt,
       required int updatedAt,
       Value<String?> sound,
@@ -12415,7 +12425,7 @@ typedef $$ConversationsTableUpdateCompanionBuilder =
       Value<int> pinned,
       Value<int> archived,
       Value<String?> draft,
-      Value<String> serverId,
+      Value<List<String>> servers,
       Value<int> createdAt,
       Value<int> updatedAt,
       Value<String?> sound,
@@ -12547,9 +12557,10 @@ class $$ConversationsTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
-  ColumnFilters<String> get serverId => $composableBuilder(
-    column: $table.serverId,
-    builder: (column) => ColumnFilters(column),
+  ColumnWithTypeConverterFilters<List<String>, List<String>, String>
+  get servers => $composableBuilder(
+    column: $table.servers,
+    builder: (column) => ColumnWithTypeConverterFilters(column),
   );
 
   ColumnFilters<int> get createdAt => $composableBuilder(
@@ -12707,8 +12718,8 @@ class $$ConversationsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
-  ColumnOrderings<String> get serverId => $composableBuilder(
-    column: $table.serverId,
+  ColumnOrderings<String> get servers => $composableBuilder(
+    column: $table.servers,
     builder: (column) => ColumnOrderings(column),
   );
 
@@ -12784,8 +12795,8 @@ class $$ConversationsTableAnnotationComposer
   GeneratedColumn<String> get draft =>
       $composableBuilder(column: $table.draft, builder: (column) => column);
 
-  GeneratedColumn<String> get serverId =>
-      $composableBuilder(column: $table.serverId, builder: (column) => column);
+  GeneratedColumnWithTypeConverter<List<String>, String> get servers =>
+      $composableBuilder(column: $table.servers, builder: (column) => column);
 
   GeneratedColumn<int> get createdAt =>
       $composableBuilder(column: $table.createdAt, builder: (column) => column);
@@ -12919,7 +12930,7 @@ class $$ConversationsTableTableManager
                 Value<int> pinned = const Value.absent(),
                 Value<int> archived = const Value.absent(),
                 Value<String?> draft = const Value.absent(),
-                Value<String> serverId = const Value.absent(),
+                Value<List<String>> servers = const Value.absent(),
                 Value<int> createdAt = const Value.absent(),
                 Value<int> updatedAt = const Value.absent(),
                 Value<String?> sound = const Value.absent(),
@@ -12936,7 +12947,7 @@ class $$ConversationsTableTableManager
                 pinned: pinned,
                 archived: archived,
                 draft: draft,
-                serverId: serverId,
+                servers: servers,
                 createdAt: createdAt,
                 updatedAt: updatedAt,
                 sound: sound,
@@ -12955,7 +12966,7 @@ class $$ConversationsTableTableManager
                 Value<int> pinned = const Value.absent(),
                 Value<int> archived = const Value.absent(),
                 Value<String?> draft = const Value.absent(),
-                required String serverId,
+                required List<String> servers,
                 required int createdAt,
                 required int updatedAt,
                 Value<String?> sound = const Value.absent(),
@@ -12972,7 +12983,7 @@ class $$ConversationsTableTableManager
                 pinned: pinned,
                 archived: archived,
                 draft: draft,
-                serverId: serverId,
+                servers: servers,
                 createdAt: createdAt,
                 updatedAt: updatedAt,
                 sound: sound,
@@ -12983,7 +12994,7 @@ class $$ConversationsTableTableManager
           withReferenceMapper: (p0) => p0
               .map(
                 (e) => (
-                  e.readTable(table),
+                  e.readTable<$ConversationsTable, Conversation>(table),
                   $$ConversationsTableReferences(db, table, e),
                 ),
               )
@@ -13650,7 +13661,7 @@ class $$MessagesTableTableManager
           withReferenceMapper: (p0) => p0
               .map(
                 (e) => (
-                  e.readTable(table),
+                  e.readTable<$MessagesTable, Message>(table),
                   $$MessagesTableReferences(db, table, e),
                 ),
               )
@@ -14244,7 +14255,7 @@ class $$ContactsTableTableManager
           withReferenceMapper: (p0) => p0
               .map(
                 (e) => (
-                  e.readTable(table),
+                  e.readTable<$ContactsTable, Contact>(table),
                   $$ContactsTableReferences(db, table, e),
                 ),
               )
@@ -14610,7 +14621,9 @@ class $$ContactsNetworkTableTableManager
           withReferenceMapper: (p0) => p0
               .map(
                 (e) => (
-                  e.readTable(table),
+                  e.readTable<$ContactsNetworkTable, ContactsNetworkData>(
+                    table,
+                  ),
                   $$ContactsNetworkTableReferences(db, table, e),
                 ),
               )
@@ -14977,7 +14990,10 @@ class $$ContactNetworkMembersTableTableManager
           withReferenceMapper: (p0) => p0
               .map(
                 (e) => (
-                  e.readTable(table),
+                  e.readTable<
+                    $ContactNetworkMembersTable,
+                    ContactNetworkMember
+                  >(table),
                   $$ContactNetworkMembersTableReferences(db, table, e),
                 ),
               )
@@ -15510,8 +15526,10 @@ class $$GroupsTableTableManager
               ),
           withReferenceMapper: (p0) => p0
               .map(
-                (e) =>
-                    (e.readTable(table), $$GroupsTableReferences(db, table, e)),
+                (e) => (
+                  e.readTable<$GroupsTable, Group>(table),
+                  $$GroupsTableReferences(db, table, e),
+                ),
               )
               .toList(),
           prefetchHooksCallback:
@@ -15956,7 +15974,7 @@ class $$GroupMembersTableTableManager
           withReferenceMapper: (p0) => p0
               .map(
                 (e) => (
-                  e.readTable(table),
+                  e.readTable<$GroupMembersTable, GroupMember>(table),
                   $$GroupMembersTableReferences(db, table, e),
                 ),
               )
@@ -16547,7 +16565,9 @@ class $$ConnectionRequestsTableTableManager
           withReferenceMapper: (p0) => p0
               .map(
                 (e) => (
-                  e.readTable(table),
+                  e.readTable<$ConnectionRequestsTable, ConnectionRequest>(
+                    table,
+                  ),
                   $$ConnectionRequestsTableReferences(db, table, e),
                 ),
               )
@@ -17317,8 +17337,10 @@ class $$TasksTableTableManager
               ),
           withReferenceMapper: (p0) => p0
               .map(
-                (e) =>
-                    (e.readTable(table), $$TasksTableReferences(db, table, e)),
+                (e) => (
+                  e.readTable<$TasksTable, Task>(table),
+                  $$TasksTableReferences(db, table, e),
+                ),
               )
               .toList(),
           prefetchHooksCallback: ({serverId = false}) {
@@ -17643,7 +17665,7 @@ class $$ShamirsSecretTableTableManager
           withReferenceMapper: (p0) => p0
               .map(
                 (e) => (
-                  e.readTable(table),
+                  e.readTable<$ShamirsSecretTable, ShamirsSecretData>(table),
                   $$ShamirsSecretTableReferences(db, table, e),
                 ),
               )
@@ -17945,7 +17967,7 @@ class $$SecretShareTableTableManager
           withReferenceMapper: (p0) => p0
               .map(
                 (e) => (
-                  e.readTable(table),
+                  e.readTable<$SecretShareTable, SecretShareData>(table),
                   $$SecretShareTableReferences(db, table, e),
                 ),
               )
@@ -18427,7 +18449,16 @@ class $$SyncStateTableTableManager
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0
-              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .map(
+                (e) => (
+                  e.readTable<$SyncStateTable, SyncStateData>(table),
+                  BaseReferences<_$AppDatabase, $SyncStateTable, SyncStateData>(
+                    db,
+                    table,
+                    e,
+                  ),
+                ),
+              )
               .toList(),
           prefetchHooksCallback: null,
         ),
@@ -18787,7 +18818,7 @@ class $$SessionsTableTableManager
           withReferenceMapper: (p0) => p0
               .map(
                 (e) => (
-                  e.readTable(table),
+                  e.readTable<$SessionsTable, Session>(table),
                   $$SessionsTableReferences(db, table, e),
                 ),
               )

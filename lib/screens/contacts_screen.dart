@@ -208,11 +208,15 @@ class _ContactsScreenState extends ConsumerState<ContactsScreen> {
 
   Future<void> _openContactChat(ContactData contact) async {
     final database = ref.read(appDatabaseProvider);
-    // Conversations and the DH task still key off a single server id:
-    // use the contact's first known server, falling back to our own list.
+    // Conversations hold the contact's full server list; the DH task still
+    // keys off a single server id, so fall back to the first known one (or
+    // our own list) for that.
     final primaryServerId = await ServerListService.primaryServerIdFor(
       contact.servers,
     );
+    final conversationServers = contact.servers.isNotEmpty
+        ? contact.servers
+        : <String>[primaryServerId];
     final conversation = await database.conversationsDao.getConversationById(
       contact.contactId,
     );
@@ -229,7 +233,7 @@ class _ContactsScreenState extends ConsumerState<ContactsScreen> {
           pinned: 0,
           archived: 0,
           draft: null,
-          serverId: primaryServerId,
+          servers: conversationServers,
           createdAt: now,
           updatedAt: now,
           sound: null,

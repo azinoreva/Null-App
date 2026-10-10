@@ -11,6 +11,7 @@ import '../../crypto/chat/crypto_types.dart';
 import '../../crypto/chat/symmetric_ratchet.dart';
 import '../../crypto/chat/asymetric_encryption.dart';
 import '../../database/app_database.dart';
+import '../../media_handling/shrink_image.dart';
 import '../../database/queries/identity_queries.dart';
 import '../../database/queries/contacts_queries.dart';
 import '../../network/people/recieve_contact.dart';
@@ -71,12 +72,14 @@ Future<SendMyContactResult> sendMyContact({
   final servers = await ServerListService.readServerIds();
   final primaryServerId = await ServerListService.primaryServerIdFor(servers);
 
+  final avatarBase64 = await _compressAvatar(identity.avatar);
+
   final shared = await SendContactService().sendContact(
     nickname: nickname,
     title: title,
     bio: identity.bio ?? '',
     publicKey: publicKey,
-    avatar: identity.avatar ?? '',
+    avatar: avatarBase64,
     servers: servers,
   );
 
@@ -110,6 +113,19 @@ Future<SendMyContactResult> sendMyContact({
     manualCode: shared.contactKey,
     shareQRSVG: shared.url,
   );
+}
+
+/// Shrinks the identity's stored avatar (a local file path) into a
+/// compressed WebP Base64 string so the identity card stays within the
+/// server's avatar size budget. Returns an empty string when there is no
+/// avatar or it cannot be compressed.
+Future<String> _compressAvatar(String? avatarPath) async {
+  if (avatarPath == null || avatarPath.isEmpty) return '';
+  final compressed = await ContactImageCompressor.processImage(
+    imageInput: avatarPath,
+    toStringFlag: true,
+  );
+  return compressed?.base64String ?? '';
 }
 
 Future<void> _pollForReceivedContact({
@@ -167,7 +183,7 @@ Future<void> _pollForReceivedContact({
         pinned: 0,
         archived: 0,
         draft: null,
-        serverId: conversationServerId,
+        servers: contactServers,
         createdAt: now,
         updatedAt: now,
         sound: null,
@@ -283,6 +299,7 @@ Future<SendMessageResponse> sendContactDetails(
     messageOrder: 0,
     nonce: 'none',
     senderSequence: 0,
+    serverId: serverId,
   );
 
   return result;
@@ -346,5 +363,6 @@ Future<SendMessageResponse> sendContactDetailsBack(
     messageOrder: 0,
     nonce: 'none',
     senderSequence: 0,
+    serverId: serverId,
   );
 }

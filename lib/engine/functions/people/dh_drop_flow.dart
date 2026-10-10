@@ -97,7 +97,12 @@ Future<void> ensureDhDropForContact({
   if (contact == null || contact.publicKey == null || contact.publicKey!.isEmpty) {
     throw StateError('Contact $contactId has no public key on file.');
   }
-  await _ensureConversation(database, contactId, serverId);
+  // The conversation mirrors the contact's servers; when they published none
+  // (rare), fall back to the server we're already dropping through.
+  final conversationServers = contact.servers.isNotEmpty
+      ? contact.servers
+      : <String>[serverId];
+  await _ensureConversation(database, contactId, conversationServers);
 
   final session = await database.sessionsDao.getSessionByConversationId(
     contactId,
@@ -173,11 +178,7 @@ Future<void> _processDrop(AppDatabase database, DhDrop drop) async {
   );
   if (session?.status == 2) return; // already established
 
-  await _ensureConversation(
-    database,
-    contactId,
-    await ServerListService.primaryServerIdFor(contact.servers),
-  );
+  await _ensureConversation(database, contactId, contact.servers);
 
   // Our own ephemeral private key: either already stored (we dropped first)
   // or freshly made + dropped now ("not sent before").
@@ -210,7 +211,7 @@ Future<void> _processDrop(AppDatabase database, DhDrop drop) async {
   await _completeDh(
     database: database,
     contactId: contactId,
-    serverId: await ServerListService.primaryServerIdFor(contact.servers),
+    servers: contact.servers,
     sharedSecret: sharedSecret,
   );
 }
@@ -240,10 +241,10 @@ Future<void> _dropForContact(AppDatabase database, Contact contact) async {
 Future<void> _completeDh({
   required AppDatabase database,
   required String contactId,
-  required String serverId,
+  required List<String> servers,
   required Uint8List sharedSecret,
 }) async {
-  await _ensureConversation(database, contactId, serverId);
+  await _ensureConversation(database, contactId, servers);
 
   await database.sessionsDao.setSymmetricKey(
     conversationId: contactId,
@@ -269,10 +270,13 @@ Future<void> _completeDh({
 
   final taskQueue = appTaskQueueRef;
   if (taskQueue == null) return;
+  final hintServer = servers.isNotEmpty
+      ? servers.first
+      : await ServerListService.primaryServerIdFor(servers);
   await taskQueue.queueTask(
     functionName: 'sendChatMessage',
-    args: [contactId, 'hi', serverId, _uuid.v4(), _uuid.v4()],
-    serverId: serverId,
+    args: [contactId, 'hi', hintServer, _uuid.v4(), _uuid.v4()],
+    serverId: hintServer,
   );
 }
 
@@ -324,7 +328,7 @@ Future<Uint8List?> _unsealEphemeralKey({required String sealed}) async {
 Future<void> _ensureConversation(
   AppDatabase database,
   String contactId,
-  String serverId,
+  List<String> servers,
 ) async {
   final existing = await database.conversationsDao.getConversationById(
     contactId,
@@ -343,7 +347,7 @@ Future<void> _ensureConversation(
       pinned: 0,
       archived: 0,
       draft: null,
-      serverId: serverId,
+      servers: servers,
       createdAt: now,
       updatedAt: now,
       sound: null,

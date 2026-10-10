@@ -1,4 +1,6 @@
 import 'dart:convert';
+import 'dart:math' as math;
+
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -219,14 +221,48 @@ class ServerListService extends ChangeNotifier {
   }
 
   /// The server id to treat as *the* server for something that only stores
-  /// one id (e.g. a row in `conversations`): the first of [servers] if the
-  /// contact published any, otherwise the first id of our own normal list,
-  /// otherwise the built-in main server id.
+  /// one id: the first of [servers] if the contact published any, otherwise
+  /// the first id of our own normal list, otherwise the built-in main server
+  /// id.
   static Future<String> primaryServerIdFor(List<String> servers) async {
     if (servers.isNotEmpty) return servers.first;
     final local = await readServerIds();
     if (local.isNotEmpty) return local.first;
     return MainServerClient.serverId;
+  }
+
+  /// Splits a message send into the two roles the `/api/message` POST needs:
+  ///
+  ///  * `transport` — the server the request is actually posted to (the one
+  ///    `SendMessageService`/`ApiClient` is built for); always one of our own
+  ///    normal-list servers.
+  ///  * `target` — the value written into the body's `serverId` field ("the
+  ///    server that should receive the message"); servers that aren't the
+  ///    transport forward it on.
+  ///
+  /// When we share a server with this conversation's contact, both roles are
+  /// a randomly chosen shared server (fire only through the matching one).
+  /// When we share none, [target] is a random server the contact is on and
+  /// [transport] is a random server of our own — the target forwards.
+  static Future<({String transport, String target})> pickSendServers(
+    List<String> conversationServers,
+  ) async {
+    final myServers = await readServerIds();
+    final matches = conversationServers.where(myServers.contains).toList();
+    if (matches.isNotEmpty) {
+      final chosen = matches[math.Random().nextInt(matches.length)];
+      return (transport: chosen, target: chosen);
+    }
+
+    final target = conversationServers.isNotEmpty
+        ? conversationServers[math.Random().nextInt(conversationServers.length)]
+        : (myServers.isNotEmpty
+            ? myServers[math.Random().nextInt(myServers.length)]
+            : MainServerClient.serverId);
+    final transport = myServers.isNotEmpty
+        ? myServers[math.Random().nextInt(myServers.length)]
+        : MainServerClient.serverId;
+    return (transport: transport, target: target);
   }
 
   List<ServerConfig> _readFrom(SharedPreferences prefs, String key) {

@@ -37,6 +37,52 @@ class _ChatInputState extends State<ChatInput> {
   List<SenderPresentation> _filteredMembers = [];
   int _mentionStartIndex = -1;
 
+  bool _showEmojiPicker = false;
+
+  static const List<String> _emojis = [
+    '😀', '😁', '😂', '🤣', '😊', '😇', '🙂', '😉',
+    '😍', '🥰', '😘', '😗', '😋', '😜', '🤪', '🤗',
+    '🤔', '🤨', '😐', '😑', '😶', '🙄', '😏', '😴',
+    '😢', '😭', '😤', '😠', '🤯', '😳', '🥵', '🥶',
+    '😱', '🤝', '🙏', '👏', '👍', '👎', '👌', '✌️',
+    '🤞', '🤙', '💪', '🫶', '👋', '🙌', '👐', '✋',
+    '❤️', '🧡', '💛', '💚', '💙', '💜', '🖤', '🤍',
+    '💔', '💕', '💞', '💓', '💗', '💖', '💘', '💝',
+    '🔥', '✨', '⭐', '🌟', '💫', '⚡', '💥', '🎉',
+    '🎊', '🎁', '🏆', '🥇', '🎯', '🚀', '💯', '✅',
+    '❌', '⚠️', '❓', '❗', '💬', '💡', '🔔', '🎵',
+    '🎶', '☕', '🍕', '🍔', '🍟', '🍰', '🍫', '🍺',
+    '🐶', '🐱', '🐼', '🦊', '🦁', '🐸', '🐵', '🦄',
+    '🌸', '🌹', '🌈', '☀️', '🌙', '⛅', '🌊', '❄️',
+    '⚽', '🏀', '🎮', '🎬', '📱', '💻', '📷', '📚',
+    '✈️', '🚗', '🏠', '📍', '💰', '🔒', '🔑', '📌',
+  ];
+
+  void _toggleEmojiPicker() {
+    if (widget.onEmojiTap != null) {
+      widget.onEmojiTap!();
+      return;
+    }
+    setState(() {
+      _showEmojiPicker = !_showEmojiPicker;
+      _showMentionDropdown = false;
+    });
+  }
+
+  void _insertEmoji(String emoji) {
+    final text = _controller.text;
+    final selection = _controller.selection;
+    final start = selection.start >= 0 ? selection.start : text.length;
+    final end = selection.end >= 0 ? selection.end : text.length;
+
+    final updatedText = text.replaceRange(start, end, emoji);
+    _controller.text = updatedText;
+    _controller.selection = TextSelection.collapsed(
+      offset: start + emoji.length,
+    );
+    _focusNode.requestFocus();
+  }
+
   @override
   void initState() {
     super.initState();
@@ -118,6 +164,7 @@ class _ChatInputState extends State<ChatInput> {
     _controller.clear();
     setState(() {
       _showMentionDropdown = false;
+      _showEmojiPicker = false;
     });
   }
 
@@ -219,6 +266,46 @@ class _ChatInputState extends State<ChatInput> {
               ),
             ),
 
+          // Emoji Picker
+          if (_showEmojiPicker && widget.onEmojiTap == null)
+            Container(
+              constraints: const BoxConstraints(maxHeight: 200.0),
+              margin: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 4.0),
+              decoration: BoxDecoration(
+                color: textboxBg,
+                borderRadius: BorderRadius.circular(12.0),
+                border: Border.all(color: borderColor),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.3),
+                    blurRadius: 8.0,
+                    offset: const Offset(0, -2),
+                  ),
+                ],
+              ),
+              child: GridView.builder(
+                padding: const EdgeInsets.all(8.0),
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 8,
+                  mainAxisSpacing: 4.0,
+                  crossAxisSpacing: 4.0,
+                ),
+                itemCount: _emojis.length,
+                itemBuilder: (context, index) {
+                  final emoji = _emojis[index];
+                  return InkWell(
+                    onTap: () => _insertEmoji(emoji),
+                    child: Center(
+                      child: Text(
+                        emoji,
+                        style: const TextStyle(fontSize: 22.0),
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+
           // Container Bar (71px height from CSS spec)
           Container(
             constraints: const BoxConstraints(minHeight: 71.0),
@@ -300,15 +387,15 @@ class _ChatInputState extends State<ChatInput> {
                               width: 1.0,
                             ),
                           ),
-                          suffixIcon: IconButton(
-                            icon: const Icon(
-                              Icons.sentiment_satisfied_outlined,
-                              color: iconColor,
-                              size: 20.0,
-                            ),
-                            onPressed: widget.isDisabled ? null : widget.onEmojiTap,
-                            splashRadius: 16.0,
-                          ),
+                           suffixIcon: IconButton(
+                             icon: const Icon(
+                               Icons.sentiment_satisfied_outlined,
+                               color: iconColor,
+                               size: 20.0,
+                             ),
+                             onPressed: widget.isDisabled ? null : _toggleEmojiPicker,
+                             splashRadius: 16.0,
+                           ),
                         ),
                         onSubmitted: (_) => _handleSend(),
                       ),

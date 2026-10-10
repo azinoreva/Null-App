@@ -1,4 +1,5 @@
 import 'package:drift/drift.dart';
+
 import '../app_database.dart';
 import '../tables/sync_state.dart';
 
@@ -11,48 +12,52 @@ class SyncStateDao extends DatabaseAccessor<AppDatabase>
   SyncStateDao(super.db);
 
   // Get a single sync state by conversation ID.
-  Future<SyncStateData?> getSyncStateById(String conversationId) =>
-      (select(db.syncState)..where((t) => t.conversationId.equals(conversationId)))
-          .getSingleOrNull();
+  Future<SyncStateData?> getSyncStateById(String conversationId) => (select(
+    db.syncState,
+  )..where((t) => t.conversationId.equals(conversationId))).getSingleOrNull();
 
   // Watch a single sync state row. The stream re-emits whenever the row is
   // inserted, updated, or deleted, so callers can react to `lastMessageId`
   // and `draft` changes live.
-  Stream<SyncStateData?> watchSyncStateById(String conversationId) =>
-      (select(db.syncState)..where((t) => t.conversationId.equals(conversationId)))
-          .watchSingleOrNull();
+  Stream<SyncStateData?> watchSyncStateById(String conversationId) => (select(
+    db.syncState,
+  )..where((t) => t.conversationId.equals(conversationId))).watchSingleOrNull();
 
   // Get all sync states, ordered by pinned first, then updated_at descending.
-  Future<List<SyncStateData>> getAllSyncStates() => (select(db.syncState)
-        ..orderBy([
-          (t) => OrderingTerm(expression: t.pinned, mode: OrderingMode.desc),
-          (t) => OrderingTerm(expression: t.updatedAt, mode: OrderingMode.desc),
-        ]))
-      .get();
+  Future<List<SyncStateData>> getAllSyncStates() =>
+      (select(db.syncState)..orderBy([
+            (t) => OrderingTerm(expression: t.pinned, mode: OrderingMode.desc),
+            (t) =>
+                OrderingTerm(expression: t.updatedAt, mode: OrderingMode.desc),
+          ]))
+          .get();
 
   // Watch every sync state row, ordered by pinned first, then updated_at
   // descending. The stream re-emits whenever any row in `sync_state` is
   // created, updated, or deleted, so UI state stays in sync with the table.
-  Stream<List<SyncStateData>> watchAllSyncStates() => (select(db.syncState)
-        ..orderBy([
-          (t) => OrderingTerm(expression: t.pinned, mode: OrderingMode.desc),
-          (t) => OrderingTerm(expression: t.updatedAt, mode: OrderingMode.desc),
-        ]))
-      .watch();
+  Stream<List<SyncStateData>> watchAllSyncStates() =>
+      (select(db.syncState)..orderBy([
+            (t) => OrderingTerm(expression: t.pinned, mode: OrderingMode.desc),
+            (t) =>
+                OrderingTerm(expression: t.updatedAt, mode: OrderingMode.desc),
+          ]))
+          .watch();
 
   // Zero out the unread count for every conversation.
   Future<void> markAllRead() async {
-    await (update(db.syncState)).write(SyncStateCompanion(
-      unreadCount: Value(0),
-      updatedAt: Value(DateTime.now().millisecondsSinceEpoch),
-    ));
+    await (update(db.syncState)).write(
+      SyncStateCompanion(
+        unreadCount: Value(0),
+        updatedAt: Value(DateTime.now().millisecondsSinceEpoch),
+      ),
+    );
   }
 
   // Get sync states for a given conversation type.
   Future<List<SyncStateData>> getSyncStatesByType(int conversationType) =>
-      (select(db.syncState)
-            ..where((t) => t.conversationType.equals(conversationType)))
-          .get();
+      (select(
+        db.syncState,
+      )..where((t) => t.conversationType.equals(conversationType))).get();
 
   // Insert a new sync state.
   Future<int> insertSyncState(Insertable<SyncStateData> syncState) =>
@@ -62,14 +67,59 @@ class SyncStateDao extends DatabaseAccessor<AppDatabase>
   Future<void> upsertSyncState(SyncStateData syncState) =>
       into(db.syncState).insertOnConflictUpdate(syncState);
 
+  /// Materializes durable conversation data into the screen projection.
+  /// Existing screen-owned fields are intentionally preserved.
+  Future<void> upsertConversationProjection({
+    required String conversationId,
+    required int conversationType,
+    required String displayName,
+    String? avatar,
+    int status = 0,
+    String? lastMessageId,
+    String? lastMessage,
+    required int updatedAt,
+    String colour = '0xFF2EB82E',
+  }) async {
+    final existing = await getSyncStateById(conversationId);
+    final values = SyncStateCompanion(
+      displayName: Value(displayName),
+      avatar: Value(avatar),
+      status: Value(status),
+      lastMessageId: Value(lastMessageId),
+      lastMessage: Value(lastMessage),
+      updatedAt: Value(updatedAt),
+    );
+
+    if (existing == null) {
+      await into(db.syncState).insert(
+        SyncStateCompanion.insert(
+          conversationId: conversationId,
+          conversationType: conversationType,
+          displayName: displayName,
+          avatar: Value(avatar),
+          status: Value(status),
+          lastMessageId: Value(lastMessageId),
+          lastMessage: Value(lastMessage),
+          updatedAt: updatedAt,
+          colour: colour,
+        ),
+      );
+      return;
+    }
+
+    await (update(
+      db.syncState,
+    )..where((t) => t.conversationId.equals(conversationId))).write(values);
+  }
+
   // Update an existing sync state row.
   Future<bool> updateSyncState(SyncStateData syncState) =>
       update(db.syncState).replace(syncState);
 
   // Delete a sync state by conversation ID.
-  Future<int> deleteSyncState(String conversationId) =>
-      (delete(db.syncState)..where((t) => t.conversationId.equals(conversationId)))
-          .go();
+  Future<int> deleteSyncState(String conversationId) => (delete(
+    db.syncState,
+  )..where((t) => t.conversationId.equals(conversationId))).go();
 
   // Update the last read message details and unread count.
   Future<void> updateLastRead(
@@ -78,16 +128,17 @@ class SyncStateDao extends DatabaseAccessor<AppDatabase>
     required String message,
     required int unreadCount,
   }) async {
-    await (update(db.syncState)
-          ..where((t) => t.conversationId.equals(conversationId)))
-        .write(SyncStateCompanion(
-      lastReadMessageId: Value(messageId),
-      lastReadMessage: Value(message),
-      unreadCount: Value(unreadCount),
-      updatedAt: Value(DateTime.now().millisecondsSinceEpoch),
-    ));
+    await (update(
+      db.syncState,
+    )..where((t) => t.conversationId.equals(conversationId))).write(
+      SyncStateCompanion(
+        lastReadMessageId: Value(messageId),
+        lastReadMessage: Value(message),
+        unreadCount: Value(unreadCount),
+        updatedAt: Value(DateTime.now().millisecondsSinceEpoch),
+      ),
+    );
   }
-
 
   // ─────────────────────────────────────────────────────────────
   // Draft
@@ -95,27 +146,28 @@ class SyncStateDao extends DatabaseAccessor<AppDatabase>
 
   // Get the draft for a single conversation.
   Future<String?> getDraft(String conversationId) async {
-    final row = await (select(db.syncState)
-          ..where((t) => t.conversationId.equals(conversationId)))
-        .getSingleOrNull();
+    final row = await (select(
+      db.syncState,
+    )..where((t) => t.conversationId.equals(conversationId))).getSingleOrNull();
     return row?.draft;
   }
 
   // Get every conversation that currently has a non-empty draft.
-  Future<List<SyncStateData>> getConversationsWithDrafts() =>
-      (select(db.syncState)
-            ..where((t) => t.draft.isNotNull() & t.draft.equals('').not()))
-          .get();
+  Future<List<SyncStateData>> getConversationsWithDrafts() => (select(
+    db.syncState,
+  )..where((t) => t.draft.isNotNull() & t.draft.equals('').not())).get();
 
   // Save (or overwrite) the draft text for a conversation.
   // Passing null or an empty string clears the draft.
   Future<void> updateDraft(String conversationId, String? draft) async {
-    await (update(db.syncState)
-          ..where((t) => t.conversationId.equals(conversationId)))
-        .write(SyncStateCompanion(
-      draft: Value((draft == null || draft.isEmpty) ? null : draft),
-      updatedAt: Value(DateTime.now().millisecondsSinceEpoch),
-    ));
+    await (update(
+      db.syncState,
+    )..where((t) => t.conversationId.equals(conversationId))).write(
+      SyncStateCompanion(
+        draft: Value((draft == null || draft.isEmpty) ? null : draft),
+        updatedAt: Value(DateTime.now().millisecondsSinceEpoch),
+      ),
+    );
   }
 
   // Clear the draft on a conversation.
@@ -127,13 +179,15 @@ class SyncStateDao extends DatabaseAccessor<AppDatabase>
     required String messageId,
     required String message,
   }) async {
-    await (update(db.syncState)
-          ..where((t) => t.conversationId.equals(conversationId)))
-        .write(SyncStateCompanion(
-      lastMessageId: Value(messageId),
-      lastMessage: Value(message),
-      updatedAt: Value(DateTime.now().millisecondsSinceEpoch),
-    ));
+    await (update(
+      db.syncState,
+    )..where((t) => t.conversationId.equals(conversationId))).write(
+      SyncStateCompanion(
+        lastMessageId: Value(messageId),
+        lastMessage: Value(message),
+        updatedAt: Value(DateTime.now().millisecondsSinceEpoch),
+      ),
+    );
   }
 
   // Toggle or set the pinned flag and optional position.
@@ -142,42 +196,50 @@ class SyncStateDao extends DatabaseAccessor<AppDatabase>
     required int pinned,
     int? pinnedPosition,
   }) async {
-    await (update(db.syncState)
-          ..where((t) => t.conversationId.equals(conversationId)))
-        .write(SyncStateCompanion(
-      pinned: Value(pinned),
-      pinnedPosition: Value(pinnedPosition),
-      updatedAt: Value(DateTime.now().millisecondsSinceEpoch),
-    ));
+    await (update(
+      db.syncState,
+    )..where((t) => t.conversationId.equals(conversationId))).write(
+      SyncStateCompanion(
+        pinned: Value(pinned),
+        pinnedPosition: Value(pinnedPosition),
+        updatedAt: Value(DateTime.now().millisecondsSinceEpoch),
+      ),
+    );
   }
 
   // Update the colour.
   Future<void> updateColour(String conversationId, String colour) async {
-    await (update(db.syncState)
-          ..where((t) => t.conversationId.equals(conversationId)))
-        .write(SyncStateCompanion(
-      colour: Value(colour),
-      updatedAt: Value(DateTime.now().millisecondsSinceEpoch),
-    ));
+    await (update(
+      db.syncState,
+    )..where((t) => t.conversationId.equals(conversationId))).write(
+      SyncStateCompanion(
+        colour: Value(colour),
+        updatedAt: Value(DateTime.now().millisecondsSinceEpoch),
+      ),
+    );
   }
 
   // Set the muted flag.
   Future<void> setMuted(String conversationId, int muted) async {
-    await (update(db.syncState)
-          ..where((t) => t.conversationId.equals(conversationId)))
-        .write(SyncStateCompanion(
-      muted: Value(muted),
-      updatedAt: Value(DateTime.now().millisecondsSinceEpoch),
-    ));
+    await (update(
+      db.syncState,
+    )..where((t) => t.conversationId.equals(conversationId))).write(
+      SyncStateCompanion(
+        muted: Value(muted),
+        updatedAt: Value(DateTime.now().millisecondsSinceEpoch),
+      ),
+    );
   }
 
   // Increment or set the mentions count.
   Future<void> setMentions(String conversationId, int mentions) async {
-    await (update(db.syncState)
-          ..where((t) => t.conversationId.equals(conversationId)))
-        .write(SyncStateCompanion(
-      mentions: Value(mentions),
-      updatedAt: Value(DateTime.now().millisecondsSinceEpoch),
-    ));
+    await (update(
+      db.syncState,
+    )..where((t) => t.conversationId.equals(conversationId))).write(
+      SyncStateCompanion(
+        mentions: Value(mentions),
+        updatedAt: Value(DateTime.now().millisecondsSinceEpoch),
+      ),
+    );
   }
 }

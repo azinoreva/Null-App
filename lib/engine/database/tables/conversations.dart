@@ -1,5 +1,7 @@
 import 'package:drift/drift.dart';
 
+import 'servers_converter.dart';
+
 /// Drift table definition for the `Conversations` table.
 ///
 /// Stores chat list entries, notification preferences, and UI state.
@@ -18,7 +20,11 @@ class Conversations extends Table {
       integer().withDefault(const Constant(0)).check(archived.isIn([0, 1]))();
   TextColumn get draft => text().nullable()();
 
-  TextColumn get serverId => text()();
+  /// The servers the contact of this conversation is on (a user has at most
+  /// 8), stored as JSON text. Mirrors [Contacts.servers] and is used to pick
+  /// where a message is routed. Rows written before multi-server support held
+  /// a bare server id, read back by [ServersConverter] as a one-element list.
+  TextColumn get servers => text().map(const ServersConverter())();
 
   IntColumn get createdAt => integer()();
 
