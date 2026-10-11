@@ -9,6 +9,7 @@ import '../../engine/database/queries/identity_queries.dart';
 import '../../engine/functions/settings/settings.dart';
 import '../../engine/media_handling/dicebear.dart';
 import '../../engine/media_handling/media_storage.dart';
+import '../../engine/network/auth_failure_handler.dart';
 import '../../state/providers.dart';
 import '../../widgets/app_theme.dart';
 import 'settings_widgets.dart';
@@ -68,7 +69,7 @@ class _ProfileSettingsScreenState extends ConsumerState<ProfileSettingsScreen> {
       await _persistProfilePicture(identityDao, avatarPath);
     } catch (error) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
+      rootScaffoldMessengerKey.currentState?.showSnackBar(
         SnackBar(content: Text('Could not save profile picture: $error')),
       );
     }
@@ -96,7 +97,7 @@ class _ProfileSettingsScreenState extends ConsumerState<ProfileSettingsScreen> {
       await _persistProfilePicture(identityDao, avatarPath);
     } catch (error) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
+      rootScaffoldMessengerKey.currentState?.showSnackBar(
         SnackBar(content: Text('Could not create profile picture: $error')),
       );
     }
@@ -127,7 +128,7 @@ class _ProfileSettingsScreenState extends ConsumerState<ProfileSettingsScreen> {
     await identityDao.setBio(bio.isEmpty ? null : bio);
 
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
+    rootScaffoldMessengerKey.currentState?.showSnackBar(
       const SnackBar(content: Text('Profile saved')),
     );
   }

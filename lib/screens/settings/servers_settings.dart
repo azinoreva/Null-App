@@ -87,9 +87,9 @@ class ServersSettingsScreen extends ConsumerWidget {
       );
     } catch (error) {
       if (!context.mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Could not load servers: $error')));
+      rootScaffoldMessengerKey.currentState?.showSnackBar(
+        SnackBar(content: Text('Could not load servers: $error')),
+      );
     }
   }
 
@@ -122,8 +122,9 @@ class ServersSettingsScreen extends ConsumerWidget {
         }
       } on ServerListException catch (error) {
         if (!context.mounted) return;
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text(error.message)));
+        rootScaffoldMessengerKey.currentState?.showSnackBar(
+          SnackBar(content: Text(error.message)),
+        );
         return;
       }
     }
@@ -147,7 +148,7 @@ class ServersSettingsScreen extends ConsumerWidget {
     );
 
     if (!context.mounted) return;
-    final messenger = ScaffoldMessenger.of(context);
+    final messenger = rootScaffoldMessengerKey.currentState;
     final message = switch (result.outcome) {
       server_connect.ServerConnectOutcome.success =>
         joinedAsExtra
@@ -172,7 +173,7 @@ class ServersSettingsScreen extends ConsumerWidget {
             ? 'Could not connect: ${result.errorMessage}'
             : 'Could not connect to the server.',
     };
-    messenger.showSnackBar(SnackBar(content: Text(message)));
+    messenger?.showSnackBar(SnackBar(content: Text(message)));
 
     // Adding to the shared server list notifies the SSE supervisor, which
     // registers the connection automatically (ServerConnectionService).

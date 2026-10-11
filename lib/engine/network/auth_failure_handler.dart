@@ -10,6 +10,8 @@ import 'main_server_client.dart';
 /// Global navigator key so non-widget code (Dio interceptors, SSE handlers)
 /// can trigger navigation back to the sign-in screen on auth failure.
 final GlobalKey<NavigatorState> rootNavigatorKey = GlobalKey<NavigatorState>();
+final GlobalKey<ScaffoldMessengerState> rootScaffoldMessengerKey =
+  GlobalKey<ScaffoldMessengerState>();
 
 /// Clears the main-server (login) credentials and the signed-in flag, tears
 /// down any live SSE subscriptions, and routes the user to the sign-in

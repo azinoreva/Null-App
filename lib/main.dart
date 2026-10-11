@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:media_kit/media_kit.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'screens/splash_screen.dart'; // your splash screen
@@ -25,7 +26,7 @@ import '/engine/engine.dart';
 import 'state/providers.dart';
 import 'engine/functions/settings/settings.dart';
 import 'utils/server_list.dart';
-import 'temp_nuke.dart'; // TEMPORARY: remove with the purge call below.
+//import 'temp_nuke.dart'; // TEMPORARY: remove with the purge call below.
 
 /// App-wide handle on the server-socket supervisor started once the user is
 /// logged in, so other code (screens, providers) can inspect connection
@@ -43,10 +44,11 @@ final ServerListService appServerList = ServerListService();
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  MediaKit.ensureInitialized();
 
   // TEMPORARY: wipe all local data once. Delete this call (and temp_nuke.dart)
   // after the first successful run.
-  await nukeAllLocalData();
+ // await nukeAllLocalData();
 
   await dotenv.load();
   await MainServerClient.init();
@@ -145,6 +147,7 @@ class _MyAppState extends State<MyApp> {
         return MaterialApp(
           title: 'Null App',
           navigatorKey: rootNavigatorKey,
+          scaffoldMessengerKey: rootScaffoldMessengerKey,
           themeMode: isDark ? ThemeMode.dark : ThemeMode.light,
           theme: ThemeData(
             brightness: Brightness.light,

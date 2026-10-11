@@ -1,5 +1,8 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
-import 'package:video_player/video_player.dart';
+import 'package:media_kit/media_kit.dart';
+import 'package:media_kit_video/media_kit_video.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class SplashScreen extends StatefulWidget {
@@ -18,59 +21,105 @@ class SplashScreen extends StatefulWidget {
 
 class _SplashScreenState extends State<SplashScreen>
     with SingleTickerProviderStateMixin {
-  late VideoPlayerController _videoController;
-  late AnimationController _animationController;
-  late Animation<Color> _colorAnimation;
+  static const String _videoAsset = 'asset:///assets/splash_video.mp4';
+  static const String _imageAsset = 'assets/splash_image.png';
+
+  /// How long the launch video plays.
+  static const Duration _videoDuration = Duration(seconds: 10);
+
+  /// How long the still image is held before routing onward.
+  static const Duration _imageHoldDuration = Duration(seconds: 2);
+
+  final Player _player = Player();
+  late final VideoController _videoController;
+  late final AnimationController _animationController;
+  late final Animation<Color> _colorAnimation;
+
+  final List<StreamSubscription<dynamic>> _subscriptions = [];
+  Timer? _transitionTimer;
+  Timer? _imageTimer;
+
+  bool _videoReady = false;
   bool _showImage = false;
+  bool _navigated = false;
 
   @override
   void initState() {
     super.initState();
 
-    _videoController = VideoPlayerController.asset('assets/splash_video.mp4')
-      ..initialize().then((_) {
-        setState(() {});
-        _videoController.play();
-      });
+    // Must be created eagerly: the controller wires up the video output, and
+    // the `Video` widget below renders through it. Creating it lazily inside
+    // `build()` deadlocks readiness detection.
+    _videoController = VideoController(_player);
 
     _animationController = AnimationController(
       vsync: this,
-      duration: const Duration(seconds: 10),
+      duration: _videoDuration,
     );
-
     _colorAnimation = _BackgroundColorTween().animate(_animationController)
       ..addListener(() {
         setState(() {});
       });
-
     _animationController.forward();
 
-    // After 10 seconds, show image, set flag, and navigate
-    Future.delayed(const Duration(seconds: 10), () {
-      if (mounted) {
-        setState(() {
-          _showImage = true;
-        });
-        _videoController.pause();
+    // Reveal the video once the decoder reports real dimensions.
+    _subscriptions.add(
+      _player.stream.videoParams.listen((params) {
+        final bool ready = (params.w ?? 0) > 0 && (params.h ?? 0) > 0;
+        if (ready && !_videoReady && mounted) {
+          setState(() => _videoReady = true);
+        }
+      }),
+    );
 
-        // Mark as launched
-        widget.prefs.setBool('is_launched', true);
+    // Fall back to the still image if the video cannot be played.
+    _subscriptions.add(
+      _player.stream.error.listen((_) => _fallBackToImage()),
+    );
 
-        // Navigate to DecisionScreen
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(
-            builder: (context) => widget.destination,
-          ),
-        );
-      }
+    _player.open(Media(_videoAsset), play: true).catchError((_) {
+      _fallBackToImage();
     });
+
+    _scheduleTransition();
+  }
+
+  void _fallBackToImage() {
+    if (_showImage || _navigated || !mounted) return;
+    setState(() => _showImage = true);
+  }
+
+  void _scheduleTransition() {
+    _transitionTimer = Timer(_videoDuration, () {
+      if (!mounted || _navigated) return;
+      setState(() {
+        _showImage = true;
+        _videoReady = false;
+      });
+      _player.pause();
+      _imageTimer = Timer(_imageHoldDuration, _finish);
+    });
+  }
+
+  void _finish() {
+    if (!mounted || _navigated) return;
+    _navigated = true;
+    widget.prefs.setBool('is_launched', true);
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(builder: (context) => widget.destination),
+    );
   }
 
   @override
   void dispose() {
-    _videoController.dispose();
+    _transitionTimer?.cancel();
+    _imageTimer?.cancel();
+    for (final subscription in _subscriptions) {
+      subscription.cancel();
+    }
     _animationController.dispose();
+    _player.dispose();
     super.dispose();
   }
 
@@ -83,20 +132,23 @@ class _SplashScreenState extends State<SplashScreen>
         fit: StackFit.expand,
         children: [
           Container(color: _colorAnimation.value),
-          Center(
-            child: _showImage
-                ? Image.asset(
-                    'assets/splash_image.png',
-                    fit: BoxFit.contain,
-                    width: size.width * 0.8,
-                  )
-                : _videoController.value.isInitialized
-                    ? AspectRatio(
-                        aspectRatio: _videoController.value.aspectRatio,
-                        child: VideoPlayer(_videoController),
-                      )
-                    : const CircularProgressIndicator(),
-          ),
+          if (_showImage)
+            Center(
+              child: Image.asset(
+                _imageAsset,
+                fit: BoxFit.contain,
+                width: size.width * 0.8,
+              ),
+            )
+          else ...[
+            Video(
+              controller: _videoController,
+              fit: BoxFit.contain,
+              controls: NoVideoControls,
+            ),
+            if (!_videoReady)
+              const Center(child: CircularProgressIndicator()),
+          ],
         ],
       ),
     );
@@ -105,6 +157,10 @@ class _SplashScreenState extends State<SplashScreen>
 
 // Custom Tween for background color (works on all Flutter versions)
 class _BackgroundColorTween extends Tween<Color> {
+  // `begin`/`end` must be non-null: Tween.transform returns them directly at
+  // t == 0.0 / 1.0 and would otherwise throw on the `as Color` cast.
+  _BackgroundColorTween() : super(begin: Colors.black, end: Colors.black);
+
   @override
   Color lerp(double t) {
     if (t <= 0.2) return Colors.black;
