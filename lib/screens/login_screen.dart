@@ -16,6 +16,8 @@ import '../engine/functions/settings/settings.dart';
 import '../engine/database/init_db.dart';
 import '../engine/database/app_database.dart';
 import '../engine/crypto/chat/identity_crypto.dart';
+import '../engine/network/auth/login.dart';
+import '../engine/securestore/security_token.dart';
 import '../engine/network/main_server_client.dart';
 import '../engine/securestore/password_verifier.dart';
 import '../engine/network/server_error_exception.dart';
@@ -101,9 +103,10 @@ class _LoginScreenState extends State<LoginScreen> {
 
     setState(() => _isSubmitting = true);
     try {
-      final response = await FunctionsList.login(
+      final response = await _signInWithRecovery(
         phoneNumber: _fullPhoneNumber,
         password: password,
+        messenger: messenger,
       );
 
       final database = await DatabaseInitializer.initialize();
@@ -189,6 +192,74 @@ class _LoginScreenState extends State<LoginScreen> {
       messenger.showSnackBar(SnackBar(content: Text('Sign in failed: $e')));
     } finally {
       if (mounted) setState(() => _isSubmitting = false);
+    }
+  }
+
+  /// Signs in, and when the server rejects the credentials with a 401, makes
+  /// one immediate recovery attempt using the local identity + securityToken
+  /// (the account may simply have been lost server-side, e.g. after a wipe).
+  ///
+  /// Returns the response on success; otherwise rethrows the original 401 so
+  /// the caller can show the error. Recovery is skipped entirely when there is
+  /// no matching local identity or no stored blob.
+  Future<SignInResponse> _signInWithRecovery({
+    required String phoneNumber,
+    required String password,
+    required ScaffoldMessengerState messenger,
+  }) async {
+    try {
+      return await FunctionsList.login(
+        phoneNumber: phoneNumber,
+        password: password,
+      );
+    } on DioException catch (e) {
+      if (e.response?.statusCode != 401) rethrow;
+
+      final recovered = await _attemptRecovery(
+        phoneNumber: phoneNumber,
+        password: password,
+        messenger: messenger,
+      );
+      if (recovered == null) rethrow;
+      return recovered;
+    }
+  }
+
+  /// Retries sign-in with the recovery payload (user id, salt version, and the
+  /// security token Only runs when the local identity's phone number
+  /// matches [phoneNumber] and a vault exists in secure storage. Returns null
+  /// when recovery cannot be attempted or when the retry still fails.
+  Future<SignInResponse?> _attemptRecovery({
+    required String phoneNumber,
+    required String password,
+    required ScaffoldMessengerState messenger,
+  }) async {
+    final database = await DatabaseInitializer.initialize();
+    final identity = await database.identityDao.getCurrentIdentityOrNull();
+    if (identity == null || identity.phoneNumber != phoneNumber) return null;
+
+    if (!await hasSecurityToken()) return null;
+    final securityToken = await getSecurityToken();
+    if (securityToken == null) return null;
+
+    messenger.showSnackBar(
+      SnackBar(content: Text('Recovering account for $phoneNumber…')),
+    );
+
+    try {
+      final response = await FunctionsList.login(
+        phoneNumber: phoneNumber,
+        password: password,
+        userId: identity.identityId,
+        saltVersion: identity.saltVersion,
+        securityToken: securityToken,
+      );
+      messenger.showSnackBar(
+        SnackBar(content: Text('Account recovered for $phoneNumber.')),
+      );
+      return response;
+    } on DioException {
+      return null;
     }
   }
 

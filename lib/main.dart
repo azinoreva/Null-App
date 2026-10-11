@@ -25,6 +25,7 @@ import '/engine/engine.dart';
 import 'state/providers.dart';
 import 'engine/functions/settings/settings.dart';
 import 'utils/server_list.dart';
+import 'temp_nuke.dart'; // TEMPORARY: remove with the purge call below.
 
 /// App-wide handle on the server-socket supervisor started once the user is
 /// logged in, so other code (screens, providers) can inspect connection
@@ -42,6 +43,11 @@ final ServerListService appServerList = ServerListService();
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // TEMPORARY: wipe all local data once. Delete this call (and temp_nuke.dart)
+  // after the first successful run.
+  await nukeAllLocalData();
+
   await dotenv.load();
   await MainServerClient.init();
   await AppSettings.init();

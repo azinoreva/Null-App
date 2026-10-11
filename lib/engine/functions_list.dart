@@ -197,7 +197,16 @@ class FunctionsList {
   static Future<dynamic> login({
     required String phoneNumber,
     required String password,
-  }) => auth_login.login(phoneNumber: phoneNumber, password: password);
+    String? userId,
+    int? saltVersion,
+    String? securityToken,
+  }) => auth_login.login(
+    phoneNumber: phoneNumber,
+    password: password,
+    userId: userId,
+    saltVersion: saltVersion,
+    securityToken: securityToken,
+  );
 
   static Future<dynamic> registerNewUser({
     required String phoneNumber,

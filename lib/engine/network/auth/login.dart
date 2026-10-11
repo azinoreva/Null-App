@@ -32,10 +32,30 @@ class SignInResponse {
 /// tokens. They are intentionally NOT stored in [ApiClient], whose
 /// per-server token store is reserved for other servers.
 class SignInService {
+  /// Signs in with [phoneNumber] and [password].
+  ///
+  /// The optional recovery fields enable immediate account recovery when the
+  /// server no longer knows the account (e.g. it was wiped) but the device
+  /// still holds the matching local identity and encrypted vault. They are
+  /// only sent when provided — [securityToken] should come from secure
+  /// storage and only be supplied when a blob actually exists locally.
   Future<SignInResponse> signIn({
     required String phoneNumber,
     required String password,
+    String? userId,
+    int? saltVersion,
+    String? securityToken,
   }) async {
+    final data = <String, dynamic>{
+      'phone_number': phoneNumber,
+      'password': password,
+    };
+    if (userId != null) data['user_id'] = userId;
+    if (saltVersion != null) data['salt_version'] = saltVersion;
+    if (securityToken != null) {
+      data['security_token'] = securityToken;
+    }
+
     final response = await MainServerClient.dio.post(
       '/api/sign-in',
       options: Options(
@@ -44,10 +64,7 @@ class SignInService {
           'Content-Type': 'application/json',
         },
       ),
-      data: {
-        'phone_number': phoneNumber,
-        'password': password,
-      },
+      data: data,
     );
 
     final result = SignInResponse.fromJson(
