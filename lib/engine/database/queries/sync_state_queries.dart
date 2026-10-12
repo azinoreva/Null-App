@@ -91,6 +91,7 @@ class SyncStateDao extends DatabaseAccessor<AppDatabase>
     String? lastMessage,
     required int updatedAt,
     String colour = '0xFF2EB82E',
+    int archived = 0,
   }) async {
     final existing = await getSyncStateById(conversationId);
     final values = SyncStateCompanion(
@@ -100,6 +101,7 @@ class SyncStateDao extends DatabaseAccessor<AppDatabase>
       lastMessageId: Value(lastMessageId),
       lastMessage: Value(lastMessage),
       updatedAt: Value(updatedAt),
+      archived: Value(archived),
     );
 
     if (existing == null) {
@@ -114,6 +116,7 @@ class SyncStateDao extends DatabaseAccessor<AppDatabase>
           lastMessage: Value(lastMessage),
           updatedAt: updatedAt,
           colour: colour,
+          archived: Value(archived),
         ),
       );
       return;
@@ -315,6 +318,16 @@ class SyncStateDao extends DatabaseAccessor<AppDatabase>
         muted: Value(muted),
         updatedAt: Value(DateTime.now().millisecondsSinceEpoch),
       ),
+    );
+  }
+
+  // Set the archived flag. Does not touch `updatedAt`, so archiving never
+  // reorders the chat list.
+  Future<void> setArchived(String conversationId, int archived) async {
+    await (update(
+      db.syncState,
+    )..where((t) => t.conversationId.equals(conversationId))).write(
+      SyncStateCompanion(archived: Value(archived)),
     );
   }
 

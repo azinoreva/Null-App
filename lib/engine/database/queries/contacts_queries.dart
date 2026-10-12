@@ -40,10 +40,18 @@ class ContactsDao extends DatabaseAccessor<AppDatabase>
   )..where((t) => t.connectionStatus.equals(2) & t.isOnline.equals(1))).get();
 
   // Get a contact by its linked conversation ID.
-  Future<Contact?> getContactByConversationId(String conversationId) =>
-      (select(db.contacts)
-            ..where((t) => t.conversationId.equals(conversationId)))
-          .getSingleOrNull();
+  //
+  // Individual conversations use the contact id as their conversation id, so
+  // if no contact carries the id in `conversation_id` (e.g. rows written
+  // before the link was set) fall back to a direct contact-id lookup. Callers
+  // only use this for individual (non-group) conversations.
+  Future<Contact?> getContactByConversationId(String conversationId) async {
+    final byConversation = await (select(
+      db.contacts,
+    )..where((t) => t.conversationId.equals(conversationId))).getSingleOrNull();
+    if (byConversation != null) return byConversation;
+    return getContactById(conversationId);
+  }
 
   // Insert a new contact.
   Future<int> insertContact(Insertable<Contact> contact) =>

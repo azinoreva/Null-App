@@ -9612,6 +9612,19 @@ class $SyncStateTable extends SyncState
     requiredDuringInsert: false,
     defaultValue: const Constant(0),
   );
+  static const VerificationMeta _archivedMeta = const VerificationMeta(
+    'archived',
+  );
+  @override
+  late final GeneratedColumn<int> archived = GeneratedColumn<int>(
+    'archived',
+    aliasedName,
+    false,
+    check: () => archived.isIn([0, 1]),
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
   @override
   List<GeneratedColumn> get $columns => [
     conversationId,
@@ -9631,6 +9644,7 @@ class $SyncStateTable extends SyncState
     colour,
     muted,
     mentions,
+    archived,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -9783,6 +9797,12 @@ class $SyncStateTable extends SyncState
         mentions.isAcceptableOrUnknown(data['mentions']!, _mentionsMeta),
       );
     }
+    if (data.containsKey('archived')) {
+      context.handle(
+        _archivedMeta,
+        archived.isAcceptableOrUnknown(data['archived']!, _archivedMeta),
+      );
+    }
     return context;
   }
 
@@ -9860,6 +9880,10 @@ class $SyncStateTable extends SyncState
         DriftSqlType.int,
         data['${effectivePrefix}mentions'],
       )!,
+      archived: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}archived'],
+      )!,
     );
   }
 
@@ -9887,6 +9911,7 @@ class SyncStateData extends DataClass implements Insertable<SyncStateData> {
   final String colour;
   final int muted;
   final int mentions;
+  final int archived;
   const SyncStateData({
     required this.conversationId,
     required this.conversationType,
@@ -9905,6 +9930,7 @@ class SyncStateData extends DataClass implements Insertable<SyncStateData> {
     required this.colour,
     required this.muted,
     required this.mentions,
+    required this.archived,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -9940,6 +9966,7 @@ class SyncStateData extends DataClass implements Insertable<SyncStateData> {
     map['colour'] = Variable<String>(colour);
     map['muted'] = Variable<int>(muted);
     map['mentions'] = Variable<int>(mentions);
+    map['archived'] = Variable<int>(archived);
     return map;
   }
 
@@ -9976,6 +10003,7 @@ class SyncStateData extends DataClass implements Insertable<SyncStateData> {
       colour: Value(colour),
       muted: Value(muted),
       mentions: Value(mentions),
+      archived: Value(archived),
     );
   }
 
@@ -10004,6 +10032,7 @@ class SyncStateData extends DataClass implements Insertable<SyncStateData> {
       colour: serializer.fromJson<String>(json['colour']),
       muted: serializer.fromJson<int>(json['muted']),
       mentions: serializer.fromJson<int>(json['mentions']),
+      archived: serializer.fromJson<int>(json['archived']),
     );
   }
   @override
@@ -10027,6 +10056,7 @@ class SyncStateData extends DataClass implements Insertable<SyncStateData> {
       'colour': serializer.toJson<String>(colour),
       'muted': serializer.toJson<int>(muted),
       'mentions': serializer.toJson<int>(mentions),
+      'archived': serializer.toJson<int>(archived),
     };
   }
 
@@ -10048,6 +10078,7 @@ class SyncStateData extends DataClass implements Insertable<SyncStateData> {
     String? colour,
     int? muted,
     int? mentions,
+    int? archived,
   }) => SyncStateData(
     conversationId: conversationId ?? this.conversationId,
     conversationType: conversationType ?? this.conversationType,
@@ -10074,6 +10105,7 @@ class SyncStateData extends DataClass implements Insertable<SyncStateData> {
     colour: colour ?? this.colour,
     muted: muted ?? this.muted,
     mentions: mentions ?? this.mentions,
+    archived: archived ?? this.archived,
   );
   SyncStateData copyWithCompanion(SyncStateCompanion data) {
     return SyncStateData(
@@ -10112,6 +10144,7 @@ class SyncStateData extends DataClass implements Insertable<SyncStateData> {
       colour: data.colour.present ? data.colour.value : this.colour,
       muted: data.muted.present ? data.muted.value : this.muted,
       mentions: data.mentions.present ? data.mentions.value : this.mentions,
+      archived: data.archived.present ? data.archived.value : this.archived,
     );
   }
 
@@ -10134,7 +10167,8 @@ class SyncStateData extends DataClass implements Insertable<SyncStateData> {
           ..write('updatedAt: $updatedAt, ')
           ..write('colour: $colour, ')
           ..write('muted: $muted, ')
-          ..write('mentions: $mentions')
+          ..write('mentions: $mentions, ')
+          ..write('archived: $archived')
           ..write(')'))
         .toString();
   }
@@ -10158,6 +10192,7 @@ class SyncStateData extends DataClass implements Insertable<SyncStateData> {
     colour,
     muted,
     mentions,
+    archived,
   );
   @override
   bool operator ==(Object other) =>
@@ -10179,7 +10214,8 @@ class SyncStateData extends DataClass implements Insertable<SyncStateData> {
           other.updatedAt == this.updatedAt &&
           other.colour == this.colour &&
           other.muted == this.muted &&
-          other.mentions == this.mentions);
+          other.mentions == this.mentions &&
+          other.archived == this.archived);
 }
 
 class SyncStateCompanion extends UpdateCompanion<SyncStateData> {
@@ -10200,6 +10236,7 @@ class SyncStateCompanion extends UpdateCompanion<SyncStateData> {
   final Value<String> colour;
   final Value<int> muted;
   final Value<int> mentions;
+  final Value<int> archived;
   final Value<int> rowid;
   const SyncStateCompanion({
     this.conversationId = const Value.absent(),
@@ -10219,6 +10256,7 @@ class SyncStateCompanion extends UpdateCompanion<SyncStateData> {
     this.colour = const Value.absent(),
     this.muted = const Value.absent(),
     this.mentions = const Value.absent(),
+    this.archived = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   SyncStateCompanion.insert({
@@ -10239,6 +10277,7 @@ class SyncStateCompanion extends UpdateCompanion<SyncStateData> {
     required String colour,
     this.muted = const Value.absent(),
     this.mentions = const Value.absent(),
+    this.archived = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : conversationId = Value(conversationId),
        conversationType = Value(conversationType),
@@ -10263,6 +10302,7 @@ class SyncStateCompanion extends UpdateCompanion<SyncStateData> {
     Expression<String>? colour,
     Expression<int>? muted,
     Expression<int>? mentions,
+    Expression<int>? archived,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -10283,6 +10323,7 @@ class SyncStateCompanion extends UpdateCompanion<SyncStateData> {
       if (colour != null) 'colour': colour,
       if (muted != null) 'muted': muted,
       if (mentions != null) 'mentions': mentions,
+      if (archived != null) 'archived': archived,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -10305,6 +10346,7 @@ class SyncStateCompanion extends UpdateCompanion<SyncStateData> {
     Value<String>? colour,
     Value<int>? muted,
     Value<int>? mentions,
+    Value<int>? archived,
     Value<int>? rowid,
   }) {
     return SyncStateCompanion(
@@ -10325,6 +10367,7 @@ class SyncStateCompanion extends UpdateCompanion<SyncStateData> {
       colour: colour ?? this.colour,
       muted: muted ?? this.muted,
       mentions: mentions ?? this.mentions,
+      archived: archived ?? this.archived,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -10383,6 +10426,9 @@ class SyncStateCompanion extends UpdateCompanion<SyncStateData> {
     if (mentions.present) {
       map['mentions'] = Variable<int>(mentions.value);
     }
+    if (archived.present) {
+      map['archived'] = Variable<int>(archived.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -10409,6 +10455,7 @@ class SyncStateCompanion extends UpdateCompanion<SyncStateData> {
           ..write('colour: $colour, ')
           ..write('muted: $muted, ')
           ..write('mentions: $mentions, ')
+          ..write('archived: $archived, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -18047,6 +18094,7 @@ typedef $$SyncStateTableCreateCompanionBuilder = SyncStateCompanion Function({
   required String colour,
   Value<int> muted,
   Value<int> mentions,
+  Value<int> archived,
   Value<int> rowid,
 });
 typedef $$SyncStateTableUpdateCompanionBuilder = SyncStateCompanion Function({
@@ -18067,6 +18115,7 @@ typedef $$SyncStateTableUpdateCompanionBuilder = SyncStateCompanion Function({
   Value<String> colour,
   Value<int> muted,
   Value<int> mentions,
+  Value<int> archived,
   Value<int> rowid,
 });
 
@@ -18161,6 +18210,11 @@ class $$SyncStateTableFilterComposer
 
   ColumnFilters<int> get mentions => $composableBuilder(
     column: $table.mentions,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get archived => $composableBuilder(
+    column: $table.archived,
     builder: (column) => ColumnFilters(column),
   );
 }
@@ -18258,6 +18312,11 @@ class $$SyncStateTableOrderingComposer
     column: $table.mentions,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<int> get archived => $composableBuilder(
+    column: $table.archived,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$SyncStateTableAnnotationComposer
@@ -18337,6 +18396,9 @@ class $$SyncStateTableAnnotationComposer
 
   GeneratedColumn<int> get mentions =>
       $composableBuilder(column: $table.mentions, builder: (column) => column);
+
+  GeneratedColumn<int> get archived =>
+      $composableBuilder(column: $table.archived, builder: (column) => column);
 }
 
 class $$SyncStateTableTableManager
@@ -18387,6 +18449,7 @@ class $$SyncStateTableTableManager
                 Value<String> colour = const Value.absent(),
                 Value<int> muted = const Value.absent(),
                 Value<int> mentions = const Value.absent(),
+                Value<int> archived = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => SyncStateCompanion(
                 conversationId: conversationId,
@@ -18406,6 +18469,7 @@ class $$SyncStateTableTableManager
                 colour: colour,
                 muted: muted,
                 mentions: mentions,
+                archived: archived,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -18427,6 +18491,7 @@ class $$SyncStateTableTableManager
                 required String colour,
                 Value<int> muted = const Value.absent(),
                 Value<int> mentions = const Value.absent(),
+                Value<int> archived = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => SyncStateCompanion.insert(
                 conversationId: conversationId,
@@ -18446,6 +18511,7 @@ class $$SyncStateTableTableManager
                 colour: colour,
                 muted: muted,
                 mentions: mentions,
+                archived: archived,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0

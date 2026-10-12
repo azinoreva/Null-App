@@ -10,17 +10,6 @@ import 'package:path_provider/path_provider.dart';
 
 import 'app_database.dart';
 
-/// The information a background task isolate needs to open the same database.
-final class BackgroundDatabaseConfig {
-  const BackgroundDatabaseConfig({
-    required this.path,
-    required this.key,
-  });
-
-  final String path;
-  final Uint8List key;
-}
-
 /// Creates and opens the application's encrypted SQLite database.
 ///
 /// Responsibilities:
@@ -49,7 +38,6 @@ final class DatabaseInitializer {
   );
 
   static AppDatabase? _database;
-  static BackgroundDatabaseConfig? _backgroundConfig;
 
   /// Initializes the database.
   ///
@@ -68,6 +56,7 @@ final class DatabaseInitializer {
       databaseFile,
       setup: (database) {
         _configureDatabaseEncryption(database, key);
+        applyConcurrencyPragmas(database);
       },
     );
 
@@ -76,20 +65,8 @@ final class DatabaseInitializer {
     await database.customStatement('SELECT 1');
 
     _database = database;
-    _backgroundConfig = BackgroundDatabaseConfig(
-      path: databaseFile.path,
-      key: Uint8List.fromList(key),
-    );
 
     return database;
-  }
-
-  static BackgroundDatabaseConfig get backgroundConfig {
-    final config = _backgroundConfig;
-    if (config == null) {
-      throw StateError('DatabaseInitializer.initialize() must run first.');
-    }
-    return config;
   }
 
   /// Closes the database and clears the in-process reference.
@@ -103,7 +80,6 @@ final class DatabaseInitializer {
     }
 
     _database = null;
-    _backgroundConfig = null;
 
     await database.close();
   }
@@ -267,6 +243,29 @@ final class DatabaseInitializer {
     database.execute(
       "PRAGMA hexkey = '$encodedKey';",
     );
+  }
+
+  /// Applies the pragmas that keep concurrent SQLite writes from surfacing
+  /// transient contention as errors.
+  ///
+  /// Drift opens the database in its own background isolate, and any other
+  /// connection touching the same file has to contend for the single write
+  /// lock SQLite allows. Without these settings a write that lands while
+  /// another connection is mid-write fails immediately with `SQLITE_BUSY`
+  /// ("database is locked", code 5).
+  ///
+  /// - `journal_mode = WAL` lets readers proceed while a writer holds the
+  ///   write lock, instead of blocking on a rollback journal.
+  /// - `busy_timeout` makes a writer wait for the lock to free up rather than
+  ///   throwing the instant it is taken.
+  /// - `synchronous = NORMAL` is the recommended durability pairing for WAL.
+  ///
+  /// Must run after [hexkey] has been set, since `journal_mode` touches the
+  /// database file.
+  static void applyConcurrencyPragmas(dynamic database) {
+    database.execute('PRAGMA busy_timeout = 5000;');
+    database.select('PRAGMA journal_mode = WAL;');
+    database.execute('PRAGMA synchronous = NORMAL;');
   }
 
   static bool _constantTimeEquals(

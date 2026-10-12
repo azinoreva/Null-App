@@ -94,6 +94,12 @@ class MessagesDao extends DatabaseAccessor<AppDatabase>
   Future<int> deleteMessage(String id) =>
       (delete(db.messages)..where((t) => t.messageId.equals(id))).go();
 
+  // Delete every message in a conversation.
+  Future<int> deleteMessagesForConversation(String conversationId) =>
+      (delete(db.messages)
+            ..where((t) => t.conversationId.equals(conversationId)))
+          .go();
+
   // Get the latest message in a conversation (ordered by message_order desc).
   Future<Message?> getLatestMessage(String conversationId) =>
       (select(db.messages)

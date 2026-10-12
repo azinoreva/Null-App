@@ -65,4 +65,12 @@ class ConversationsDao extends DatabaseAccessor<AppDatabase>
           ..where((t) => t.conversationId.equals(conversationId)))
         .write(ConversationsCompanion(badge: Value(badge)));
   }
+
+  // Set the archived flag without touching `updatedAt`, so archiving never
+  // reorders the chat list.
+  Future<void> setArchived(String conversationId, int archived) async {
+    await (update(db.conversations)
+          ..where((t) => t.conversationId.equals(conversationId)))
+        .write(ConversationsCompanion(archived: Value(archived)));
+  }
 }

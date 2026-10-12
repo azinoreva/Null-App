@@ -214,6 +214,7 @@ class SyncStatesNotifier extends AsyncNotifier<List<SyncStateData>> {
         lastMessageId: latest?.messageId ?? conversation.lastMessageId,
         lastMessage: latest?.decryptedMessage,
         updatedAt: latest?.timestamp ?? conversation.updatedAt,
+        archived: conversation.archived,
       );
     }
   }
@@ -263,6 +264,32 @@ class SyncStatesNotifier extends AsyncNotifier<List<SyncStateData>> {
   /// Mutes or unmutes a conversation.
   Future<void> setMuted(String conversationId, {required bool muted}) =>
       _dao.setMuted(conversationId, muted ? 1 : 0);
+
+  /// Archives or unarchives a conversation. Writes both the durable
+  /// `conversations.archived` flag and the `sync_state` projection so the
+  /// change shows up immediately and survives a restart.
+  Future<void> setArchived(
+    String conversationId, {
+    required bool archived,
+  }) async {
+    final database = ref.read(appDatabaseProvider);
+    await database.conversationsDao.setArchived(
+      conversationId,
+      archived ? 1 : 0,
+    );
+    await _dao.setArchived(conversationId, archived ? 1 : 0);
+  }
+
+  /// Permanently removes a conversation: its messages, the conversation row,
+  /// and its `sync_state` projection.
+  Future<void> delete(String conversationId) async {
+    final database = ref.read(appDatabaseProvider);
+    await database.transaction(() async {
+      await database.messagesDao.deleteMessagesForConversation(conversationId);
+      await database.conversationsDao.deleteConversation(conversationId);
+      await _dao.deleteSyncState(conversationId);
+    });
+  }
 
   /// Updates the ring colour shown around the avatar.
   Future<void> updateColour(String conversationId, String colour) =>
@@ -947,7 +974,11 @@ class PendingContactsNotifier extends AsyncNotifier<List<ReceivedContact>> {
             servers: contact.servers,
             createdAt: now,
             updatedAt: now,
-            conversationId: const Value(null),
+            // Individual conversations are keyed by the contact id, so link
+            // the conversation immediately. Without this the chat list could
+            // only resolve the raw conversation id instead of the contact
+            // name.
+            conversationId: Value(contact.contactId),
           ),
         );
     await _cache.remove(contact.contactId);

@@ -94,22 +94,16 @@
 
 import 'dart:async';
 import 'dart:convert';
-import 'dart:io';
-import 'dart:isolate';
 
 import 'package:drift/drift.dart';
-import 'package:drift/native.dart';
 
 import 'app_queue.dart';
 import 'database/app_database.dart';
-import 'database/init_db.dart';
 import 'database/queries/tasks_queries.dart';
 import 'functions_list.dart' as functions;
-import 'task_queue.dart';
 
 const int kMaxConcurrentIsolates = 3;
 const Duration kSlowTaskThreshold = Duration(seconds: 2);
-const Duration kHardIsolateTimeout = Duration(seconds: 10);
 const int kMaxRetries = 10000;
 
 /// Shared contract type: what every entry in functions_list.dart's
@@ -210,15 +204,10 @@ class TaskEngine {
   /// [updateNetworkState] as soon as you know better.
   static Future<TaskEngine> start({
     required AppDatabase database,
-    required BackgroundDatabaseConfig databaseConfig,
     bool initiallyOnline = false,
   }) async {
     final engine = TaskEngine._(
-      _EngineWorker(
-        database: database,
-        databaseConfig: databaseConfig,
-        initiallyOnline: initiallyOnline,
-      ),
+      _EngineWorker(database: database, initiallyOnline: initiallyOnline),
     );
     engine.ping();
     return engine;
@@ -247,7 +236,6 @@ class TaskEngine {
 class _EngineWorker {
   _EngineWorker({
     required this.database,
-    required this.databaseConfig,
     required bool initiallyOnline,
   }) : _isOnline = initiallyOnline {
     // Anything left "inProgress" from a previous run (crash, force-quit,
@@ -257,11 +245,6 @@ class _EngineWorker {
   }
 
   final AppDatabase database;
-  final BackgroundDatabaseConfig databaseConfig;
-  late final TaskQueue _followUpQueue = TaskQueue(
-    database: database,
-    onQueued: ping,
-  );
 
   bool _processing = false;
   bool _pingedAgain = false;
@@ -310,15 +293,18 @@ class _EngineWorker {
 
   /// The core loop. Runs tasks essentially one at a time -- but if a task
   /// is still going after kSlowTaskThreshold, the loop moves on and starts
-  /// the next one concurrently in its own isolate (up to
-  /// kMaxConcurrentIsolates at once). Anything that's still running after
-  /// kHardIsolateTimeout gets killed and sent to retry.
+  /// the next one concurrently (up to kMaxConcurrentIsolates at once).
+  ///
+  /// Executors run on this (the coordinator) isolate rather than a spawned
+  /// worker: they reach the same plugins (secure storage, shared
+  /// preferences, dotenv) the rest of the app uses, and their database
+  /// writes go through the coordinator's [AppDatabase] connection, so Drift
+  /// stream queries (the chat list and message view) are notified live.
   Future<void> _drainQueue() async {
     final active = <_RunningWorker>[];
 
     while (true) {
       await _reap(active);
-      await _enforceHardTimeout(active);
 
       if (active.length < kMaxConcurrentIsolates) {
         final claim = await _claimNextTask();
@@ -385,96 +371,75 @@ class _EngineWorker {
 
   _RunningWorker _spawnWorker(_TaskClaim task) {
     final completer = Completer<_WorkerResult>();
-    final replyPort = ReceivePort();
-    final errorPort = ReceivePort();
-    final enqueuePort = ReceivePort();
-
     final handle = _RunningWorker(
       taskId: task.taskId,
       startedAt: DateTime.now(),
       completer: completer,
     );
+    unawaited(_executeTask(task, completer));
+    return handle;
+  }
 
-    void finish(_WorkerResult result) {
-      if (!completer.isCompleted) completer.complete(result);
-      replyPort.close();
-      errorPort.close();
-      enqueuePort.close();
-    }
+  /// Runs one claimed task's executor on the coordinator isolate and reports
+  /// the outcome through [completer] (never throwing out of the future).
+  Future<void> _executeTask(
+    _TaskClaim task,
+    Completer<_WorkerResult> completer,
+  ) async {
+    try {
+      final definition = functions.functionRegistry[task.functionName];
+      if (definition == null) {
+        completer.complete(
+          _WorkerResult.failure(
+            task.taskId,
+            'No executor registered for "${task.functionName}".',
+          ),
+        );
+        return;
+      }
 
-    replyPort.listen((message) {
-      if (message is _WorkerResult) finish(message);
-    });
-
-    // Isolate.spawn's onError port delivers [errorMessage, stackTrace],
-    // not a _WorkerResult -- an uncaught error escaping the isolate
-    // entirely (rather than being caught by the try/catch in
-    // _workerEntryPoint) still needs to count as a failure.
-    errorPort.listen((error) {
-      final description = error is List ? error.join('\n') : error.toString();
-      finish(_WorkerResult.failure(task.taskId, description));
-    });
-
-    enqueuePort.listen((message) {
-      if (message is! Map) return;
-      final functionName = message['functionName'];
-      final args = message['args'];
-      if (functionName is! String || args is! List) return;
-      unawaited(
-        _followUpQueue.queueTask(
-          functionName: functionName,
-          args: args,
-          serverId: message['serverId'] as String?,
-          taskData: message['taskData'] as String?,
-        ),
-      );
-    });
-
-    Isolate.spawn(
-      _workerEntryPoint,
-      _WorkerRequest(
+      final decodedArgs = jsonDecode(task.functionArgsJson) as List<dynamic>;
+      final payload = TaskPayload(
         taskId: task.taskId,
-        functionName: task.functionName,
-        functionArgsJson: task.functionArgsJson,
+        functionArgs: decodedArgs,
         blobs: task.blobs,
         taskData: task.taskData,
         serverId: task.serverId,
-        replyPort: replyPort.sendPort,
-        enqueuePort: enqueuePort.sendPort,
-        databasePath: databaseConfig.path,
-        databaseKey: databaseConfig.key,
-      ),
-      onError: errorPort.sendPort,
-      debugName: 'task_${task.taskId}',
-    ).then((isolate) => handle.isolate = isolate);
+      );
 
-    return handle;
+      // Executors on this isolate queue follow-up work through the app-wide
+      // TaskQueue (appTaskQueueRef); they don't need a worker port.
+      appTaskQueuePort = null;
+
+      final databaseExecutor = definition.databaseExecutor;
+      final executor = definition.executor;
+      if (databaseExecutor != null) {
+        await databaseExecutor(payload, database);
+      } else if (executor != null) {
+        await executor(payload);
+      } else {
+        throw StateError(
+          'Task definition for "${task.functionName}" has no executor.',
+        );
+      }
+
+      if (!completer.isCompleted) {
+        completer.complete(_WorkerResult.success(task.taskId));
+      }
+    } catch (error, stackTrace) {
+      if (!completer.isCompleted) {
+        completer.complete(
+          _WorkerResult.failure(task.taskId, '$error\n$stackTrace'),
+        );
+      }
+    }
   }
 
   Future<void> _reap(List<_RunningWorker> active) async {
     final finished = active.where((w) => w.completer.isCompleted).toList();
     for (final w in finished) {
       active.remove(w);
-      w.isolate?.kill();
       final result = await w.completer.future;
-      await _applyResult(w, result);
-    }
-  }
-
-  Future<void> _enforceHardTimeout(List<_RunningWorker> active) async {
-    final now = DateTime.now();
-    for (final w in List<_RunningWorker>.from(active)) {
-      if (w.completer.isCompleted) continue;
-      if (now.difference(w.startedAt) < kHardIsolateTimeout) continue;
-
-      w.isolate?.kill(priority: Isolate.immediate);
-      final result = _WorkerResult.failure(
-        w.taskId,
-        'Task exceeded the ${kHardIsolateTimeout.inSeconds}s hard limit and was terminated.',
-      );
-      if (!w.completer.isCompleted) w.completer.complete(result);
-
-      active.remove(w);
       await _applyResult(w, result);
     }
   }
@@ -534,33 +499,6 @@ class _RunningWorker {
   final String taskId;
   final DateTime startedAt;
   final Completer<_WorkerResult> completer;
-  Isolate? isolate;
-}
-
-class _WorkerRequest {
-  const _WorkerRequest({
-    required this.taskId,
-    required this.functionName,
-    required this.functionArgsJson,
-    required this.blobs,
-    required this.taskData,
-    required this.replyPort,
-    required this.serverId,
-    required this.enqueuePort,
-    required this.databasePath,
-    required this.databaseKey,
-  });
-
-  final String taskId;
-  final String functionName;
-  final String functionArgsJson;
-  final List<Uint8List?> blobs;
-  final String? taskData;
-  final String? serverId;
-  final SendPort replyPort;
-  final SendPort enqueuePort;
-  final String databasePath;
-  final Uint8List databaseKey;
 }
 
 class _WorkerResult {
@@ -575,65 +513,4 @@ class _WorkerResult {
   final String taskId;
   final bool success;
   final String? error;
-}
-
-/// Entry point for each individual task's isolate. Database-backed tasks open
-/// their own database handle here, so task code never executes on the UI
-/// isolate or through the coordinator's database handle.
-void _workerEntryPoint(_WorkerRequest req) async {
-  AppDatabase? database;
-  try {
-    final definition = functions.functionRegistry[req.functionName];
-
-    if (definition == null) {
-      req.replyPort.send(
-        _WorkerResult.failure(
-          req.taskId,
-          'No executor registered for "${req.functionName}".',
-        ),
-      );
-      return;
-    }
-
-    final decodedArgs = jsonDecode(req.functionArgsJson) as List<dynamic>;
-
-    final payload = TaskPayload(
-      taskId: req.taskId,
-      functionArgs: decodedArgs,
-      blobs: req.blobs,
-      taskData: req.taskData,
-      serverId: req.serverId,
-    );
-
-    appTaskQueuePort = req.enqueuePort;
-    if (definition.databaseExecutor != null) {
-      final executor = NativeDatabase(
-        File(req.databasePath),
-        setup: (db) {
-          final encodedKey = req.databaseKey
-              .map((byte) => byte.toRadixString(16).padLeft(2, '0'))
-              .join();
-          db.execute("PRAGMA hexkey = '$encodedKey';");
-        },
-      );
-      database = AppDatabase(executor);
-      await definition.databaseExecutor!(payload, database);
-      await database.close();
-      database = null;
-    } else {
-      final executor = definition.executor;
-      if (executor == null) {
-        throw StateError(
-          'Task definition for "${req.functionName}" has no executor.',
-        );
-      }
-      await executor(payload);
-    }
-    req.replyPort.send(_WorkerResult.success(req.taskId));
-  } catch (error, stackTrace) {
-    await database?.close();
-    req.replyPort.send(
-      _WorkerResult.failure(req.taskId, '$error\n$stackTrace'),
-    );
-  }
 }

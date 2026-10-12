@@ -2,7 +2,7 @@
 
 import 'dart:convert';
 import 'dart:io';
-import 'dart:typed_data';
+import 'package:flutter/foundation.dart';
 import 'package:image/image.dart' as img;
 
 /// Container class to hold the output data formats for SQLite.
@@ -18,6 +18,45 @@ class CompressedImageResult {
     required this.blobBytes,
     this.base64String,
   });
+}
+
+/// Isolate-transferable description of one compression job. Kept as a plain
+/// value type (only bytes + scalars) so it can cross the isolate boundary.
+class _ImageJob {
+  const _ImageJob({
+    required this.fileBytes,
+    required this.targetBytes,
+    required this.toStringFlag,
+  });
+
+  final Uint8List fileBytes;
+  final int targetBytes;
+  final bool toStringFlag;
+}
+
+/// Decode + cubic-resize + WebP-encode. All of this is CPU-bound, so it runs
+/// on a background isolate (via [compute]) to keep the UI thread free. Must be
+/// a top-level function for [compute].
+CompressedImageResult? _compressImageBytes(_ImageJob job) {
+  final img.Image? originalImage = img.decodeImage(job.fileBytes);
+  if (originalImage == null) return null;
+
+  final img.Image resizedImage = img.copyResize(
+    originalImage,
+    width: 96,
+    height: 96,
+    interpolation: img.Interpolation.cubic,
+  );
+
+  final compressedBytes = img.encodeWebP(resizedImage);
+  if (compressedBytes.length > job.targetBytes) return null;
+
+  return CompressedImageResult(
+    blobBytes: Uint8List.fromList(compressedBytes),
+    base64String: job.toStringFlag
+        ? 'data:image/webp;base64,${base64Encode(compressedBytes)}'
+        : null,
+  );
 }
 
 class ContactImageCompressor {
@@ -44,27 +83,14 @@ class ContactImageCompressor {
       }
 
       if (!await file.exists()) {
-        ('Error: File does not exist at specified directory.');
         return null;
       }
 
-      // 1. Read raw file bytes and decode into an Image object
+      // File IO stays on this isolate; the decode/resize/encode work is
+      // handed off to a background isolate below.
       final Uint8List fileBytes = await file.readAsBytes();
-      img.Image? originalImage = img.decodeImage(fileBytes);
-      if (originalImage == null) {
-        ('Error: Unable to decode image file.');
-        return null;
-      }
 
-      // 2. Resize image to standard contact resolution (96x96 px)
-      img.Image resizedImage = img.copyResize(
-        originalImage,
-        width: 96,
-        height: 96,
-        interpolation: img.Interpolation.cubic,
-      );
-
-      // 3. Calculate the maximum allowed binary size
+      // Calculate the maximum allowed binary size.
       final int totalAllowedBytes = (targetKb * 1024).round();
       int targetBytes = totalAllowedBytes;
 
@@ -76,29 +102,15 @@ class ContactImageCompressor {
         targetBytes = (allowedBase64Chars * 3 / 4).floor();
       }
 
-      // 4. Compress using WebP.
-      final compressedBytes = img.encodeWebP(resizedImage);
-
-      // 5. If even the lowest quality does not fit, fail gracefully
-      if (compressedBytes.length > targetBytes) {
-        ('Error: Could not compress image to the required size budget of $targetKb KB.');
-        return null;
-      }
-
-      // 6. Build output results
-      final Uint8List finalBlob = Uint8List.fromList(compressedBytes);
-      String? finalBase64;
-
-      if (toStringFlag) {
-        finalBase64 = 'data:image/webp;base64,${base64Encode(compressedBytes)}';
-      }
-
-      return CompressedImageResult(
-        blobBytes: finalBlob,
-        base64String: finalBase64,
+      return await compute(
+        _compressImageBytes,
+        _ImageJob(
+          fileBytes: fileBytes,
+          targetBytes: targetBytes,
+          toStringFlag: toStringFlag,
+        ),
       );
     } catch (e) {
-      ('Exception occurred during image processing: $e');
       return null;
     }
   }

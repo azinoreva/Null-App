@@ -106,7 +106,7 @@ class AppDatabase extends _$AppDatabase {
   }
 
   @override
-  int get schemaVersion => 9;
+  int get schemaVersion => 10;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -157,6 +157,12 @@ class AppDatabase extends _$AppDatabase {
         await customStatement(
           'ALTER TABLE conversations RENAME COLUMN server_id TO servers;',
         );
+      }
+      if (from < 10) {
+        // The chat list is driven by `sync_state`, so the archived flag has to
+        // live there too (mirroring conversations.archived) for the archived
+        // view to be able to hide and reveal conversations.
+        await m.addColumn(syncState, syncState.archived);
       }
     },
 

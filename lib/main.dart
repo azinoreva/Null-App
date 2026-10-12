@@ -61,11 +61,9 @@ void main() async {
   await UpdatesCacheService.instance.init();
   await PendingContactsCacheService.instance.init();
   final database = await DatabaseInitializer.initialize();
-  final databaseConfig = DatabaseInitializer.backgroundConfig;
   await const IdentityCrypto().ensureIdentityKey(database: database);
   final taskEngine = await TaskEngine.start(
     database: database,
-    databaseConfig: databaseConfig,
     initiallyOnline: true,
   );
   taskEngine.ping();

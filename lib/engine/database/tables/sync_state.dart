@@ -32,6 +32,12 @@ class SyncState extends Table {
       integer().withDefault(const Constant(0)).check(muted.isIn([0, 1]))();
   IntColumn get mentions => integer().withDefault(const Constant(0))();
 
+  // 1 when the conversation is hidden from the main chat list and shown under
+  // the archived view. Mirrors [Conversations.archived] so the durable state
+  // survives a restart via the projection rebuild.
+  IntColumn get archived =>
+      integer().withDefault(const Constant(0)).check(archived.isIn([0, 1]))();
+
   @override
   Set<Column> get primaryKey => {conversationId};
 }

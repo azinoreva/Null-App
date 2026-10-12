@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 //  AppColorScheme, AppTypography, AppColors, and ConversationListItem 
+import '../engine/database/app_database.dart';
 import '../widgets/app_theme.dart';
 import '../widgets/display/conversation_card.dart';
 import '../widgets/display/navigation.dart';
@@ -20,6 +21,10 @@ class ChatScreen extends ConsumerStatefulWidget {
 
 class _ChatScreenState extends ConsumerState<ChatScreen> {
   NavigationTab _currentTab = NavigationTab.chats;
+
+  /// When true the chat list shows archived conversations instead of the
+  /// active ones.
+  bool _showArchived = false;
 
   @override
   Widget build(BuildContext context) {
@@ -119,6 +124,19 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                 ),
                 const Spacer(),
                 IconButton(
+                  onPressed: () =>
+                      setState(() => _showArchived = !_showArchived),
+                  icon: Icon(
+                    _showArchived
+                        ? Icons.unarchive_outlined
+                        : Icons.archive_outlined,
+                    color: _showArchived
+                        ? AppColors.haloRing
+                        : themeExtension.textInputColor,
+                  ),
+                  tooltip: _showArchived ? 'Back to chats' : 'Archived',
+                ),
+                IconButton(
                   onPressed: () => Navigator.of(context).push(
                     MaterialPageRoute(builder: (_) => const SettingsScreen()),
                   ),
@@ -135,13 +153,32 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         if (isDesktop) ...[
           Padding(
             padding: const EdgeInsets.all(16.0),
-            child: Text(
-              'Recent Conversations',
-              style: TextStyle(
-                fontSize: 18.0,
-                fontWeight: FontWeight.bold,
-                color: themeExtension.textInputColor,
-              ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    _showArchived ? 'Archived' : 'Recent Conversations',
+                    style: TextStyle(
+                      fontSize: 18.0,
+                      fontWeight: FontWeight.bold,
+                      color: themeExtension.textInputColor,
+                    ),
+                  ),
+                ),
+                IconButton(
+                  onPressed: () =>
+                      setState(() => _showArchived = !_showArchived),
+                  icon: Icon(
+                    _showArchived
+                        ? Icons.unarchive_outlined
+                        : Icons.archive_outlined,
+                    color: _showArchived
+                        ? AppColors.haloRing
+                        : themeExtension.textInputColor,
+                  ),
+                  tooltip: _showArchived ? 'Back to chats' : 'Archived',
+                ),
+              ],
             ),
           ),
         ],
@@ -183,7 +220,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(
-                  'RECENT CONVERSATIONS',
+                  _showArchived ? 'ARCHIVED' : 'RECENT CONVERSATIONS',
                   style: TextStyle(
                     fontSize: 12.0,
                     fontWeight: FontWeight.w600,
@@ -318,10 +355,14 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         ),
       ),
       data: (rows) {
-        if (rows.isEmpty) {
+        final visible = rows
+            .where((row) => (row.archived == 1) == _showArchived)
+            .toList(growable: false);
+
+        if (visible.isEmpty) {
           return Center(
             child: Text(
-              'No conversations yet',
+              _showArchived ? 'No archived conversations' : 'No conversations yet',
               style: TextStyle(color: themeExtension.textInputColor),
             ),
           );
@@ -330,7 +371,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         return ListView(
           padding: EdgeInsets.zero,
           children: [
-            for (final row in rows) ...[
+            for (final row in visible) ...[
               GestureDetector(
                 onTap: () {
                   Navigator.of(context).push(
@@ -345,6 +386,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                     ),
                   );
                 },
+                onLongPress: () => _showConversationActions(row),
                 child: ConversationListItem(
                   displayName: row.displayName,
                   lastMessage: row.lastMessage ?? '',
@@ -364,5 +406,120 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         );
       },
     );
+  }
+
+  Future<void> _showConversationActions(SyncStateData row) async {
+    final isArchived = row.archived == 1;
+    final isPinned = row.pinned == 1;
+    final isMuted = row.muted == 1;
+
+    await showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Theme.of(context).colorScheme.surface,
+      builder: (sheetContext) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: Icon(
+                isArchived
+                    ? Icons.unarchive_outlined
+                    : Icons.archive_outlined,
+              ),
+              title: Text(isArchived ? 'Unarchive' : 'Archive'),
+              onTap: () {
+                Navigator.pop(sheetContext);
+                ref
+                    .read(syncStatesProvider.notifier)
+                    .setArchived(row.conversationId, archived: !isArchived);
+              },
+            ),
+            ListTile(
+              leading: Icon(
+                isPinned ? Icons.push_pin : Icons.push_pin_outlined,
+              ),
+              title: Text(isPinned ? 'Unpin' : 'Pin'),
+              onTap: () {
+                Navigator.pop(sheetContext);
+                ref
+                    .read(syncStatesProvider.notifier)
+                    .setPinned(row.conversationId, pinned: !isPinned);
+              },
+            ),
+            ListTile(
+              leading: Icon(
+                isMuted
+                    ? Icons.notifications_off
+                    : Icons.notifications_none,
+              ),
+              title: Text(isMuted ? 'Unmute' : 'Mute'),
+              onTap: () {
+                Navigator.pop(sheetContext);
+                ref
+                    .read(syncStatesProvider.notifier)
+                    .setMuted(row.conversationId, muted: !isMuted);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.done_all),
+              title: const Text('Mark as read'),
+              onTap: () {
+                Navigator.pop(sheetContext);
+                ref
+                    .read(syncStatesProvider.notifier)
+                    .markRead(
+                      row.conversationId,
+                      messageId: row.lastMessageId ?? '',
+                      message: row.lastMessage ?? '',
+                    );
+              },
+            ),
+            ListTile(
+              leading: const Icon(
+                Icons.delete_outline,
+                color: Color(0xFFF44336),
+              ),
+              title: const Text(
+                'Delete',
+                style: TextStyle(color: Color(0xFFF44336)),
+              ),
+              onTap: () {
+                Navigator.pop(sheetContext);
+                _confirmDelete(row);
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _confirmDelete(SyncStateData row) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Delete conversation?'),
+        content: Text(
+          'This permanently deletes your chat with '
+          '${row.displayName} and all of its messages.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text(
+              'Delete',
+              style: TextStyle(color: Color(0xFFF44336)),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !mounted) return;
+    await ref.read(syncStatesProvider.notifier).delete(row.conversationId);
   }
 }
