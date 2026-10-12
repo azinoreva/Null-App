@@ -265,12 +265,23 @@ class _ContactsScreenState extends ConsumerState<ContactsScreen> {
   }
 
   Future<void> _deleteContact(ContactData contact) async {
+    await _deleteContacts([contact]);
+  }
+
+  Future<void> _deleteContacts(List<ContactData> contacts) async {
+    if (contacts.isEmpty) return;
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: const Text('Delete contact?'),
+        title: Text(
+          contacts.length == 1
+              ? 'Delete contact?'
+              : 'Delete ${contacts.length} contacts?',
+        ),
         content: Text(
-          'Remove ${contact.displayName} and its conversation from this device?',
+          contacts.length == 1
+              ? 'Remove ${contacts.first.displayName} and its conversation from this device?'
+              : 'Remove these contacts and their conversations from this device?',
         ),
         actions: [
           TextButton(
@@ -289,18 +300,20 @@ class _ContactsScreenState extends ConsumerState<ContactsScreen> {
     final database = ref.read(appDatabaseProvider);
     await database.transaction(() async {
       final tasks = await database.tasksDao.getIncompleteTasks();
-      for (final task in tasks) {
-        if (task.functionName == 'ensureDhFlow' &&
-            task.functionArgs.contains(contact.contactId)) {
-          await database.tasksDao.deleteTask(task.taskId);
+      final contactIds = contacts.map((contact) => contact.contactId).toSet();
+      for (final contactId in contactIds) {
+        for (final task in tasks) {
+          if (task.functionName == 'ensureDhFlow' &&
+              task.functionArgs.contains(contactId)) {
+            await database.tasksDao.deleteTask(task.taskId);
+          }
         }
+        await (database.delete(database.conversations)..where(
+              (conversation) => conversation.conversationId.equals(contactId),
+            ))
+            .go();
+        await database.contactsDao.deleteContact(contactId);
       }
-      await (database.delete(database.conversations)..where(
-            (conversation) =>
-                conversation.conversationId.equals(contact.contactId),
-          ))
-          .go();
-      await database.contactsDao.deleteContact(contact.contactId);
     });
     await ref.read(contactsProvider.notifier).refresh();
   }
@@ -375,6 +388,8 @@ class _ContactsScreenState extends ConsumerState<ContactsScreen> {
           onOpenPendingContacts: () => _openPendingContacts(pendingContacts),
           onOpenContactChat: _openContactChat,
           onLongPressContact: _showContactActions,
+          onAddContactsToNetwork: _addContactsToNetwork,
+          onDeleteContacts: _deleteContacts,
           onAddContact: () async {
             final added = await showModalBottomSheet<bool>(
               context: context,
@@ -560,6 +575,11 @@ class _ContactsScreenState extends ConsumerState<ContactsScreen> {
   }
 
   Future<void> _addContactToNetwork(ContactData contact) async {
+    await _addContactsToNetwork([contact]);
+  }
+
+  Future<void> _addContactsToNetwork(List<ContactData> contacts) async {
+    if (contacts.isEmpty) return;
     if (_networks.isEmpty) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -588,15 +608,18 @@ class _ContactsScreenState extends ConsumerState<ContactsScreen> {
     );
     if (networkId == null || !mounted) return;
     try {
-      await ref
-          .read(appDatabaseProvider)
-          .contactNetworkMembersDao
-          .addMember(networkId, contact.contactId);
+      await network_functions.addContactsToNetwork(
+        ref.read(appDatabaseProvider).contactNetworkMembersDao,
+        networkId: networkId,
+        contactIds: contacts.map((contact) => contact.contactId).toList(),
+      );
       if (_selectedNetworkId == networkId) await _selectNetwork(networkId);
     } on Exception {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Contact is already in that Network.')),
+        const SnackBar(
+          content: Text('One or more contacts are already in that Network.'),
+        ),
       );
     }
   }
@@ -657,6 +680,9 @@ class ContactsListScreen extends StatefulWidget {
   final VoidCallback? onOpenSettings;
   final Future<void> Function(ContactData contact)? onOpenContactChat;
   final Future<void> Function(ContactData contact)? onLongPressContact;
+  final Future<void> Function(List<ContactData> contacts)?
+  onAddContactsToNetwork;
+  final Future<void> Function(List<ContactData> contacts)? onDeleteContacts;
 
   const ContactsListScreen({
     super.key,
@@ -672,6 +698,8 @@ class ContactsListScreen extends StatefulWidget {
     this.onOpenSettings,
     this.onOpenContactChat,
     this.onLongPressContact,
+    this.onAddContactsToNetwork,
+    this.onDeleteContacts,
   });
 
   @override
@@ -680,6 +708,7 @@ class ContactsListScreen extends StatefulWidget {
 
 class _ContactsListScreenState extends State<ContactsListScreen> {
   final TextEditingController _searchController = TextEditingController();
+  final Set<String> _selectedContactIds = {};
   String _query = '';
 
   @override
@@ -716,6 +745,37 @@ class _ContactsListScreenState extends State<ContactsListScreen> {
       (a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()),
     );
     return filtered;
+  }
+
+  List<ContactData> get _selectedContacts => widget.contacts
+      .where((contact) => _selectedContactIds.contains(contact.contactId))
+      .toList(growable: false);
+
+  void _toggleContact(ContactData contact) {
+    setState(() {
+      if (!_selectedContactIds.add(contact.contactId)) {
+        _selectedContactIds.remove(contact.contactId);
+      }
+    });
+  }
+
+  void _clearSelection() {
+    if (_selectedContactIds.isEmpty) return;
+    setState(_selectedContactIds.clear);
+  }
+
+  Future<void> _addSelectedContacts() async {
+    final contacts = _selectedContacts;
+    if (contacts.isEmpty || widget.onAddContactsToNetwork == null) return;
+    await widget.onAddContactsToNetwork!(contacts);
+    if (mounted) _clearSelection();
+  }
+
+  Future<void> _deleteSelectedContacts() async {
+    final contacts = _selectedContacts;
+    if (contacts.isEmpty || widget.onDeleteContacts == null) return;
+    await widget.onDeleteContacts!(contacts);
+    if (mounted) _clearSelection();
   }
 
   @override
@@ -760,6 +820,11 @@ class _ContactsListScreenState extends State<ContactsListScreen> {
                   onPressed: () => widget.onLongPressContact!(contact),
                   icon: const Icon(Icons.more_vert),
                 ),
+              Checkbox(
+                value: _selectedContactIds.contains(contact.contactId),
+                onChanged: (_) => _toggleContact(contact),
+                semanticLabel: 'Select ${contact.displayName}',
+              ),
             ],
           ),
         ),
@@ -816,6 +881,40 @@ class _ContactsListScreenState extends State<ContactsListScreen> {
                 ],
               ),
               const SizedBox(height: 12.0),
+
+              if (_selectedContactIds.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 8.0),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          '${_selectedContactIds.length} contact${_selectedContactIds.length == 1 ? '' : 's'} selected',
+                          style: AppTypography.getTextStyle(
+                            context,
+                            AppTextType.tiny,
+                            color: theme.primaryGreen,
+                          ),
+                        ),
+                      ),
+                      IconButton(
+                        onPressed: _addSelectedContacts,
+                        tooltip: 'Add selected to Network',
+                        icon: const Icon(Icons.playlist_add_outlined),
+                      ),
+                      IconButton(
+                        onPressed: _deleteSelectedContacts,
+                        tooltip: 'Delete selected contacts',
+                        icon: const Icon(Icons.delete_outline),
+                      ),
+                      IconButton(
+                        onPressed: _clearSelection,
+                        tooltip: 'Clear selection',
+                        icon: const Icon(Icons.close),
+                      ),
+                    ],
+                  ),
+                ),
 
               // Search field
               TextField(

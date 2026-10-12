@@ -2,6 +2,7 @@
 import 'package:dio/dio.dart';
 
 import '../main_server_client.dart';
+import 'wire_servers.dart';
 
 /// Result of creating a shareable contact invite.
 class SendContactResult {
@@ -57,7 +58,7 @@ class SendContactReboundService {
           'public_key': publicKey,
           'avatar': avatar,
           'contact_key': contactKey,
-          'servers': servers
+          'servers': writeServersToJson(servers)
       },
     );
 

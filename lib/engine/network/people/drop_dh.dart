@@ -2,6 +2,7 @@
 import 'package:dio/dio.dart';
 
 import '../main_server_client.dart';
+import 'wire_servers.dart';
 
 class DhDropService {
   Dio get _dio => MainServerClient.dio;
@@ -38,7 +39,7 @@ class DhDropService {
         'recipient_id': recipientId,
         'dh_enc_key': dhEncKey,
         'dh_enc_nonce': dhEncNonce,
-        'servers': servers,
+        'servers': writeServersToJson(servers),
 
       },
     );

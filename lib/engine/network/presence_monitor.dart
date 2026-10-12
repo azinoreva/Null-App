@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import '../../utils/server_list.dart';
 import '../database/app_database.dart';
 import 'api_client.dart';
 import 'auth_failure_handler.dart';
@@ -48,9 +49,15 @@ class PresenceMonitor {
       final contacts = await database.contactsDao.getConnectedContacts();
       if (contacts.isEmpty) return;
 
+      // Contacts whose saved card never carried a server list still have to be
+      // asked somewhere; fall back to the servers this device is registered on.
+      final localServers = await ServerListService.readServerIds();
+
       final idsByServer = <String, Set<String>>{};
       for (final contact in contacts) {
-        for (final serverId in contact.servers) {
+        final servers =
+            contact.servers.isEmpty ? localServers : contact.servers;
+        for (final serverId in servers) {
           if (serverId.isEmpty) continue;
           idsByServer.putIfAbsent(serverId, () => <String>{}).add(
             contact.contactId,

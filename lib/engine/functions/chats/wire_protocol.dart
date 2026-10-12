@@ -19,6 +19,7 @@ import 'dart:typed_data';
 
 import 'package:drift/drift.dart';
 
+import '../../crypto/base64_tolerant.dart';
 import '../../crypto/chat/null_crypto.dart';
 import '../../database/app_database.dart';
 import '../../database/queries/messages_queries.dart';
@@ -75,13 +76,9 @@ Future<Map<String, dynamic>> decryptEncryptedWirePayload(
   final plaintext = await crypto.decryptMessage(
     conversationId: conversationId,
     chainIndex: decoded['chain_index'] as int,
-    ciphertext: Uint8List.fromList(
-      base64Url.decode(decoded['ciphertext'] as String),
-    ),
-    nonce: Uint8List.fromList(
-      base64Url.decode(decoded['nonce'] as String),
-    ),
-    mac: Uint8List.fromList(base64Url.decode(decoded['mac'] as String)),
+    ciphertext: base64DecodeTolerant(decoded['ciphertext'] as String),
+    nonce: base64DecodeTolerant(decoded['nonce'] as String),
+    mac: base64DecodeTolerant(decoded['mac'] as String),
     aad: messageAad(conversationId),
   );
 
@@ -260,15 +257,13 @@ Future<void> storeDecryptedContent(
     chainIndex: chainIndex,
     timestamp: now,
     ciphertext: hasCipher
-        ? Uint8List.fromList(
-            base64Url.decode(decoded['ciphertext'] as String),
-          )
+        ? base64DecodeTolerant(decoded['ciphertext'] as String)
         : Uint8List(0),
     nonce: decoded['nonce'] is String
-        ? Uint8List.fromList(base64Url.decode(decoded['nonce'] as String))
+        ? base64DecodeTolerant(decoded['nonce'] as String)
         : Uint8List(0),
     mac: decoded['mac'] is String
-        ? Uint8List.fromList(base64Url.decode(decoded['mac'] as String))
+        ? base64DecodeTolerant(decoded['mac'] as String)
         : Uint8List(0),
     decryptedMessage: Value(jsonEncode(payload)),
     messageType: type.value,

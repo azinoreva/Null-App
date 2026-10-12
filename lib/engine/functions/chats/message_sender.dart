@@ -19,6 +19,7 @@ import 'dart:typed_data';
 import 'package:drift/drift.dart';
 import 'package:uuid/uuid.dart';
 
+import '../../crypto/base64_tolerant.dart';
 import '../../crypto/chat/identity_crypto.dart';
 import '../../crypto/chat/null_crypto.dart';
 import '../../crypto/chat/ratchet_store.dart';
@@ -271,13 +272,9 @@ return _post(
     );
     wireMessage = jsonEncode(encryptedWire);
     messageOrder = encryptedWire['chain_index'] as int;
-    ciphertext = Uint8List.fromList(
-      base64Url.decode(encryptedWire['ciphertext'] as String),
-    );
-    nonce = Uint8List.fromList(
-      base64Url.decode(encryptedWire['nonce'] as String),
-    );
-    mac = Uint8List.fromList(base64Url.decode(encryptedWire['mac'] as String));
+    ciphertext = base64DecodeTolerant(encryptedWire['ciphertext'] as String);
+    nonce = base64DecodeTolerant(encryptedWire['nonce'] as String);
+    mac = base64DecodeTolerant(encryptedWire['mac'] as String);
     decryptedText = plaintextJson;
   } else {
     final envelope = ControlEnvelope(

@@ -2,6 +2,7 @@
 import 'package:dio/dio.dart';
 
 import '../main_server_client.dart';
+import 'wire_servers.dart';
 
 /// The contact being dropped. Mirrors the server's `Contact` model.
 ///
@@ -73,7 +74,7 @@ class Contact {
         'title': title,
         'bio': bio,
         'public_key': publicKey,
-        'servers': servers,
+        'servers': writeServersToJson(servers),
         
         if (dhPublicKey != null) 'dh_public_key': dhPublicKey,
         if (avatar != null) 'avatar': avatar,

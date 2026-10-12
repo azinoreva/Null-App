@@ -4,6 +4,8 @@ import 'dart:convert';
 import 'dart:typed_data';
 import 'package:cryptography/cryptography.dart';
 
+import '../base64_tolerant.dart';
+
 /// Asymmetric ("sealed box" style) encryption using X25519 + AES-GCM.
 ///
 /// This encrypts [plaintext] so that only the holder of the private key
@@ -38,8 +40,9 @@ Future<String> encryptMessage({
   final ephemeralKeyPair = await x25519.newKeyPair();
   final ephemeralPublicKey = await ephemeralKeyPair.extractPublicKey();
 
-  // 2. Recipient's public key, from the Base64 string passed in.
-  final recipientPublicKeyBytes = base64Url.decode(publicKey);
+  // 2. Recipient's public key, from the Base64 string passed in. The wire
+  // ships urlsafe base64 with no padding, so decode tolerantly.
+  final recipientPublicKeyBytes = base64DecodeTolerant(publicKey);
   if (recipientPublicKeyBytes.length != 32) {
     throw FormatException('Recipient public key must be 32 bytes.');
   }
@@ -83,7 +86,7 @@ Future<String> decryptMessage({
   final x25519 = X25519();
   final aesGcm = AesGcm.with256bits();
 
-  final packed = base64Decode(packedMessage);
+  final packed = base64DecodeTolerant(packedMessage);
 
   const pubKeyLen = 32;
   const nonceLen = 12;

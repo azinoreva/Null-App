@@ -32,6 +32,7 @@ import 'package:cryptography/cryptography.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../app_queue.dart';
+import '../../crypto/base64_tolerant.dart';
 import '../../crypto/chat/asymetric_encryption.dart';
 import '../../crypto/chat/dh_identity_crypto.dart';
 import '../../crypto/chat/identity_crypto.dart';
@@ -320,7 +321,7 @@ Future<Uint8List?> _unsealEphemeralKey({required String sealed}) async {
     packedMessage: sealed,
   );
   final decoded = jsonDecode(plaintext) as Map<String, dynamic>;
-  return Uint8List.fromList(base64Url.decode(decoded['e'] as String));
+  return base64DecodeTolerant(decoded['e'] as String);
 }
 
 /// Creates the conversation row for [contactId] if it doesn't exist yet
