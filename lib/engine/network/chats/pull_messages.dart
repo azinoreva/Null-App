@@ -10,11 +10,11 @@ class QueuedMessage {
   final String logicalId;
   final int messageType;
   final String message;
-  final int messageOrder;
+  final int? messageOrder;
   final String nonce;
   final int timestamp;
   final int protocolVersion;
-  final int serverId;
+  final String serverId;
   final int senderSequence;
 
   QueuedMessage({
@@ -40,11 +40,11 @@ class QueuedMessage {
       logicalId: json['logicalId'] as String,
       messageType: json['messageType'] as int,
       message: json['message'] as String,
-      messageOrder: json['messageOrder'] as int,
+      messageOrder: json['messageOrder'] as int?,
       nonce: json['nonce'] as String,
       timestamp: json['timestamp'] as int,
       protocolVersion: json['protocolVersion'] as int,
-      serverId: json['serverId'] as int,
+      serverId: json['serverId'] as String,
       senderSequence: json['senderSequence'] as int,
     );
   }

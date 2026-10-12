@@ -59,6 +59,16 @@ class SyncStateDao extends DatabaseAccessor<AppDatabase>
         db.syncState,
       )..where((t) => t.conversationType.equals(conversationType))).get();
 
+  // Set the online-status projection for a conversation without touching
+  // `updatedAt`, so presence changes never reorder the chat list.
+  Future<void> setStatus(String conversationId, int status) async {
+    await (update(
+      db.syncState,
+    )..where((t) => t.conversationId.equals(conversationId))).write(
+      SyncStateCompanion(status: Value(status)),
+    );
+  }
+
   // Insert a new sync state.
   Future<int> insertSyncState(Insertable<SyncStateData> syncState) =>
       into(db.syncState).insert(syncState);

@@ -18,6 +18,7 @@ import 'engine/network/auth_failure_handler.dart';
 import 'engine/network/updates/updates_cache.dart';
 import 'engine/network/people/pending_contacts_cache.dart';
 import 'engine/network/server_connections.dart';
+import 'engine/network/presence_monitor.dart';
 import 'engine/database/init_db.dart';
 import 'engine/crypto/chat/identity_crypto.dart';
 import 'engine/task_queue.dart';
@@ -36,6 +37,10 @@ ServerConnectionService? appServerConnections;
 /// The newest [TaskQueue] created at startup; used to (re)start the server
 /// socket supervisor outside of [main] (e.g. right after a login).
 TaskQueue? appTaskQueue;
+
+/// The app-wide presence poller, started alongside the server sockets once the
+/// user is logged in.
+PresenceMonitor? appPresenceMonitor;
 
 /// The app's single server-list instance, shared between the socket supervisor
 /// and the settings screen so connecting/disconnecting a server stays in
@@ -105,6 +110,9 @@ Future<void> startServerConnections() async {
     taskQueue: taskQueue,
   );
   await appServerConnections!.start();
+
+  appPresenceMonitor ??= PresenceMonitor(database: taskQueue.database);
+  appPresenceMonitor!.start();
 }
 
 class MyApp extends StatefulWidget {

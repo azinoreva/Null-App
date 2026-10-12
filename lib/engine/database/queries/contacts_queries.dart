@@ -28,6 +28,12 @@ class ContactsDao extends DatabaseAccessor<AppDatabase>
   // Get only connected contacts (status = 2).
   Future<List<Contact>> getConnectedContacts() => getContactsByStatus(2);
 
+  // Watch the connected contacts, so presence/status writes made anywhere in
+  // the app are reflected in the UI without an explicit reload.
+  Stream<List<Contact>> watchConnectedContacts() => (select(
+    db.contacts,
+  )..where((t) => t.connectionStatus.equals(2))).watch();
+
   // Get contacts that are online and connected.
   Future<List<Contact>> getOnlineConnectedContacts() => (select(
     db.contacts,

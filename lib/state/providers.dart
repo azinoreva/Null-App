@@ -843,10 +843,21 @@ final contactsProvider =
 
 class ContactsNotifier extends AsyncNotifier<List<ContactData>> {
   ContactsDao get _dao => ref.read(contactsDaoProvider);
+  StreamSubscription<List<Contact>>? _subscription;
 
   @override
   Future<List<ContactData>> build() async {
     final rows = await _dao.getConnectedContacts();
+
+    // Presence polling and other writers update the contacts table directly;
+    // watching it here is what makes the on-screen status reflect that.
+    _subscription = _dao.watchConnectedContacts().listen(
+      (rows) => state = AsyncData(rows.map(_toContactData).toList()),
+      onError: (Object error, StackTrace stackTrace) =>
+          state = AsyncError(error, stackTrace),
+    );
+    ref.onDispose(() => _subscription?.cancel());
+
     return rows.map(_toContactData).toList();
   }
 

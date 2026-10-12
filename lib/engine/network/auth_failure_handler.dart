@@ -3,7 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import '../../main.dart' show appServerConnections;
+import '../../main.dart' show appServerConnections, appPresenceMonitor;
 import '../../screens/login_screen.dart';
 import 'main_server_client.dart';
 
@@ -28,6 +28,9 @@ Future<void> redirectToLogin() async {
     service.stop();
     appServerConnections = null;
   }
+
+  appPresenceMonitor?.stop();
+  appPresenceMonitor = null;
 
   final prefs = await SharedPreferences.getInstance();
   await prefs.setBool('is_logged_in', false);

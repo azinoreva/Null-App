@@ -90,8 +90,11 @@ class ServerInfo {
 /// Every card shows a single action button whose label/icon is driven by
 /// [action] (Connect or Disconnect). Tapping it invokes
 /// [onServerAction]; while that future is in flight the card shows a
-/// spinner in place of the button. If the future completes successfully
-/// the server is removed from the locally-rendered list.
+/// spinner in place of the button. When the future resolves to `true` the
+/// server is removed from the locally-rendered list — for a disconnect it is
+/// no longer connected, and for a connect it now belongs to the connected
+/// list instead. Resolving to `false` (a failed action) leaves the card in
+/// place so it can be retried.
 class ServersListModal extends StatefulWidget {
   final List<ServerInfo> servers;
 
@@ -99,8 +102,9 @@ class ServersListModal extends StatefulWidget {
   final ServerAction action;
 
   /// Called when a card's action button is tapped. The returned future
-  /// drives the per-card loading state.
-  final Future<void> Function(ServerInfo server) onServerAction;
+  /// drives the per-card loading state; resolving to `true` removes the
+  /// card from the list (the action succeeded), `false` keeps it.
+  final Future<bool> Function(ServerInfo server) onServerAction;
 
   final VoidCallback? onDone;
   final VoidCallback? onClose;
@@ -157,14 +161,15 @@ class _ServersListModalState extends State<ServersListModal> {
     if (_busy.contains(server)) return;
     setState(() => _busy.add(server));
 
-    await widget.onServerAction(server);
+    final succeeded = await widget.onServerAction(server);
 
     if (!mounted) return;
     setState(() {
-      // A successful disconnect means the server is no longer connected,
-      // so drop it from the list. A successful connect just clears the
-      // spinner (the caller can rebuild with a new list if it wants).
-      if (widget.action == ServerAction.disconnect) {
+      // A successful action changes the server's state: a disconnected one is
+      // gone, and a connected one now lives under "Connected Servers". Either
+      // way it no longer belongs in this modal. A failure leaves it in place
+      // so the user can retry.
+      if (succeeded) {
         _servers.remove(server);
       }
       _busy.remove(server);

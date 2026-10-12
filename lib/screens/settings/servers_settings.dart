@@ -48,7 +48,7 @@ class ServersSettingsScreen extends ConsumerWidget {
     );
   }
 
-  Future<void> _disconnectServer(WidgetRef ref, ServerInfo server) async {
+  Future<bool> _disconnectServer(WidgetRef ref, ServerInfo server) async {
     final serverList = ref.read(serverListProvider);
     // Whichever list it lives in — normal first, then extra.
     if (!await serverList.removeServer(server.serverId)) {
@@ -58,17 +58,32 @@ class ServersSettingsScreen extends ConsumerWidget {
 
     // The shared server list notifies the SSE supervisor, which drops that
     // server's subscription (see ServerConnectionService._syncToServerList).
+    return true;
   }
 
   Future<void> _showAddServer(BuildContext context, WidgetRef ref) async {
     try {
+      final serverList = ref.read(serverListProvider);
+      await serverList.init();
+
       final directory = server_directory.ServerDirectoryService();
       final response = await directory.getServers();
 
-      final byId = {for (final s in response.servers) s.serverId: s};
-      final servers = response.servers
-          .map((s) => ServerInfo.fromJson(s.toJson()))
-          .toList();
+      // Anything already joined — normal or extra — belongs under "Connected
+      // Servers" now, so it must not be offered for adding again.
+      final addedIds = {
+        for (final s in serverList.servers) s.serverId,
+        for (final s in serverList.extraServers) s.serverId,
+      };
+
+      final byId = {
+        for (final s in response.servers)
+          if (!addedIds.contains(s.serverId)) s.serverId: s,
+      };
+      final servers = [
+        for (final s in response.servers)
+          if (!addedIds.contains(s.serverId)) ServerInfo.fromJson(s.toJson()),
+      ];
 
       if (!context.mounted) return;
       showModalBottomSheet<void>(
@@ -93,7 +108,7 @@ class ServersSettingsScreen extends ConsumerWidget {
     }
   }
 
-  Future<void> _connectServer(
+  Future<bool> _connectServer(
     BuildContext context,
     WidgetRef ref,
     ServerInfo server, {
@@ -101,7 +116,7 @@ class ServersSettingsScreen extends ConsumerWidget {
   }) async {
     // The modal only carries the four display fields; pull the full config
     // from the directory response so nothing is lost when persisting.
-    if (full == null) return;
+    if (full == null) return false;
 
     final serverList = ref.read(serverListProvider);
     await serverList.init();
@@ -121,11 +136,11 @@ class ServersSettingsScreen extends ConsumerWidget {
           await serverList.addServer(config);
         }
       } on ServerListException catch (error) {
-        if (!context.mounted) return;
+        if (!context.mounted) return false;
         rootScaffoldMessengerKey.currentState?.showSnackBar(
           SnackBar(content: Text(error.message)),
         );
-        return;
+        return false;
       }
     }
 
@@ -147,7 +162,10 @@ class ServersSettingsScreen extends ConsumerWidget {
       serverId: full.serverId,
     );
 
-    if (!context.mounted) return;
+    final succeeded =
+        result.outcome == server_connect.ServerConnectOutcome.success;
+
+    if (!context.mounted) return succeeded;
     final messenger = rootScaffoldMessengerKey.currentState;
     final message = switch (result.outcome) {
       server_connect.ServerConnectOutcome.success =>
@@ -177,6 +195,7 @@ class ServersSettingsScreen extends ConsumerWidget {
 
     // Adding to the shared server list notifies the SSE supervisor, which
     // registers the connection automatically (ServerConnectionService).
+    return succeeded;
   }
 
   @override
