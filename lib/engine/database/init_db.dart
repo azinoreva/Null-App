@@ -10,6 +10,17 @@ import 'package:path_provider/path_provider.dart';
 
 import 'app_database.dart';
 
+/// The information a background task isolate needs to open the same database.
+final class BackgroundDatabaseConfig {
+  const BackgroundDatabaseConfig({
+    required this.path,
+    required this.key,
+  });
+
+  final String path;
+  final Uint8List key;
+}
+
 /// Creates and opens the application's encrypted SQLite database.
 ///
 /// Responsibilities:
@@ -38,6 +49,7 @@ final class DatabaseInitializer {
   );
 
   static AppDatabase? _database;
+  static BackgroundDatabaseConfig? _backgroundConfig;
 
   /// Initializes the database.
   ///
@@ -64,8 +76,20 @@ final class DatabaseInitializer {
     await database.customStatement('SELECT 1');
 
     _database = database;
+    _backgroundConfig = BackgroundDatabaseConfig(
+      path: databaseFile.path,
+      key: Uint8List.fromList(key),
+    );
 
     return database;
+  }
+
+  static BackgroundDatabaseConfig get backgroundConfig {
+    final config = _backgroundConfig;
+    if (config == null) {
+      throw StateError('DatabaseInitializer.initialize() must run first.');
+    }
+    return config;
   }
 
   /// Closes the database and clears the in-process reference.
@@ -79,6 +103,7 @@ final class DatabaseInitializer {
     }
 
     _database = null;
+    _backgroundConfig = null;
 
     await database.close();
   }

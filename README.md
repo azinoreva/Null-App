@@ -89,9 +89,10 @@ output under `build/` and `.dart_tool/`.
    an AES-256 key is generated on first install, stored in
    `FlutterSecureStorage`, and unlocked via `PRAGMA hexkey`
    (SQLCipher / SQLite3MultipleCiphers) — see `lib/engine/database/init_db.dart`.
-3. `TaskEngine.start(database)` spawns the background orchestrator isolate,
+3. `TaskEngine.start(database, databaseConfig)` starts the task coordinator,
    which immediately **recovers interrupted tasks** (anything marked
-   in-progress from a previous run goes back to pending) and starts draining.
+   in-progress from a previous run goes back to pending) and dispatches every
+   task, including chat and database-backed work, to a dedicated worker isolate.
 4. The app runs inside `ProviderScope(overrides: [appDatabaseProvider …])` so
    every provider talks to the one real database.
 5. `MyApp` shows `SplashScreen` (first run only) → `DecisionScreen` →

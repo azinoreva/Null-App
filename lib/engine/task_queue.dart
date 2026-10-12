@@ -24,11 +24,13 @@ import 'engine.dart';
 class TaskQueue {
   TaskQueue({
     required this.database,
-    required this.engine,
+    this.engine,
+    this.onQueued,
   });
 
   final AppDatabase database;
-  final TaskEngine engine;
+  final TaskEngine? engine;
+  final void Function()? onQueued;
 
   Future<String> queueTask({
     required String functionName,
@@ -89,7 +91,8 @@ class TaskQueue {
       ),
     );
 
-    engine.ping();
+    engine?.ping();
+    onQueued?.call();
     return taskId;
   }
 

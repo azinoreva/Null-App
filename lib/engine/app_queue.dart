@@ -6,7 +6,28 @@
 // DH-drop flow queues the first "hi" message through it.
 
 import 'task_queue.dart';
+import 'dart:isolate';
 
 /// Set right after [TaskQueue] construction in main(). Null until then, or
 /// on a fresh engine task raced against startup.
 TaskQueue? appTaskQueueRef;
+
+/// Set only inside a task worker isolate. It lets task functions request
+/// follow-up work from the queue owner without sharing UI-isolate objects.
+SendPort? appTaskQueuePort;
+
+void requestTaskFromWorker({
+  required String functionName,
+  required List<dynamic> args,
+  String? serverId,
+  String? taskData,
+}) {
+  final port = appTaskQueuePort;
+  if (port == null) return;
+  port.send({
+    'functionName': functionName,
+    'args': args,
+    'serverId': serverId,
+    'taskData': taskData,
+  });
+}

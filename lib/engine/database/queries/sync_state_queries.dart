@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:drift/drift.dart';
 
 import '../app_database.dart';
@@ -120,6 +122,81 @@ class SyncStateDao extends DatabaseAccessor<AppDatabase>
     await (update(
       db.syncState,
     )..where((t) => t.conversationId.equals(conversationId))).write(values);
+  }
+
+  /// Points a conversation's projection at [messageId], creating the row if it
+  /// doesn't exist yet.
+  ///
+  /// The chat message list is driven by this row's `lastMessageId`, so a
+  /// conversation that was created at runtime (e.g. straight from the contacts
+  /// screen) never materialized a projection at startup and would otherwise
+  /// never surface a newly sent or received message. Rendering fields are read
+  /// from the contact/group so the chat list entry stays populated.
+  Future<void> recordLatestMessage({
+    required String conversationId,
+    required String messageId,
+    String? message,
+    required int updatedAt,
+  }) async {
+    final existing = await getSyncStateById(conversationId);
+    if (existing != null) {
+      await (update(
+        db.syncState,
+      )..where((t) => t.conversationId.equals(conversationId))).write(
+        SyncStateCompanion(
+          lastMessageId: Value(messageId),
+          lastMessage: Value(message),
+          updatedAt: Value(updatedAt),
+        ),
+      );
+      return;
+    }
+
+    final conversation = await db.conversationsDao.getConversationById(
+      conversationId,
+    );
+    final conversationType = conversation?.conversationType ?? 0;
+
+    var displayName = conversationId;
+    String? avatar;
+    var status = 0;
+
+    if (conversationType == 0) {
+      final contact = await db.contactsDao.getContactByConversationId(
+        conversationId,
+      );
+      if (contact != null) {
+        displayName = (contact.nickname?.trim().isNotEmpty ?? false)
+            ? contact.nickname!.trim()
+            : contact.contactId;
+        avatar = contact.avatar == null
+            ? null
+            : 'data:image/png;base64,${base64Encode(contact.avatar!)}';
+        status = contact.isOnline;
+      }
+    } else {
+      final group = await db.groupsDao.getGroupById(conversationId);
+      if (group != null) {
+        displayName = group.groupName;
+        avatar = group.avatar == null
+            ? null
+            : 'data:image/png;base64,${base64Encode(group.avatar!)}';
+      }
+    }
+
+    await into(db.syncState).insert(
+      SyncStateCompanion.insert(
+        conversationId: conversationId,
+        conversationType: conversationType,
+        displayName: displayName,
+        avatar: Value(avatar),
+        status: Value(status),
+        lastMessageId: Value(messageId),
+        lastMessage: Value(message),
+        updatedAt: updatedAt,
+        colour: '0xFF2EB82E',
+      ),
+    );
   }
 
   // Update an existing sync state row.

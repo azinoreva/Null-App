@@ -1,10 +1,9 @@
 // task_engine.dart
 //
-// The whole point of this file: nothing task-related runs on the main
-// isolate. `TaskEngine` (bottom half of this file, "public" side) is a
-// lightweight handle you can call from anywhere in the app. Everything
-// below the `EVERYTHING BELOW RUNS INSIDE THE ENGINE ISOLATE` marker
-// executes on a background isolate that this file spawns for you.
+// Task execution never runs on the UI isolate. `TaskEngine` (bottom half of
+// this file, "public" side) is a lightweight handle you can call from
+// anywhere in the app. The queue coordinator remains lightweight, while each
+// claimed task is dispatched to its own worker isolate.
 //
 // ---------------------------------------------------------------------
 // Wiring it up
@@ -95,13 +94,18 @@
 
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 import 'dart:isolate';
 
 import 'package:drift/drift.dart';
+import 'package:drift/native.dart';
 
+import 'app_queue.dart';
 import 'database/app_database.dart';
+import 'database/init_db.dart';
 import 'database/queries/tasks_queries.dart';
 import 'functions_list.dart' as functions;
+import 'task_queue.dart';
 
 const int kMaxConcurrentIsolates = 3;
 const Duration kSlowTaskThreshold = Duration(seconds: 2);
@@ -206,10 +210,15 @@ class TaskEngine {
   /// [updateNetworkState] as soon as you know better.
   static Future<TaskEngine> start({
     required AppDatabase database,
+    required BackgroundDatabaseConfig databaseConfig,
     bool initiallyOnline = false,
   }) async {
     final engine = TaskEngine._(
-      _EngineWorker(database: database, initiallyOnline: initiallyOnline),
+      _EngineWorker(
+        database: database,
+        databaseConfig: databaseConfig,
+        initiallyOnline: initiallyOnline,
+      ),
     );
     engine.ping();
     return engine;
@@ -232,12 +241,15 @@ class TaskEngine {
 }
 
 /// -----------------------------------------------------------------------
-/// EVERYTHING BELOW RUNS INSIDE THE ENGINE ISOLATE.
+/// QUEUE COORDINATOR AND WORKER ISOLATE IMPLEMENTATION
 /// -----------------------------------------------------------------------
 
 class _EngineWorker {
-  _EngineWorker({required this.database, required bool initiallyOnline})
-    : _isOnline = initiallyOnline {
+  _EngineWorker({
+    required this.database,
+    required this.databaseConfig,
+    required bool initiallyOnline,
+  }) : _isOnline = initiallyOnline {
     // Anything left "inProgress" from a previous run (crash, force-quit,
     // etc.) couldn't possibly still be running -- put it back in the
     // pending pool before we do anything else.
@@ -245,6 +257,11 @@ class _EngineWorker {
   }
 
   final AppDatabase database;
+  final BackgroundDatabaseConfig databaseConfig;
+  late final TaskQueue _followUpQueue = TaskQueue(
+    database: database,
+    onQueued: ping,
+  );
 
   bool _processing = false;
   bool _pingedAgain = false;
@@ -370,6 +387,7 @@ class _EngineWorker {
     final completer = Completer<_WorkerResult>();
     final replyPort = ReceivePort();
     final errorPort = ReceivePort();
+    final enqueuePort = ReceivePort();
 
     final handle = _RunningWorker(
       taskId: task.taskId,
@@ -381,6 +399,7 @@ class _EngineWorker {
       if (!completer.isCompleted) completer.complete(result);
       replyPort.close();
       errorPort.close();
+      enqueuePort.close();
     }
 
     replyPort.listen((message) {
@@ -396,28 +415,20 @@ class _EngineWorker {
       finish(_WorkerResult.failure(task.taskId, description));
     });
 
-    final definition = functions.functionRegistry[task.functionName];
-    if (definition is TaskDefinition && definition.databaseExecutor != null) {
-      try {
-        final decodedArgs = jsonDecode(task.functionArgsJson) as List<dynamic>;
-        final payload = TaskPayload(
-          taskId: task.taskId,
-          functionArgs: decodedArgs,
-          blobs: task.blobs,
-          taskData: task.taskData,
-          serverId: task.serverId,
-        );
-        definition.databaseExecutor!(payload, database).then(
-          (_) => finish(_WorkerResult.success(task.taskId)),
-          onError: (Object error, StackTrace stackTrace) {
-            finish(_WorkerResult.failure(task.taskId, '$error\n$stackTrace'));
-          },
-        );
-      } catch (error, stackTrace) {
-        finish(_WorkerResult.failure(task.taskId, '$error\n$stackTrace'));
-      }
-      return handle;
-    }
+    enqueuePort.listen((message) {
+      if (message is! Map) return;
+      final functionName = message['functionName'];
+      final args = message['args'];
+      if (functionName is! String || args is! List) return;
+      unawaited(
+        _followUpQueue.queueTask(
+          functionName: functionName,
+          args: args,
+          serverId: message['serverId'] as String?,
+          taskData: message['taskData'] as String?,
+        ),
+      );
+    });
 
     Isolate.spawn(
       _workerEntryPoint,
@@ -429,6 +440,9 @@ class _EngineWorker {
         taskData: task.taskData,
         serverId: task.serverId,
         replyPort: replyPort.sendPort,
+        enqueuePort: enqueuePort.sendPort,
+        databasePath: databaseConfig.path,
+        databaseKey: databaseConfig.key,
       ),
       onError: errorPort.sendPort,
       debugName: 'task_${task.taskId}',
@@ -532,6 +546,9 @@ class _WorkerRequest {
     required this.taskData,
     required this.replyPort,
     required this.serverId,
+    required this.enqueuePort,
+    required this.databasePath,
+    required this.databaseKey,
   });
 
   final String taskId;
@@ -541,6 +558,9 @@ class _WorkerRequest {
   final String? taskData;
   final String? serverId;
   final SendPort replyPort;
+  final SendPort enqueuePort;
+  final String databasePath;
+  final Uint8List databaseKey;
 }
 
 class _WorkerResult {
@@ -557,10 +577,11 @@ class _WorkerResult {
   final String? error;
 }
 
-/// Entry point for each individual task's isolate. Pure compute -- it
-/// never touches the database. It just runs the registered function and
-/// reports success/failure back to the engine isolate.
+/// Entry point for each individual task's isolate. Database-backed tasks open
+/// their own database handle here, so task code never executes on the UI
+/// isolate or through the coordinator's database handle.
 void _workerEntryPoint(_WorkerRequest req) async {
+  AppDatabase? database;
   try {
     final definition = functions.functionRegistry[req.functionName];
 
@@ -584,15 +605,33 @@ void _workerEntryPoint(_WorkerRequest req) async {
       serverId: req.serverId,
     );
 
-    final executor = definition.executor;
-    if (executor == null) {
-      throw StateError(
-        'Task definition for "${req.functionName}" has no isolate executor.',
+    appTaskQueuePort = req.enqueuePort;
+    if (definition.databaseExecutor != null) {
+      final executor = NativeDatabase(
+        File(req.databasePath),
+        setup: (db) {
+          final encodedKey = req.databaseKey
+              .map((byte) => byte.toRadixString(16).padLeft(2, '0'))
+              .join();
+          db.execute("PRAGMA hexkey = '$encodedKey';");
+        },
       );
+      database = AppDatabase(executor);
+      await definition.databaseExecutor!(payload, database);
+      await database.close();
+      database = null;
+    } else {
+      final executor = definition.executor;
+      if (executor == null) {
+        throw StateError(
+          'Task definition for "${req.functionName}" has no executor.',
+        );
+      }
+      await executor(payload);
     }
-    await executor(payload);
     req.replyPort.send(_WorkerResult.success(req.taskId));
   } catch (error, stackTrace) {
+    await database?.close();
     req.replyPort.send(
       _WorkerResult.failure(req.taskId, '$error\n$stackTrace'),
     );

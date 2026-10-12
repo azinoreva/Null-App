@@ -3,7 +3,6 @@ import 'package:drift/drift.dart';
 import '../app_database.dart';
 
 import '../tables/messages.dart';
-import '../tables/sync_state.dart';
 
 part 'messages_queries.g.dart';
 
@@ -37,21 +36,34 @@ class MessagesDao extends DatabaseAccessor<AppDatabase>
             ..limit(limit, offset: offset))
           .get();
 
-  // Insert a new message.
-  Future<int> insertMessage(Insertable<Message> message) =>
+  // Insert a new message. The per-conversation display order is assigned here
+  // as a monotonic counter, so ordering stays chronological across both
+  // senders (each side's crypto chain index is per-sender and would otherwise
+  // collide at 0, 1, 2, ...). The crypto chain index is preserved separately
+  // in [Messages.chainIndex].
+  Future<int> insertMessage(MessagesCompanion message) =>
       db.transaction(() async {
-        final inserted = await into(db.messages).insertReturning(message);
-        await (update(db.syncState)
-              ..where((t) => t.conversationId.equals(inserted.conversationId)))
-            .write(
-              SyncStateCompanion(
-                lastMessageId: Value(inserted.messageId),
-                lastMessage: Value(inserted.decryptedMessage),
-                updatedAt: Value(inserted.timestamp),
-              ),
-            );
+        final order = await _nextMessageOrder(message.conversationId.value);
+        final inserted = await into(db.messages).insertReturning(
+          message.copyWith(messageOrder: Value(order)),
+        );
+        await db.syncStateDao.recordLatestMessage(
+          conversationId: inserted.conversationId,
+          messageId: inserted.messageId,
+          message: inserted.decryptedMessage,
+          updatedAt: inserted.timestamp,
+        );
         return 1;
       });
+
+  Future<int> _nextMessageOrder(String conversationId) async {
+    final maxOrder = db.messages.messageOrder.max();
+    final query = selectOnly(db.messages)
+      ..addColumns([maxOrder])
+      ..where(db.messages.conversationId.equals(conversationId));
+    final row = await query.getSingle();
+    return (row.read(maxOrder) ?? -1) + 1;
+  }
 
   // Insert multiple messages in a batch (atomic).
   Future<void> insertMessages(List<Insertable<Message>> messages) =>

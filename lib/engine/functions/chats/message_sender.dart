@@ -238,7 +238,7 @@ return _post(
       conversationId,
       existing.messageType,
       wirePayload,
-      existing.messageOrder,
+      existing.chainIndex,
       existing.senderSequence,
       'none',
       targetServerId: targetServerId,

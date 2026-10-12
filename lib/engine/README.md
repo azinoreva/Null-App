@@ -9,7 +9,7 @@ functions.
 
 | File | Purpose |
 |---|---|
-| `engine.dart` | `TaskEngine` — the public handle called from the main isolate (`start`, `ping`, `updateNetworkState`, `dispose`). Everything runs on an **orchestrator isolate** that claims tasks, spawns up to 3 worker isolates (with a 2-second slow threshold and a 10-second hard timeout), reaps results, retries failures up to 10,000 times, and gatekeeps network tasks on connectivity. Starts with crash recovery: any tasks stuck in "in-progress" from a previous run are returned to the pending pool. |
+| `engine.dart` | `TaskEngine` — the public handle called from the main isolate (`start`, `ping`, `updateNetworkState`, `dispose`). The lightweight coordinator claims tasks and dispatches up to 3 dedicated worker isolates (with a 2-second slow threshold and a 10-second hard timeout), reaps results, retries failures up to 10,000 times, and gatekeeps network tasks on connectivity. Database-backed tasks open their own database handle inside the worker, so chat and other task code never runs on the UI isolate. Starts with crash recovery: any tasks stuck in "in-progress" from a previous run are returned to the pending pool. |
 | `task_queue.dart` | `TaskQueue` — **enqueue-only**. Validates arguments, JSON-serializes them, splits `Uint8List` parameters into up to 5 blob columns, stamps the row with the `TaskKind` (network or non-network) from the function registry, and pings the engine. |
 | `functions_list.dart` | `FunctionsList` — the **public typed façade** exposing every engine function (login, sendChatMessage, handshake, createGroup, etc.) as static async methods. Also contains the `functionRegistry` map (consumed by the task engine worker) that maps string names to `TaskDefinition` objects (kind + executor). |
 | `network_state.dart` | `NetworkStateManager` — listens to `connectivity_plus` on the main isolate, persists the state to SharedPreferences, and exposes a `stateChanges` stream. The engine is told about state changes via `TaskEngine.updateNetworkState()` so network tasks are frozen when offline. |
@@ -31,7 +31,10 @@ functions.
 await dotenv.load();
 MainServerClient.init();                                    // .env → Dio
 final database = await DatabaseInitializer.initialize();    // encrypted DB
-await TaskEngine.start(database: database);                 // background isolate
+await TaskEngine.start(
+  database: database,
+  databaseConfig: DatabaseInitializer.backgroundConfig,
+);
 runApp(ProviderScope(overrides: [appDatabaseProvider...], ...));
 ```
 
@@ -41,10 +44,10 @@ frozen until that connection is added.
 
 ## Design notes
 
-- **One database instance, shared across isolates.** Both the main and engine
-  isolates write to the same encrypted SQLite file — WAL mode
-  (`PRAGMA journal_mode=WAL`) is strongly recommended; see the file header in
-  `engine.dart`.
+- **One encrypted database file, separate handles.** The UI and each worker
+  isolate open separate Drift handles against the same encrypted SQLite file.
+  WAL mode (`PRAGMA journal_mode=WAL`) is strongly recommended; see the file
+  header in `engine.dart`.
 - **Functions are pure.** Every function here is a static method with no
   dependency on anything that lives on the main isolate; all external state
   arrives through the `TaskPayload` or DAOs.

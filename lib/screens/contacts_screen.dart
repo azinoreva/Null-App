@@ -709,6 +709,7 @@ class ContactsListScreen extends StatefulWidget {
 class _ContactsListScreenState extends State<ContactsListScreen> {
   final TextEditingController _searchController = TextEditingController();
   final Set<String> _selectedContactIds = {};
+  bool _isSelectionMode = false;
   String _query = '';
 
   @override
@@ -759,9 +760,32 @@ class _ContactsListScreenState extends State<ContactsListScreen> {
     });
   }
 
+  void _startSelection(ContactData contact) {
+    setState(() {
+      _isSelectionMode = true;
+      _selectedContactIds.add(contact.contactId);
+    });
+  }
+
+  void _toggleSelectAll(List<ContactData> contacts) {
+    if (contacts.isEmpty) return;
+    final visibleContactIds = contacts.map((contact) => contact.contactId);
+    final allSelected = visibleContactIds.every(_selectedContactIds.contains);
+    setState(() {
+      if (allSelected) {
+        _selectedContactIds.removeAll(visibleContactIds);
+      } else {
+        _selectedContactIds.addAll(visibleContactIds);
+      }
+    });
+  }
+
   void _clearSelection() {
-    if (_selectedContactIds.isEmpty) return;
-    setState(_selectedContactIds.clear);
+    if (!_isSelectionMode && _selectedContactIds.isEmpty) return;
+    setState(() {
+      _isSelectionMode = false;
+      _selectedContactIds.clear();
+    });
   }
 
   Future<void> _addSelectedContacts() async {
@@ -801,12 +825,12 @@ class _ContactsListScreenState extends State<ContactsListScreen> {
             children: [
               Expanded(
                 child: GestureDetector(
-                  onTap: widget.onOpenContactChat == null
+                  onTap: _isSelectionMode
+                      ? () => _toggleContact(contact)
+                      : widget.onOpenContactChat == null
                       ? null
                       : () => widget.onOpenContactChat!(contact),
-                  onLongPress: widget.onLongPressContact == null
-                      ? null
-                      : () => widget.onLongPressContact!(contact),
+                  onLongPress: () => _startSelection(contact),
                   child: ContactCard(
                     avatarUrl: contact.avatarUrl,
                     displayName: contact.displayName,
@@ -820,11 +844,12 @@ class _ContactsListScreenState extends State<ContactsListScreen> {
                   onPressed: () => widget.onLongPressContact!(contact),
                   icon: const Icon(Icons.more_vert),
                 ),
-              Checkbox(
-                value: _selectedContactIds.contains(contact.contactId),
-                onChanged: (_) => _toggleContact(contact),
-                semanticLabel: 'Select ${contact.displayName}',
-              ),
+              if (_isSelectionMode)
+                Checkbox(
+                  value: _selectedContactIds.contains(contact.contactId),
+                  onChanged: (_) => _toggleContact(contact),
+                  semanticLabel: 'Select ${contact.displayName}',
+                ),
             ],
           ),
         ),
@@ -882,11 +907,36 @@ class _ContactsListScreenState extends State<ContactsListScreen> {
               ),
               const SizedBox(height: 12.0),
 
-              if (_selectedContactIds.isNotEmpty)
+              if (_isSelectionMode)
                 Padding(
                   padding: const EdgeInsets.only(bottom: 8.0),
                   child: Row(
                     children: [
+                      Tooltip(
+                        message:
+                            contacts.isNotEmpty &&
+                                contacts.every(
+                                  (contact) => _selectedContactIds.contains(
+                                    contact.contactId,
+                                  ),
+                                )
+                            ? 'Deselect all'
+                            : 'Select all',
+                        child: Checkbox(
+                          value:
+                              contacts.isNotEmpty &&
+                              contacts.every(
+                                (contact) => _selectedContactIds.contains(
+                                  contact.contactId,
+                                ),
+                              ),
+                          onChanged: contacts.isEmpty
+                              ? null
+                              : (_) => _toggleSelectAll(contacts),
+                          semanticLabel: 'Select all visible contacts',
+                        ),
+                      ),
+                      const SizedBox(width: 8.0),
                       Expanded(
                         child: Text(
                           '${_selectedContactIds.length} contact${_selectedContactIds.length == 1 ? '' : 's'} selected',

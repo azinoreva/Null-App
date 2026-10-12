@@ -193,7 +193,7 @@ Future<SendMessageResponse> sendChatMessage(
       conversationId: conversationId,
       messageType: existing.messageType,
       message: wirePayload,
-      messageOrder: existing.messageOrder,
+      messageOrder: existing.chainIndex,
       nonce: 'none',
       senderSequence: existing.senderSequence,
       serverId: targetServerId ?? serverId,

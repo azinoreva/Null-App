@@ -269,16 +269,24 @@ Future<void> _completeDh({
 
   await database.sessionsDao.markEstablished(contactId);
 
-  final taskQueue = appTaskQueueRef;
-  if (taskQueue == null) return;
   final hintServer = servers.isNotEmpty
       ? servers.first
       : await ServerListService.primaryServerIdFor(servers);
-  await taskQueue.queueTask(
-    functionName: 'sendChatMessage',
-    args: [contactId, 'hi', hintServer, _uuid.v4(), _uuid.v4()],
-    serverId: hintServer,
-  );
+  final taskArgs = [contactId, 'hi', hintServer, _uuid.v4(), _uuid.v4()];
+  final taskQueue = appTaskQueueRef;
+  if (taskQueue != null) {
+    await taskQueue.queueTask(
+      functionName: 'sendChatMessage',
+      args: taskArgs,
+      serverId: hintServer,
+    );
+  } else {
+    requestTaskFromWorker(
+      functionName: 'sendChatMessage',
+      args: taskArgs,
+      serverId: hintServer,
+    );
+  }
 }
 
 /// Seals our ephemeral public key to the contact's long-term public key and
