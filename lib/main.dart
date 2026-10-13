@@ -13,8 +13,10 @@ import 'widgets/app_theme.dart';
 
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 
+import 'engine/network/api_client.dart';
 import 'engine/network/main_server_client.dart';
 import 'engine/network/auth_failure_handler.dart';
+import 'engine/functions/servers/connect_serverfxn.dart';
 import 'engine/network/updates/updates_cache.dart';
 import 'engine/network/people/pending_contacts_cache.dart';
 import 'engine/network/server_connections.dart';
@@ -62,6 +64,20 @@ void main() async {
   await PendingContactsCacheService.instance.init();
   final database = await DatabaseInitializer.initialize();
   await const IdentityCrypto().ensureIdentityKey(database: database);
+
+  // Let ApiClient fall back to the passport handshake when a peer's refresh
+  // token is dead: re-entering mints a new token pair instead of dropping the
+  // server. The main server is excluded — its tokens *are* the login, so a dead
+  // refresh token there means signing in again, not re-entering.
+  ApiClient.passportReconnect = (serverId) async {
+    if (isMainServerId(serverId)) return false;
+    final result = await connectServerUsingPassport(
+      serverId: serverId,
+      database: database,
+    );
+    return result.isSuccess;
+  };
+
   final taskEngine = await TaskEngine.start(
     database: database,
     initiallyOnline: true,

@@ -173,7 +173,14 @@ Future<SendMessageResponse> sendChatMessage(
       ? null
       : await messagesDao.getMessageById(messageId);
   final service = SendMessageService(serverId: serverId);
-  if (existing != null) {
+
+  // An existing row that already holds ciphertext is a finished send being
+  // retried: re-POST it unchanged. An existing row with empty ciphertext is the
+  // optimistic placeholder written when the user hit send — fall through and
+  // encrypt it in place.
+  final isPendingPlaceholder =
+      existing != null && existing.ciphertext.isEmpty;
+  if (existing != null && !isPendingPlaceholder) {
     final wirePayload = jsonEncode({
       'chain_index': existing.chainIndex,
       'ciphertext': base64UrlEncode(existing.ciphertext),
@@ -232,27 +239,42 @@ Future<SendMessageResponse> sendChatMessage(
     'sender_sequence': senderSequence,
   });
 
-  // Persist locally — decryptedMessage is saved as plain text since we
-  // already know it (we're the one who just encrypted it).
-  final messageCompanion = MessagesCompanion.insert(
-    messageId: outgoingMessageId,
-    logicalMessageId: outgoingLogicalId,
-    conversationId: conversationId,
-    senderId: identity.identityId,
-    senderSequence: senderSequence,
-    messageOrder: encrypted.chainIndex,
-    chainIndex: encrypted.chainIndex, // expected to be 1 for the first message — confirm against NullCrypto's actual ratchet output
-    timestamp: now,
-    ciphertext: encrypted.ciphertext,
-    nonce: encrypted.nonce,
-    mac: encrypted.mac,
-    decryptedMessage: Value(plaintext),
-    messageType: 1,
-    status: 0, // assumed: 0 = sent/pending — confirm your status numbering
-    keyVersion: 1,
-  );
+  // Promote the optimistic placeholder (if the user queued this from the chat
+  // screen) with the freshly-encrypted fields, keeping its display order and
+  // plaintext. Otherwise this is a brand-new row (e.g. the DH "hi"), so insert.
+  if (isPendingPlaceholder) {
+    await messagesDao.updateSentMessage(
+      messageId: existing.messageId,
+      chainIndex: encrypted.chainIndex,
+      senderSequence: senderSequence,
+      ciphertext: encrypted.ciphertext,
+      nonce: encrypted.nonce,
+      mac: encrypted.mac,
+      timestamp: now,
+    );
+  } else {
+    // Persist locally — decryptedMessage is saved as plain text since we
+    // already know it (we're the one who just encrypted it).
+    final messageCompanion = MessagesCompanion.insert(
+      messageId: outgoingMessageId,
+      logicalMessageId: outgoingLogicalId,
+      conversationId: conversationId,
+      senderId: identity.identityId,
+      senderSequence: senderSequence,
+      messageOrder: encrypted.chainIndex,
+      chainIndex: encrypted.chainIndex, // expected to be 1 for the first message — confirm against NullCrypto's actual ratchet output
+      timestamp: now,
+      ciphertext: encrypted.ciphertext,
+      nonce: encrypted.nonce,
+      mac: encrypted.mac,
+      decryptedMessage: Value(plaintext),
+      messageType: 1,
+      status: 0, // assumed: 0 = sent/pending — confirm your status numbering
+      keyVersion: 1,
+    );
 
-  await messagesDao.insertMessage(messageCompanion);
+    await messagesDao.insertMessage(messageCompanion);
+  }
 
   return service.sendMessage(
     recipientIds: [

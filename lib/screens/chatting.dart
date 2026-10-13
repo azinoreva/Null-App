@@ -1,9 +1,12 @@
 import 'dart:async';
+import 'dart:typed_data';
 
+import 'package:drift/drift.dart' show Value;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 
+import '../engine/database/app_database.dart';
 import '../engine/functions/servers/serverfxn.dart' as server_database;
 import '../engine/network/servers/servers.dart' as server_directory;
 import '../state/providers.dart';
@@ -160,11 +163,44 @@ class _ChattingState extends ConsumerState<Chatting> {
         );
       }
 
-      final session = await ref
-          .read(appDatabaseProvider)
-          .sessionsDao
-          .getSessionByConversationId(widget.conversationId);
+      final session = await database.sessionsDao.getSessionByConversationId(
+        widget.conversationId,
+      );
       final handshakeRequired = session?.status != 2;
+
+      final messageId = _uuid.v4();
+      final logicalId = _uuid.v4();
+
+      // Show the message immediately. The durable send task runs behind the DH
+      // handshake and the network, so writing only there meant a message sent
+      // before the handshake finished never appeared at all. This row is the
+      // placeholder the task encrypts into (see sendChatMessage), so the bubble
+      // the user sees is the exact row that gets sent.
+      final identity = await database.identityDao.getCurrentIdentityOrNull();
+      if (identity == null) {
+        throw StateError('No local identity found.');
+      }
+      await ref
+          .read(messagesDaoProvider)
+          .insertMessage(
+            MessagesCompanion.insert(
+              messageId: messageId,
+              logicalMessageId: logicalId,
+              conversationId: widget.conversationId,
+              senderId: identity.identityId,
+              senderSequence: 0,
+              messageOrder: 0,
+              chainIndex: 0,
+              timestamp: DateTime.now().millisecondsSinceEpoch,
+              ciphertext: Uint8List(0),
+              nonce: Uint8List(0),
+              mac: Uint8List(0),
+              decryptedMessage: Value(text),
+              messageType: 1,
+              status: 0,
+              keyVersion: 1,
+            ),
+          );
 
       if (handshakeRequired) {
         await ref
@@ -184,8 +220,8 @@ class _ChattingState extends ConsumerState<Chatting> {
               widget.conversationId,
               text,
               primaryServerId,
-              _uuid.v4(),
-              _uuid.v4(),
+              messageId,
+              logicalId,
             ],
             serverId: primaryServerId,
           );

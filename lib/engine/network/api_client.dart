@@ -8,6 +8,11 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../../utils/server_list.dart';
 import 'server_error_exception.dart';
 
+/// Signature for [ApiClient.passportReconnect]: re-enter [serverId] using the
+/// passport saved at signup, mint and persist a fresh token pair, and report
+/// whether it worked.
+typedef PassportReconnect = Future<bool> Function(String serverId);
+
 /// Manages API clients for multiple servers. Each server has its own
 /// baseUrl, its own Dio instance, and its own access/refresh tokens —
 /// stored under server-scoped keys in secure storage — so tokens for one
@@ -42,6 +47,20 @@ class ApiClient {
   // server id so one server refreshing never blocks or interferes with
   // another.
   static final Map<String, Completer<String?>> _refreshCompleters = {};
+
+  // Same coalescing idea for the passport re-entry fallback: several 401s on a
+  // peer whose refresh token is dead should trigger one handshake, not one per
+  // failed request.
+  static final Map<String, Completer<bool>> _reconnectCompleters = {};
+
+  /// Optional hook the app registers once at startup: re-enter [serverId]
+  /// through the passport/challenge handshake and save a fresh token pair.
+  ///
+  /// The 401 chain calls this only after a refresh has failed, before treating
+  /// the server as unauthenticated. It stays a hook — rather than an import —
+  /// so this networking layer needn't know about the passport machinery above
+  /// it. Left null (e.g. in tests) the chain degrades to refresh-only.
+  static PassportReconnect? passportReconnect;
 
   /// The Dio client for [serverId]. Throws if that server hasn't been
   /// registered via [registerServer] yet.
@@ -132,7 +151,7 @@ class ApiClient {
             return;
           }
 
-          // Avoid infinite loop if the refresh-retry request itself gets a 401.
+          // Avoid infinite loop if the refresh/reconnect retry itself gets a 401.
           final alreadyRetried = error.requestOptions.extra['retried'] == true;
           if (alreadyRetried) {
             await handleAuthFailure(serverId);
@@ -141,7 +160,18 @@ class ApiClient {
           }
 
           try {
-            final newAccessToken = await refreshAccessToken(serverId);
+            // Cheap path first: refresh the access token in place.
+            var newAccessToken = await refreshAccessToken(serverId);
+
+            // Refresh failed (no refresh token, or it was rejected). Peers mint
+            // their tokens through the passport handshake, so re-enter with the
+            // stored passport before giving up on this server.
+            if (newAccessToken == null) {
+              final reconnected = await _reconnectWithPassport(serverId);
+              if (reconnected) {
+                newAccessToken = await getAccessToken(serverId);
+              }
+            }
 
             if (newAccessToken == null) {
               await handleAuthFailure(serverId);
@@ -188,6 +218,7 @@ class ApiClient {
     _baseUrls.remove(serverId);
     _onAuthFailureCallbacks.remove(serverId);
     _refreshCompleters.remove(serverId);
+    _reconnectCompleters.remove(serverId);
     await _storage.delete(key: _accessTokenKey(serverId));
     await _storage.delete(key: _refreshTokenKey(serverId));
   }
@@ -275,6 +306,36 @@ class ApiClient {
       return null;
     } finally {
       _refreshCompleters.remove(serverId);
+    }
+  }
+
+  /// Re-enters [serverId] through the [passportReconnect] hook, which mints and
+  /// saves a fresh token pair. Returns true when that happened.
+  ///
+  /// Coalesces concurrent 401s for the same server into a single handshake,
+  /// mirroring [refreshAccessToken]. Returns false immediately when no hook is
+  /// registered.
+  static Future<bool> _reconnectWithPassport(String serverId) async {
+    final reconnect = passportReconnect;
+    if (reconnect == null) return false;
+
+    final inFlight = _reconnectCompleters[serverId];
+    if (inFlight != null) {
+      return inFlight.future;
+    }
+
+    final completer = Completer<bool>();
+    _reconnectCompleters[serverId] = completer;
+
+    try {
+      final succeeded = await reconnect(serverId);
+      completer.complete(succeeded);
+      return succeeded;
+    } catch (_) {
+      completer.complete(false);
+      return false;
+    } finally {
+      _reconnectCompleters.remove(serverId);
     }
   }
 

@@ -56,6 +56,34 @@ class MessagesDao extends DatabaseAccessor<AppDatabase>
         return 1;
       });
 
+  // Fill in an optimistically-inserted placeholder row once it has been
+  // encrypted and is ready to send. Only the crypto/transport fields are
+  // written, so the row keeps its `message_order` (and therefore its place in
+  // the conversation) and `decryptedMessage` (the plaintext the user typed).
+  Future<void> updateSentMessage({
+    required String messageId,
+    required int chainIndex,
+    required int senderSequence,
+    required Uint8List ciphertext,
+    required Uint8List nonce,
+    required Uint8List mac,
+    required int timestamp,
+    int status = 0,
+  }) async {
+    await (update(db.messages)..where((t) => t.messageId.equals(messageId)))
+        .write(
+          MessagesCompanion(
+            chainIndex: Value(chainIndex),
+            senderSequence: Value(senderSequence),
+            ciphertext: Value(ciphertext),
+            nonce: Value(nonce),
+            mac: Value(mac),
+            timestamp: Value(timestamp),
+            status: Value(status),
+          ),
+        );
+  }
+
   Future<int> _nextMessageOrder(String conversationId) async {
     final maxOrder = db.messages.messageOrder.max();
     final query = selectOnly(db.messages)
