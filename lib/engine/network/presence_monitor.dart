@@ -17,7 +17,7 @@ import 'chats/prescence_check.dart';
 class PresenceMonitor {
   PresenceMonitor({
     required this.database,
-    this.interval = const Duration(seconds: 10),
+    this.interval = const Duration(seconds: 60),
   });
 
   final AppDatabase database;

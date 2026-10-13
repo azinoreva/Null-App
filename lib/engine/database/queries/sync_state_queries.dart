@@ -63,7 +63,19 @@ class SyncStateDao extends DatabaseAccessor<AppDatabase>
 
   // Set the online-status projection for a conversation without touching
   // `updatedAt`, so presence changes never reorder the chat list.
+  //
+  // Writes only when the value actually changes. Drift fires a table-update
+  // notification for every executed write, so an unconditional no-op write
+  // would re-run every `sync_state` stream query (rebuilding the chat list)
+  // even when nothing changed — which is exactly what a presence poll does
+  // most of the time.
   Future<void> setStatus(String conversationId, int status) async {
+    final current = await (select(
+      db.syncState,
+    )..where((t) => t.conversationId.equals(conversationId))).getSingleOrNull();
+
+    if (current == null || current.status == status) return;
+
     await (update(
       db.syncState,
     )..where((t) => t.conversationId.equals(conversationId))).write(

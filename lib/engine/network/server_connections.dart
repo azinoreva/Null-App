@@ -49,7 +49,9 @@ class ServerConnectionService extends ChangeNotifier {
 
   /// How often the watchdog re-checks the list and re-opens anything that
   /// slipped through (the hub also reconnects internally on its own cadence).
-  static const Duration _watchdogInterval = Duration(seconds: 10);
+  /// List changes are also applied immediately via [_syncToServerList], so this
+  /// is only a slow backstop.
+  static const Duration _watchdogInterval = Duration(seconds: 60);
 
   final ServerListService _serverList;
   final TaskQueue _taskQueue;

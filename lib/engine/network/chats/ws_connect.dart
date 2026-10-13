@@ -375,8 +375,17 @@ class _WsConnection {
   static bool _isRetryableClose(int? closeCode) =>
       closeCode == _closeAlreadyConnected || closeCode == _closeTryAgainLater;
 
+  /// Brings a dropped socket back without bypassing its backoff.
+  ///
+  /// A drop always schedules its own reconnect via [_scheduleReconnect], so in
+  /// normal operation there is a [_reconnectTimer] pending and this is a no-op.
+  /// It only opens immediately when a connection is somehow down with no
+  /// reconnect scheduled and no attempt already in flight — the watchdog's
+  /// safety-net case. Opening here while a backoff timer was pending (as this
+  /// used to) is what let a dead server be re-dialed on every watchdog tick.
   Future<void> reconnectIfNeeded() async {
     if (isConnected || _manuallyClosed || _authFailed) return;
+    if (_reconnectTimer != null || _opening) return;
     await _open();
   }
 
@@ -547,7 +556,11 @@ class WsHub {
   }
 
   /// How often to check for dropped sockets.
-  static const Duration _watchdogInterval = Duration(seconds: 10);
+  ///
+  /// Only a safety net: each connection already reconnects itself via its own
+  /// backoff timer, so this rarely has anything to do. Kept infrequent so it
+  /// doesn't fight that backoff.
+  static const Duration _watchdogInterval = Duration(seconds: 60);
 
   /// Queues [message] for local processing under [serverId].
   ///
