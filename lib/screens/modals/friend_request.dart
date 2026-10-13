@@ -108,10 +108,25 @@ class _FriendRequestModalState extends State<FriendRequestModal> {
                     shape: BoxShape.circle,
                     border: Border.all(color: theme.primaryGreen, width: 2.0),
                   ),
-                  child: CircleAvatar(
-                    radius: 36.0,
-                    backgroundColor: AppColors.neutralGray,
-                    backgroundImage: NetworkImage(widget.avatarUrl),
+                  child: ClipOval(
+                    child: Image.network(
+                      widget.avatarUrl,
+                      width: 72.0,
+                      height: 72.0,
+                      fit: BoxFit.cover,
+                      // A broken/expired avatar URL shouldn't spam the image
+                      // resource service or leave an empty circle behind.
+                      errorBuilder: (context, error, stackTrace) => Container(
+                        width: 72.0,
+                        height: 72.0,
+                        color: AppColors.neutralGray,
+                        child: const Icon(
+                          Icons.person,
+                          size: 36.0,
+                          color: AppColors.mutedSlate,
+                        ),
+                      ),
+                    ),
                   ),
                 ),
                 const SizedBox(height: 12.0),

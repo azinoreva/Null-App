@@ -182,7 +182,7 @@ class ShareContactModal extends StatefulWidget {
 }
 
 class _ShareContactModalState extends State<ShareContactModal> {
-  late final Future<SendMyContactResult> _exchange;
+  late Future<SendMyContactResult> _exchange;
 
   // The share QR is generated once the contact exchange resolves and kept
   // here in memory only - it is never built into a visible widget in the
@@ -196,13 +196,36 @@ class _ShareContactModalState extends State<ShareContactModal> {
   @override
   void initState() {
     super.initState();
-    _exchange = sendMyContact(
+    _exchange = _startExchange();
+  }
+
+  /// Kicks off (or re-kicks off) the contact exchange. The derived future
+  /// that renders the share QR is guarded so a failed exchange is reported
+  /// through the FutureBuilder's error state instead of surfacing as an
+  /// unhandled exception.
+  Future<SendMyContactResult> _startExchange() {
+    final exchange = sendMyContact(
       database: widget.database,
       taskQueue: widget.taskQueue,
     );
-    _exchange.then((result) {
-      final svg = ConnectionIdentityService.qrSvgForPayload(result.shareQRSVG);
-      if (mounted) setState(() => _shareQrSvg = svg);
+    exchange.then(
+      (result) {
+        final svg =
+            ConnectionIdentityService.qrSvgForPayload(result.shareQRSVG);
+        if (mounted) setState(() => _shareQrSvg = svg);
+      },
+      onError: (_) {
+        // Handled by the FutureBuilder below; swallow here so the failure
+        // doesn't bubble up as an unhandled async error.
+      },
+    );
+    return exchange;
+  }
+
+  void _retry() {
+    setState(() {
+      _shareQrSvg = null;
+      _exchange = _startExchange();
     });
   }
 
@@ -275,7 +298,10 @@ class _ShareContactModalState extends State<ShareContactModal> {
                           );
                         }
                         if (snapshot.hasError) {
-                          return _ErrorView(error: snapshot.error!);
+                          return _ErrorView(
+                            error: snapshot.error!,
+                            onRetry: _retry,
+                          );
                         }
 
                         final result = snapshot.data!;
@@ -661,8 +687,9 @@ class _ShareQrButton extends StatelessWidget {
 
 class _ErrorView extends StatelessWidget {
   final Object error;
+  final VoidCallback onRetry;
 
-  const _ErrorView({required this.error});
+  const _ErrorView({required this.error, required this.onRetry});
 
   @override
   Widget build(BuildContext context) {
@@ -685,6 +712,20 @@ class _ErrorView extends StatelessWidget {
             overflow: TextOverflow.ellipsis,
             textAlign: TextAlign.center,
             style: const TextStyle(color: _kMutedText, fontSize: 12),
+          ),
+          const SizedBox(height: 20),
+          OutlinedButton.icon(
+            onPressed: onRetry,
+            style: OutlinedButton.styleFrom(
+              foregroundColor: _kAccentGreen,
+              side: const BorderSide(color: _kAccentGreen),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(24),
+              ),
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+            ),
+            icon: const Icon(Icons.refresh, size: 18),
+            label: const Text('Retry'),
           ),
         ],
       ),

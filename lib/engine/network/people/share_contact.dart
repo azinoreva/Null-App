@@ -2,6 +2,7 @@
 import 'package:dio/dio.dart';
 
 import '../main_server_client.dart';
+import '../server_error_exception.dart';
 import 'wire_servers.dart';
 
 /// Result of creating a shareable contact invite.
@@ -74,30 +75,45 @@ class SendContactService {
       maxExpirySeconds,
     );
 
-    final response = await _dio.post(
-      '/api/send_contact',
-      options: Options(
-        headers: {
-          'accept': 'application/json',
-          'Content-Type': 'application/json',
+    try {
+      final response = await _dio.post(
+        '/api/send_contact',
+        options: Options(
+          // The default client receive timeout (3s) is too short for the
+          // invite generation round-trip; give the server ample headroom so
+          // a slow response doesn't abort the request.
+          receiveTimeout: const Duration(seconds: 20),
+          headers: {
+            'accept': 'application/json',
+            'Content-Type': 'application/json',
+          },
+        ),
+        data: {
+          'contact': {
+            'nickname': nickname,
+            'title': title,
+            'bio': bio,
+            'public_key': publicKey,
+            'avatar': avatar,
+            'servers': writeServersToJson(servers),
+          },
+          'expires_in': clampedExpiry,
+          'one_time': oneTime,
         },
-      ),
-      data: {
-        'contact': {
-          'nickname': nickname,
-          'title': title,
-          'bio': bio,
-          'public_key': publicKey,
-          'avatar': avatar,
-          'servers': writeServersToJson(servers),
-        },
-        'expires_in': clampedExpiry,
-        'one_time': oneTime,
-      },
-    );
+      );
 
-    return SendContactResult.fromJson(
-      response.data as Map<String, dynamic>,
-    );
+      return SendContactResult.fromJson(
+        response.data as Map<String, dynamic>,
+      );
+    } on DioException catch (error) {
+      // Convert transport-level failures (timeouts, no connection) into a
+      // readable error instead of leaking the raw DioException. HTTP errors
+      // are already translated to ServerErrorException by the interceptor.
+      throw ServerErrorException(
+        'Could not create the contact invite. Please check your connection '
+        'and try again.',
+        statusCode: error.response?.statusCode ?? 0,
+      );
+    }
   }
 }

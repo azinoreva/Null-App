@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../utils/avatar.dart';
 import '../app_theme.dart';
 
 class ConversationListItem extends StatelessWidget {
@@ -110,8 +111,8 @@ class ConversationListItem extends StatelessWidget {
             ),
             padding: const EdgeInsets.all(2.0), // Space between ring and image
             child: ClipOval(
-              child: Image.network(
-                avatarUrl,
+              child: Image(
+                image: avatarImageProvider(avatarUrl, seed: displayName),
                 fit: BoxFit.cover,
                 errorBuilder: (context, error, stackTrace) => Container(
                   color: AppColors.neutralGray,

@@ -39,8 +39,8 @@ class MainServerClient {
   /// Initializes the shared Dio instance using `SERVER_URL` from dotenv.
   /// Call this again any time the environment configuration changes.
   static Future<void> init({
-    Duration connectTimeout = const Duration(seconds: 5),
-    Duration receiveTimeout = const Duration(seconds: 3),
+    Duration connectTimeout = const Duration(seconds: 10),
+    Duration receiveTimeout = const Duration(seconds: 30),
   }) async {
     final baseUrl = dotenv.env['SERVER_URL'];
     if (baseUrl == null || baseUrl.isEmpty) {

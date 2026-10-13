@@ -961,6 +961,10 @@ class PendingContactsNotifier extends AsyncNotifier<List<ReceivedContact>> {
         : '${contact.nickname} - ${contact.title}';
     final now = DateTime.now().millisecondsSinceEpoch;
     final database = ref.read(appDatabaseProvider);
+    // Contacts.conversationId has a foreign key to Conversations and
+    // PRAGMA foreign_keys is ON, so the conversation row must exist before
+    // the contact can reference it.
+    await _ensureConversation(database, contact.contactId, contact.servers, now);
     await database
         .into(database.contacts)
         .insertOnConflictUpdate(
@@ -988,6 +992,41 @@ class PendingContactsNotifier extends AsyncNotifier<List<ReceivedContact>> {
   Future<void> decline(ReceivedContact contact) async {
     await _cache.remove(contact.contactId);
     _removeFromState(contact.contactId);
+  }
+
+  /// Creates the one-on-one conversation row for [conversationId] if it does
+  /// not exist yet. Required before linking a contact to it, since the
+  /// foreign key would otherwise fail.
+  Future<void> _ensureConversation(
+    AppDatabase database,
+    String conversationId,
+    List<String> servers,
+    int now,
+  ) async {
+    final existing = await database.conversationsDao.getConversationById(
+      conversationId,
+    );
+    if (existing != null) return;
+
+    await database.conversationsDao.upsertConversation(
+      Conversation(
+        conversationId: conversationId,
+        conversationType: 0,
+        lastMessageId: null,
+        lastMessageTime: null,
+        unreadCount: 0,
+        muted: 0,
+        pinned: 0,
+        archived: 0,
+        draft: null,
+        servers: servers,
+        createdAt: now,
+        updatedAt: now,
+        sound: null,
+        badge: 0,
+        vibration: 0,
+      ),
+    );
   }
 
   void _removeFromState(String contactId) {

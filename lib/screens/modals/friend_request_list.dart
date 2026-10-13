@@ -285,10 +285,25 @@ class _FriendRequestRow extends StatelessWidget {
       padding: const EdgeInsets.symmetric(vertical: 10.0),
       child: Row(
         children: [
-          CircleAvatar(
-            radius: 20.0,
-            backgroundColor: AppColors.neutralGray,
-            backgroundImage: NetworkImage(request.avatarUrl),
+          ClipOval(
+            child: Image.network(
+              request.avatarUrl,
+              width: 40.0,
+              height: 40.0,
+              fit: BoxFit.cover,
+              // Fall back to a placeholder instead of spamming "Invalid image
+              // data" errors for a broken/expired avatar URL.
+              errorBuilder: (context, error, stackTrace) => Container(
+                width: 40.0,
+                height: 40.0,
+                color: AppColors.neutralGray,
+                child: const Icon(
+                  Icons.person,
+                  size: 22.0,
+                  color: AppColors.mutedSlate,
+                ),
+              ),
+            ),
           ),
           const SizedBox(width: 12.0),
           Expanded(

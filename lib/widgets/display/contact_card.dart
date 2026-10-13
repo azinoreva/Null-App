@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../utils/avatar.dart';
 import '../app_theme.dart';
 
 /// Contact card component.
@@ -54,7 +55,7 @@ class ContactCard extends StatelessWidget {
               CircleAvatar(
                 radius: 22.0,
                 backgroundColor: AppColors.neutralGray,
-                backgroundImage: NetworkImage(avatarUrl),
+                backgroundImage: avatarImageProvider(avatarUrl, seed: name),
               ),
               Positioned(
                 right: 0,
