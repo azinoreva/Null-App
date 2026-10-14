@@ -17,12 +17,32 @@ class MessagesDao extends DatabaseAccessor<AppDatabase>
     db.messages,
   )..where((t) => t.messageId.equals(id))).getSingleOrNull();
 
+  // Resolve a message by either its `message_id` or its `logical_message_id`.
+  // Edit / delete / pin events address a target that may be referenced by the
+  // id the peer sees, which can be either.
+  Future<Message?> findMessageByIdOrLogicalId(String id) =>
+      (select(db.messages)
+            ..where(
+              (t) => t.messageId.equals(id) | t.logicalMessageId.equals(id),
+            ))
+          .getSingleOrNull();
+
   // Get all messages in a conversation, ordered by message_order.
   Future<List<Message>> getMessagesForConversation(String conversationId) =>
       (select(db.messages)
             ..where((t) => t.conversationId.equals(conversationId))
             ..orderBy([(t) => OrderingTerm(expression: t.messageOrder)]))
           .get();
+
+  // Watch every message in a conversation, ordered by message_order. Re-emits
+  // on any insert/update/delete, so the chat view can reflect changes that
+  // don't move `sync_state.lastMessageId` — e.g. a sent message advancing from
+  // "sending" (0) to "sent" (1), or a later read receipt arriving.
+  Stream<List<Message>> watchMessagesForConversation(String conversationId) =>
+      (select(db.messages)
+            ..where((t) => t.conversationId.equals(conversationId))
+            ..orderBy([(t) => OrderingTerm(expression: t.messageOrder)]))
+          .watch();
 
   // Get messages for a conversation with pagination.
   Future<List<Message>> getMessagesForConversationPaginated(
@@ -109,6 +129,51 @@ class MessagesDao extends DatabaseAccessor<AppDatabase>
         .write(MessagesCompanion(status: Value(newStatus)));
   }
 
+  // Marks a just-sent message as accepted by the server (status 1). Only
+  // advances a row that is still in the "sending" state (status 0), so a
+  // delivery/read receipt that already moved it to 2/3 is never downgraded.
+  Future<void> markMessageSent(String messageId) async {
+    await (update(db.messages)
+          ..where((t) => t.messageId.equals(messageId) & t.status.equals(0)))
+        .write(const MessagesCompanion(status: Value(1)));
+  }
+
+  // Marks messages as delivered (status 2). Only advances from sending/sent
+  // (status 0/1) to delivered; never downgrades read (3).
+  Future<void> markMessagesAsDelivered(List<String> messageIds) async {
+    if (messageIds.isEmpty) return;
+    await (update(db.messages)
+          ..where((t) =>
+              t.messageId.isIn(messageIds) &
+              t.status.isSmallerThanValue(2)))
+        .write(const MessagesCompanion(status: Value(2)));
+  }
+
+  // Marks a message as delivered if it was still unsent/sent.
+  Future<void> markMessageAsDelivered(String messageId) async {
+    await markMessagesAsDelivered([messageId]);
+  }
+
+  // Marks messages as read (status 3) and stamps `readAt`. Only advances
+  // status (0/1/2 -> 3), never downgrades.
+  Future<void> markMessagesAsRead(List<String> messageIds, {int? readAt}) async {
+    if (messageIds.isEmpty) return;
+    final ts = readAt ?? DateTime.now().millisecondsSinceEpoch;
+    await (update(db.messages)
+          ..where((t) =>
+              t.messageId.isIn(messageIds) &
+              t.status.isSmallerThanValue(3)))
+        .write(MessagesCompanion(
+          status: const Value(3),
+          readAt: Value(ts),
+        ));
+  }
+
+  // Marks a single message as read.
+  Future<void> markMessageAsRead(String messageId, {int? readAt}) async {
+    await markMessagesAsRead([messageId], readAt: readAt);
+  }
+
   // Update only the decrypted content of a message.
   Future<void> updateDecryptedMessage(
     String messageId,
@@ -127,6 +192,20 @@ class MessagesDao extends DatabaseAccessor<AppDatabase>
       (delete(db.messages)
             ..where((t) => t.conversationId.equals(conversationId)))
           .go();
+
+  // Insert or overwrite a message by its primary key (`message_id`). Used by
+  // an edit (17): the edited message keeps the original `message_id` (so both
+  // peers replace the same row) but carries fresh ciphertext and text. Unlike
+  // [insertMessage] it does not reassign `message_order` or bump the
+  // conversation preview, so an edit stays in place in history.
+  Future<void> upsertMessage(MessagesCompanion message) =>
+      into(db.messages).insertOnConflictUpdate(message);
+
+  // Pin (1) or unpin (0) a single message in the conversation.
+  Future<void> setMessagePinned(String messageId, int pinned) async {
+    await (update(db.messages)..where((t) => t.messageId.equals(messageId)))
+        .write(MessagesCompanion(pinned: Value(pinned)));
+  }
 
   // Get the latest message in a conversation (ordered by message_order desc).
   Future<Message?> getLatestMessage(String conversationId) =>

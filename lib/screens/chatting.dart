@@ -21,6 +21,11 @@ class Chatting extends ConsumerStatefulWidget {
   final int status;
   final int conversationType;
 
+  /// Called when the header back button is pressed. When null the screen pops
+  /// the route (mobile). When embedded in a side-by-side layout the parent
+  /// passes a callback that clears the selected conversation instead.
+  final VoidCallback? onBack;
+
   const Chatting({
     super.key,
     required this.conversationId,
@@ -28,6 +33,7 @@ class Chatting extends ConsumerStatefulWidget {
     this.avatarUrl = '',
     this.status = 0,
     this.conversationType = 0,
+    this.onBack,
   });
 
   @override
@@ -260,7 +266,7 @@ class _ChattingState extends ConsumerState<Chatting> {
               color: colorScheme.onSurface,
               size: 20,
             ),
-            onPressed: () => Navigator.maybePop(context),
+            onPressed: widget.onBack ?? () => Navigator.maybePop(context),
           ),
           const SizedBox(width: 4),
           Stack(

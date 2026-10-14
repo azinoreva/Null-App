@@ -45,6 +45,13 @@ class Messages extends Table {
   IntColumn get receivedAt => integer().nullable()();
   IntColumn get readAt => integer().nullable()();
 
+  // 1 when the message is pinned in the conversation (the in-chat pinned
+  // banner), 0 otherwise. Pinning is per-message and synced across peers via
+  // the pin (15) / unpin (16) events; the chat-list pin is separate and lives
+  // on `sync_state.pinned`.
+  IntColumn get pinned =>
+      integer().withDefault(const Constant(0)).check(pinned.isIn([0, 1]))();
+
   @override
   Set<Column> get primaryKey => {messageId};
 }

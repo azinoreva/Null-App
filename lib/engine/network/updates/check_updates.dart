@@ -33,6 +33,8 @@ class UpdateMedia {
 
 /// Represents a single item returned by POST /api/get_updates
 class Update {
+  /// Server that returned this update. Empty for older cached entries.
+  final String serverId;
   final String nickname;
   final UpdateMedia? media;
   final String text;
@@ -41,6 +43,7 @@ class Update {
   final String updateId;
 
   Update({
+    this.serverId = '',
     required this.nickname,
     this.media,
     required this.text,
@@ -51,6 +54,7 @@ class Update {
 
   factory Update.fromJson(Map<String, dynamic> json) {
     return Update(
+      serverId: json['server_id'] as String? ?? '',
       nickname: json['nickname'] as String,
       media: json['media'] != null
           ? UpdateMedia.fromJson(json['media'] as Map<String, dynamic>)
@@ -64,6 +68,7 @@ class Update {
 
   Map<String, dynamic> toJson() {
     return {
+      'server_id': serverId,
       'nickname': nickname,
       'media': media?.toJson(),
       'text': text,
@@ -72,6 +77,16 @@ class Update {
       'update_id': updateId,
     };
   }
+
+  Update fromServer(String value) => Update(
+    serverId: value,
+    nickname: nickname,
+    media: media,
+    text: text,
+    category: category,
+    hashtag: hashtag,
+    updateId: updateId,
+  );
 
   @override
   String toString() =>

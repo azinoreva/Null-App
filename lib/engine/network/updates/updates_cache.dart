@@ -23,6 +23,7 @@ class UpdatesCacheService {
   static const String _updateKey = 'update';
   static const String _offsetPrefix = '_offset:';
   static const String _hasMorePrefix = '_has_more:';
+  static const String _reactionPrefix = '_reaction:';
 
   /// How long a cached update survives before it is deleted.
   static const Duration ttl = Duration(days: 7);
@@ -75,6 +76,42 @@ class UpdatesCacheService {
     await box.putAll(entries);
   }
 
+  /// Persists the user's reaction locally, keyed by its source server and
+  /// update id. Reaction state is restored from Hive without a server read.
+  Future<void> saveReaction({
+    required String serverId,
+    required String updateId,
+    required bool liked,
+    required bool disliked,
+  }) async {
+    final key = _reactionKey(serverId, updateId);
+    await _requireBox.put(
+      key,
+      jsonEncode({'liked': liked, 'disliked': disliked}),
+    );
+  }
+
+  CachedUpdateReaction loadReaction({
+    required String serverId,
+    required String updateId,
+  }) {
+    final raw = _requireBox.get(_reactionKey(serverId, updateId));
+    if (raw == null) return const CachedUpdateReaction();
+    try {
+      final value = jsonDecode(raw) as Map<String, dynamic>;
+      return CachedUpdateReaction(
+        liked: value['liked'] == true,
+        disliked: value['disliked'] == true,
+      );
+    } catch (_) {
+      return const CachedUpdateReaction();
+    }
+  }
+
+  String _reactionKey(String serverId, String updateId) =>
+      _reactionPrefix +
+      base64Url.encode(utf8.encode('$serverId\u0000$updateId'));
+
   /// Returns the last pagination offset saved for each server.
   Map<String, int> loadOffsets() => _loadIntMetadata(_offsetPrefix);
 
@@ -122,6 +159,12 @@ class UpdatesCacheService {
     final cutoff = DateTime.now().subtract(ttl).millisecondsSinceEpoch;
     final stale = <dynamic>[];
     for (final key in box.keys) {
+      if (key is String &&
+          (key.startsWith(_offsetPrefix) ||
+              key.startsWith(_hasMorePrefix) ||
+              key.startsWith(_reactionPrefix))) {
+        continue;
+      }
       final parsed = _decode(box.get(key));
       if (parsed == null || parsed.$1 < cutoff) stale.add(key);
     }
@@ -170,4 +213,11 @@ class UpdatesCacheService {
       return null;
     }
   }
+}
+
+class CachedUpdateReaction {
+  final bool liked;
+  final bool disliked;
+
+  const CachedUpdateReaction({this.liked = false, this.disliked = false});
 }

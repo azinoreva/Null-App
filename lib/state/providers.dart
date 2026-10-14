@@ -29,6 +29,7 @@ import '../widgets/chats/chat_bubble_component.dart';
 /// Data needed to render one post in the updates feed (see [UpdateComponent]).
 class PostData {
   final String updateId;
+  final String serverId;
   final String avatarUrl;
   final String nickname;
   final String timeText;
@@ -36,11 +37,11 @@ class PostData {
   final String? mediaUrl;
   final bool isLiked;
   final bool isDisliked;
-  final bool isShared;
-  final bool isSubscribed;
+  final bool isReposted;
 
   const PostData({
     required this.updateId,
+    this.serverId = '',
     required this.avatarUrl,
     required this.nickname,
     required this.timeText,
@@ -48,9 +49,21 @@ class PostData {
     this.mediaUrl,
     this.isLiked = false,
     this.isDisliked = false,
-    this.isShared = false,
-    this.isSubscribed = false,
+    this.isReposted = false,
   });
+
+  PostData copyWith({bool? isLiked, bool? isDisliked}) => PostData(
+    updateId: updateId,
+    serverId: serverId,
+    avatarUrl: avatarUrl,
+    nickname: nickname,
+    timeText: timeText,
+    text: text,
+    mediaUrl: mediaUrl,
+    isLiked: isLiked ?? this.isLiked,
+    isDisliked: isDisliked ?? this.isDisliked,
+    isReposted: isReposted,
+  );
 }
 
 /// Simple data holder for one contact entry shown in the contacts screen.
@@ -353,6 +366,19 @@ final conversationSyncStateProvider =
       return ref.watch(syncStateDaoProvider).watchSyncStateById(conversationId);
     });
 
+/// A live view of every message row in a conversation.
+///
+/// Emits on any insert/update/delete of a message, so [ChatMessagesNotifier]
+/// can re-render changes that don't move `sync_state.lastMessageId` — like a
+/// sent message advancing from "sending" (0) to "sent" (1) once the server
+/// accepts it, or a read receipt arriving later.
+final conversationMessagesProvider =
+    StreamProvider.family<List<Message>, String>((ref, conversationId) {
+      return ref
+          .watch(messagesDaoProvider)
+          .watchMessagesForConversation(conversationId);
+    });
+
 /// The rendered message list for a conversation.
 ///
 /// Built from the `messages` table, using `sync_state.lastMessageId` to anchor
@@ -404,6 +430,13 @@ class ChatMessagesNotifier extends AsyncNotifier<List<ChatMessageItem>> {
 
     ref.listen(conversationSyncStateProvider(conversationId), (previous, next) {
       unawaited(_onSyncStateChanged(next.value));
+    });
+
+    // Any message-row change (status flips, read receipts, content updates)
+    // re-renders the loaded window, even when `sync_state.lastMessageId`
+    // hasn't moved.
+    ref.listen(conversationMessagesProvider(conversationId), (previous, next) {
+      unawaited(_refreshLoadedWindow());
     });
 
     return _toChatItems(initialMessages, isGroup: isGroup, ownId: ownId);
@@ -472,6 +505,38 @@ class ChatMessagesNotifier extends AsyncNotifier<List<ChatMessageItem>> {
 
     // The message row isn't written yet; retry on the next emission.
     _lastProcessedMessageId = previousId;
+  }
+
+  /// Re-renders the currently loaded window straight from the `messages`
+  /// table. Used when a message row changes without `sync_state.lastMessageId`
+  /// moving — e.g. a sent message advancing from "sending" (0) to "sent" (1)
+  /// once the server accepts it, or a read receipt arriving after the fact.
+  ///
+  /// The query is size-matched to the present state (`limit: current.length`)
+  /// so ongoing deltas never collapse the window back to [_initialWindow].
+  Future<void> _refreshLoadedWindow() async {
+    if (_loadedUpToOrder < 0) return;
+    final current = state.value;
+    if (current == null || current.isEmpty) return;
+
+    final messagesDao = ref.read(messagesDaoProvider);
+    final messages = await messagesDao.getMessagesBeforeOrder(
+      conversationId,
+      _loadedUpToOrder,
+      limit: current.length,
+    );
+    messages.sort((a, b) => a.messageOrder.compareTo(b.messageOrder));
+    if (messages.isEmpty) return;
+
+    final syncState = await ref
+        .read(syncStateDaoProvider)
+        .getSyncStateById(conversationId);
+    final ownId = await ref.read(currentUserIdProvider.future);
+    final isGroup = (syncState?.conversationType ?? 0) == 1;
+
+    state = AsyncData(
+      await _toChatItems(messages, isGroup: isGroup, ownId: ownId),
+    );
   }
 
   Future<void> _appendDelta() async {
@@ -783,7 +848,10 @@ class UpdatesFeedNotifier extends AsyncNotifier<UpdatesFeedState> {
           hasMore: _hasMoreByServer[serverId]!,
         );
         for (final update in page) {
-          if (_loadedUpdateIds.add(update.updateId)) updates.add(update);
+          final sourcedUpdate = update.fromServer(serverId);
+          if (_loadedUpdateIds.add(sourcedUpdate.updateId)) {
+            updates.add(sourcedUpdate);
+          }
         }
       } catch (_) {
         // One unavailable server should not prevent the remaining servers
@@ -844,9 +912,45 @@ class UpdatesFeedNotifier extends AsyncNotifier<UpdatesFeedState> {
     }
   }
 
+  /// Saves reaction state locally and updates the visible feed immediately.
+  /// This state is restored from Hive; it is never fetched from the backend.
+  Future<void> saveReaction(
+    PostData post, {
+    required bool liked,
+    required bool disliked,
+  }) async {
+    final normalizedDislike = disliked && !liked;
+    await _cache.saveReaction(
+      serverId: post.serverId,
+      updateId: post.updateId,
+      liked: liked,
+      disliked: normalizedDislike,
+    );
+
+    final current = state.value;
+    if (current == null) return;
+    state = AsyncData(
+      current.copyWith(
+        posts: current.posts
+            .map(
+              (item) => item.updateId == post.updateId &&
+                      item.serverId == post.serverId
+                  ? item.copyWith(isLiked: liked, isDisliked: normalizedDislike)
+                  : item,
+            )
+            .toList(growable: false),
+      ),
+    );
+  }
+
   PostData _toPostData(Update update) {
+    final reaction = _cache.loadReaction(
+      serverId: update.serverId,
+      updateId: update.updateId,
+    );
     return PostData(
       updateId: update.updateId,
+      serverId: update.serverId,
       avatarUrl:
           'https://api.dicebear.com/7.x/avataaars/png?seed='
           '${Uri.encodeComponent(update.nickname)}&size=128',
@@ -854,6 +958,8 @@ class UpdatesFeedNotifier extends AsyncNotifier<UpdatesFeedState> {
       timeText: '',
       text: update.text,
       mediaUrl: update.media?.mediaUrl,
+      isLiked: reaction.liked,
+      isDisliked: reaction.disliked,
     );
   }
 }

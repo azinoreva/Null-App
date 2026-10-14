@@ -188,7 +188,7 @@ Future<SendMessageResponse> sendChatMessage(
       'mac': base64UrlEncode(existing.mac),
       'sender_sequence': existing.senderSequence,
     });
-    return service.sendMessage(
+    final response = await service.sendMessage(
       recipientIds: [
         MessageRecipient(
           userId: conversationId,
@@ -205,6 +205,8 @@ Future<SendMessageResponse> sendChatMessage(
       senderSequence: existing.senderSequence,
       serverId: targetServerId ?? serverId,
     );
+    await messagesDao.markMessageSent(existing.messageId);
+    return response;
   }
 
   // AAD binds the ciphertext to this conversation, preventing it from
@@ -276,7 +278,7 @@ Future<SendMessageResponse> sendChatMessage(
     await messagesDao.insertMessage(messageCompanion);
   }
 
-  return service.sendMessage(
+  final response = await service.sendMessage(
     recipientIds: [
       MessageRecipient(
         userId: conversationId,
@@ -293,4 +295,9 @@ Future<SendMessageResponse> sendChatMessage(
     senderSequence: senderSequence,
     serverId: targetServerId ?? serverId,
   );
+
+  // The server accepted it: move the local row out of the "sending" state so
+  // the bubble stops showing a spinner. Only reached once the POST succeeded.
+  await messagesDao.markMessageSent(outgoingMessageId);
+  return response;
 }

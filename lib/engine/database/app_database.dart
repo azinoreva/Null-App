@@ -106,7 +106,7 @@ class AppDatabase extends _$AppDatabase {
   }
 
   @override
-  int get schemaVersion => 10;
+  int get schemaVersion => 11;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -163,6 +163,11 @@ class AppDatabase extends _$AppDatabase {
         // live there too (mirroring conversations.archived) for the archived
         // view to be able to hide and reveal conversations.
         await m.addColumn(syncState, syncState.archived);
+      }
+      if (from < 11) {
+        // Per-message pinning for the in-chat pinned banner. Existing rows
+        // default to unpinned.
+        await m.addColumn(messages, messages.pinned);
       }
     },
 

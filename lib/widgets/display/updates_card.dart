@@ -1,18 +1,8 @@
 import 'package:flutter/material.dart';
+
 import '../app_theme.dart';
 
-/// A social-style "update" / post card.
-///
-///  - [avatarUrl], [nickname], [timeText] : header info (timeText is shown
-///    as-is, e.g. "JUST NOW", "5H AGO" - pass whatever string you want).
-///  - [text]      : the post body.
-///  - [mediaUrl]  : optional image shown under the text. Pass null / leave
-///                  out if the post has no media.
-///  - [isLiked] / [isDisliked] / [isShared] / [isSubscribed] : initial
-///    state for the corresponding action icon - true turns that icon
-///    green. Like and dislike are mutually exclusive once the user starts
-///    tapping (even if you happened to pass both true).
-///  - [onHidePost] : called when the user picks "Hide" from the "..." menu.
+/// Compact update preview that opens the full post in a centered dialog.
 class UpdateComponent extends StatefulWidget {
   final String avatarUrl;
   final String nickname;
@@ -21,8 +11,8 @@ class UpdateComponent extends StatefulWidget {
   final String? mediaUrl;
   final bool isLiked;
   final bool isDisliked;
-  final bool isShared;
-  final bool isSubscribed;
+  final bool isReposted;
+  final void Function(bool liked, bool disliked)? onReactionChanged;
   final VoidCallback? onHidePost;
 
   const UpdateComponent({
@@ -34,8 +24,8 @@ class UpdateComponent extends StatefulWidget {
     this.mediaUrl,
     this.isLiked = false,
     this.isDisliked = false,
-    this.isShared = false,
-    this.isSubscribed = false,
+    this.isReposted = false,
+    this.onReactionChanged,
     this.onHidePost,
   });
 
@@ -46,32 +36,15 @@ class UpdateComponent extends StatefulWidget {
 class _UpdateComponentState extends State<UpdateComponent> {
   late bool _liked;
   late bool _disliked;
-  late bool _shared;
-  late bool _subscribed;
-  bool _flagged = false; // first icon - no external prop was specified for this one
+  late bool _reposted;
+  bool _flagged = false;
 
   @override
   void initState() {
     super.initState();
     _liked = widget.isLiked;
-    _disliked = widget.isDisliked && !widget.isLiked; // enforce mutual exclusion up front
-    _shared = widget.isShared;
-    _subscribed = widget.isSubscribed;
-  }
-
-  // ---- Stub function to be implemented later ----
-  void _hidePost() {
-    // TODO: hide/remove this post from the feed.
-  }
-  // -------------------------------------------------
-
-  void _handleHideSelected() {
-    _hidePost();
-    widget.onHidePost?.call();
-  }
-
-  void _toggleFlag() {
-    setState(() => _flagged = !_flagged);
+    _disliked = widget.isDisliked && !widget.isLiked;
+    _reposted = widget.isReposted;
   }
 
   void _toggleLike() {
@@ -79,6 +52,7 @@ class _UpdateComponentState extends State<UpdateComponent> {
       _liked = !_liked;
       if (_liked) _disliked = false;
     });
+    widget.onReactionChanged?.call(_liked, _disliked);
   }
 
   void _toggleDislike() {
@@ -86,149 +60,207 @@ class _UpdateComponentState extends State<UpdateComponent> {
       _disliked = !_disliked;
       if (_disliked) _liked = false;
     });
+    widget.onReactionChanged?.call(_liked, _disliked);
   }
 
-  void _toggleShare() {
-    setState(() => _shared = !_shared);
+  void _openPost() {
+    final theme =
+        Theme.of(context).extension<AppColorScheme>() ?? AppColorScheme.dark;
+    showDialog<void>(
+      context: context,
+      barrierDismissible: true,
+      builder: (dialogContext) => Dialog(
+        backgroundColor: theme.background,
+        surfaceTintColor: Colors.transparent,
+        insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 28),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(18),
+          side: BorderSide(color: theme.border),
+        ),
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            maxWidth: 560,
+            maxHeight: MediaQuery.sizeOf(dialogContext).height * .84,
+          ),
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(20),
+            child: _fullPost(context, theme),
+          ),
+        ),
+      ),
+    );
   }
 
-  void _toggleSubscribe() {
-    setState(() => _subscribed = !_subscribed);
+  Widget _header(BuildContext context, AppColorScheme theme) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        CircleAvatar(
+          radius: 20,
+          backgroundColor: AppColors.neutralGray,
+          backgroundImage: NetworkImage(widget.avatarUrl),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                widget.nickname,
+                style: AppTypography.getTextStyle(
+                  context,
+                  AppTextType.body,
+                  color: theme.textInputColor,
+                ).copyWith(fontWeight: FontWeight.bold),
+              ),
+              if (widget.timeText.isNotEmpty)
+                Text(
+                  widget.timeText,
+                  style: AppTypography.getTextStyle(
+                    context,
+                    AppTextType.tiny,
+                    color: AppColors.activeGreen,
+                  ).copyWith(fontWeight: FontWeight.w600),
+                ),
+            ],
+          ),
+        ),
+        PopupMenuButton<String>(
+          icon: const Icon(Icons.more_horiz, color: AppColors.mutedSlate),
+          color: theme.background,
+          onSelected: (value) {
+            if (value == 'hide') widget.onHidePost?.call();
+          },
+          itemBuilder: (_) => const [
+            PopupMenuItem(value: 'hide', child: Text('Hide')),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _bodyText(BuildContext context, AppColorScheme theme, {int? maxLines}) {
+    return Text(
+      widget.text,
+      maxLines: maxLines,
+      overflow: maxLines == null ? TextOverflow.visible : TextOverflow.ellipsis,
+      style: AppTypography.getTextStyle(
+        context,
+        AppTextType.body,
+        color: theme.textInputColor,
+      ),
+    );
+  }
+
+  Widget _media() {
+    if (widget.mediaUrl == null || widget.mediaUrl!.isEmpty) {
+      return const SizedBox.shrink();
+    }
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(12),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxHeight: 220),
+        child: AspectRatio(
+          aspectRatio: 16 / 9,
+          child: Image.network(widget.mediaUrl!, fit: BoxFit.cover),
+        ),
+      ),
+    );
+  }
+
+  Widget _fullPost(BuildContext context, AppColorScheme theme) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        _header(context, theme),
+        const SizedBox(height: 14),
+        if (widget.mediaUrl != null) ...[
+          _media(),
+          const SizedBox(height: 14),
+        ],
+        _bodyText(context, theme),
+      ],
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context).extension<AppColorScheme>() ?? AppColorScheme.dark;
+    final theme =
+        Theme.of(context).extension<AppColorScheme>() ?? AppColorScheme.dark;
+    final hasMedia = widget.mediaUrl != null && widget.mediaUrl!.isNotEmpty;
 
-    return Container(
-      padding: const EdgeInsets.all(16.0),
-      decoration: BoxDecoration(
-        color: theme.background,
-        borderRadius: BorderRadius.circular(16.0),
-        border: Border.all(color: theme.border),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Header
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              CircleAvatar(
-                radius: 20.0,
-                backgroundColor: AppColors.neutralGray,
-                backgroundImage: NetworkImage(widget.avatarUrl),
-              ),
-              const SizedBox(width: 10.0),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+    return Material(
+      color: theme.background,
+      borderRadius: BorderRadius.circular(16),
+      child: InkWell(
+        onTap: _openPost,
+        borderRadius: BorderRadius.circular(16),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(minHeight: 164, maxHeight: 420),
+          child: Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: theme.border),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _header(context, theme),
+                const SizedBox(height: 12),
+                if (hasMedia) ...[
+                  _media(),
+                  const SizedBox(height: 10),
+                  _bodyText(context, theme, maxLines: 2),
+                ] else
+                  _bodyText(context, theme, maxLines: 5),
+                const SizedBox(height: 6),
+                Text(
+                  'Tap to read full post',
+                  style: AppTypography.getTextStyle(
+                    context,
+                    AppTextType.tiny,
+                    color: AppColors.mutedSlate,
+                  ),
+                ),
+                const SizedBox(height: 14),
+                Divider(color: theme.border, height: 1),
+                const SizedBox(height: 8),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text(
-                      widget.nickname,
-                      style: AppTypography.getTextStyle(
-                        context,
-                        AppTextType.body,
-                        color: theme.textInputColor,
-                      ).copyWith(fontWeight: FontWeight.bold),
+                    _ActionIcon(
+                      icon: Icons.outlined_flag,
+                      tooltip: 'Flag',
+                      isActive: _flagged,
+                      onTap: () => setState(() => _flagged = !_flagged),
                     ),
-                    Text(
-                      widget.timeText,
-                      style: AppTypography.getTextStyle(
-                        context,
-                        AppTextType.tiny,
-                        color: AppColors.activeGreen,
-                      ).copyWith(fontWeight: FontWeight.w600),
+                    _ActionIcon(
+                      icon: Icons.thumb_up_alt_outlined,
+                      tooltip: 'Like',
+                      isActive: _liked,
+                      onTap: _toggleLike,
+                    ),
+                    _ActionIcon(
+                      icon: Icons.thumb_down_alt_outlined,
+                      tooltip: 'Dislike',
+                      isActive: _disliked,
+                      onTap: _toggleDislike,
+                    ),
+                    _ActionIcon(
+                      icon: Icons.repeat_rounded,
+                      tooltip: 'Repost',
+                      isActive: _reposted,
+                      onTap: () => setState(() => _reposted = !_reposted),
                     ),
                   ],
                 ),
-              ),
-              PopupMenuButton<String>(
-                icon: Icon(Icons.more_horiz, color: AppColors.mutedSlate),
-                color: theme.background,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10.0),
-                  side: BorderSide(color: theme.border),
-                ),
-                onSelected: (value) {
-                  if (value == 'hide') _handleHideSelected();
-                },
-                itemBuilder: (context) => [
-                  PopupMenuItem<String>(
-                    value: 'hide',
-                    child: Text(
-                      'Hide',
-                      style: AppTypography.getTextStyle(
-                        context,
-                        AppTextType.body,
-                        color: theme.textInputColor,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-          const SizedBox(height: 12.0),
-
-          // Body text
-          Text(
-            widget.text,
-            style: AppTypography.getTextStyle(
-              context,
-              AppTextType.body,
-              color: theme.textInputColor,
+              ],
             ),
           ),
-
-          // Media
-          if (widget.mediaUrl != null) ...[
-            const SizedBox(height: 12.0),
-            ClipRRect(
-              borderRadius: BorderRadius.circular(12.0),
-              child: AspectRatio(
-                aspectRatio: 16 / 9,
-                child: Image.network(widget.mediaUrl!, fit: BoxFit.cover),
-              ),
-            ),
-          ],
-
-          const SizedBox(height: 14.0),
-          Divider(color: theme.border, height: 1.0),
-          const SizedBox(height: 8.0),
-
-          // Action icons
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              _ActionIcon(
-                icon: Icons.outlined_flag,
-                isActive: _flagged,
-                onTap: _toggleFlag,
-              ),
-              _ActionIcon(
-                icon: Icons.thumb_up_alt_outlined,
-                isActive: _liked,
-                onTap: _toggleLike,
-              ),
-              _ActionIcon(
-                icon: Icons.thumb_down_alt_outlined,
-                isActive: _disliked,
-                onTap: _toggleDislike,
-              ),
-              _ActionIcon(
-                icon: Icons.share_outlined,
-                isActive: _shared,
-                onTap: _toggleShare,
-              ),
-              _ActionIcon(
-                icon: Icons.person_add_alt_1_outlined,
-                isActive: _subscribed,
-                onTap: _toggleSubscribe,
-              ),
-            ],
-          ),
-        ],
+        ),
       ),
     );
   }
@@ -236,26 +268,31 @@ class _UpdateComponentState extends State<UpdateComponent> {
 
 class _ActionIcon extends StatelessWidget {
   final IconData icon;
+  final String tooltip;
   final bool isActive;
   final VoidCallback onTap;
 
   const _ActionIcon({
     required this.icon,
+    required this.tooltip,
     required this.isActive,
     required this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      customBorder: const CircleBorder(),
-      child: Padding(
-        padding: const EdgeInsets.all(6.0),
-        child: Icon(
-          icon,
-          size: 22.0,
-          color: isActive ? AppColors.activeGreen : AppColors.mutedSlate,
+    return Tooltip(
+      message: tooltip,
+      child: InkWell(
+        onTap: onTap,
+        customBorder: const CircleBorder(),
+        child: Padding(
+          padding: const EdgeInsets.all(6),
+          child: Icon(
+            icon,
+            size: 22,
+            color: isActive ? AppColors.activeGreen : AppColors.mutedSlate,
+          ),
         ),
       ),
     );

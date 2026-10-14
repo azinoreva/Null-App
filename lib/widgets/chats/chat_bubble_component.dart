@@ -357,7 +357,7 @@ class ChatBubbleComponent extends StatelessWidget {
       case DeliveryStatus.delivered:
         return const Icon(Icons.done_all, size: 12.0, color: Color(0xFF9095A1));
       case DeliveryStatus.read:
-        return const Icon(Icons.done_all, size: 12.0, color: Color(0xFF2EB82E));
+        return const Icon(Icons.done_all, size: 12.0, color: Color(0xFF66BB6A));
     }
   }
 

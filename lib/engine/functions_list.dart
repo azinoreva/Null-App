@@ -28,9 +28,15 @@ import 'functions/chats/01_send_message.dart' as chat_send;
 import 'functions/chats/22_contact.dart' as chat_contact;
 import 'functions/chats/conversation_function.dart' as conversation;
 import 'functions/chats/recieve_message.dart' as chat_receive;
+import 'functions/chats/read_receipts.dart' as receipts;
+import 'functions/chats/wire_protocol.dart';
 import 'functions/chats/message_types.dart';
-import 'functions/people/connection_request.dart' as connection_request;
+import 'functions/chats/pinned_messages.dart' as pinned;
+import 'functions/chats/edit_delete_message.dart' as edit_delete;
+import 'functions/chats/typing_indicator.dart' as typing;
+import 'functions/chats/message_sender.dart' as message_sender;
 import 'functions/people/dh_drop_flow.dart' as dh_flow;
+import 'functions/people/connection_request.dart' as connection_request;
 import 'functions/people/group_membersfxn.dart' as group_member;
 import 'functions/people/groupsfxn.dart' as group;
 import 'functions/people/networkfxn.dart' as network;
@@ -105,6 +111,10 @@ final Map<String, dynamic> functionRegistry = {
     kind: TaskKind.network,
     databaseExecutor: _sendChatMessageTask,
   ),
+  'sendTypedMessage': TaskDefinition(
+    kind: TaskKind.network,
+    databaseExecutor: _sendTypedMessageTask,
+  ),
   'receiveQueuedMessage': TaskDefinition(
     kind: TaskKind.nonNetwork,
     databaseExecutor: _receiveQueuedMessageTask,
@@ -118,6 +128,9 @@ final Map<String, dynamic> functionRegistry = {
 
 Future<void> _sendChatMessageTask(TaskPayload payload, AppDatabase database) =>
     chat_send.sendQueuedChatMessage(payload.functionArgs, database);
+
+Future<void> _sendTypedMessageTask(TaskPayload payload, AppDatabase database) =>
+    message_sender.sendTypedMessageTask(payload.functionArgs, database);
 
 Future<void> _receiveQueuedMessageTask(
   TaskPayload payload,
@@ -147,6 +160,74 @@ Future<void> _receiveQueuedMessageTask(
     ReceivedMessageAcks.instance.record(serverId, messageId);
   }
 
+  // Edit / delete / pin / unpin / typing are addressed by the id of an
+  // *existing* target message (the wire `messageId` is the target's id), so
+  // they must be applied before the "already stored" dedup below — which
+  // would otherwise treat the event as a replay of the target and drop it.
+  if (messageType == MessageType.edit.value) {
+    final crypto = NullCrypto(
+      identity: identityCrypto,
+      ratchetStore: const RatchetStore(),
+    );
+    final ctx = IncomingContext(
+      senderContactId: senderContactId,
+      conversationId: senderContactId,
+      messageId: messageId,
+      logicalId: logicalId,
+      messageOrder: 0,
+      senderSequence: 0,
+      rawMessage: rawMessage,
+      serverId: serverId,
+    );
+    await edit_delete.handleEditMessage(
+      crypto: crypto,
+      sessionsDao: database.sessionsDao,
+      messagesDao: database.messagesDao,
+      ctx: ctx,
+    );
+    ackPersisted();
+    return;
+  }
+
+  if (messageType == MessageType.delete.value ||
+      messageType == MessageType.pin.value ||
+      messageType == MessageType.unpin.value ||
+      messageType == MessageType.typing_start.value ||
+      messageType == MessageType.typing_stop.value) {
+    // Control-carrier events: plaintext, never persisted, never decrypted.
+    final ctx = IncomingContext(
+      senderContactId: senderContactId,
+      conversationId: senderContactId,
+      messageId: messageId,
+      logicalId: logicalId,
+      messageOrder: 0,
+      senderSequence: 0,
+      rawMessage: rawMessage,
+      serverId: serverId,
+    );
+
+    if (messageType == MessageType.delete.value) {
+      await edit_delete.handleDeleteMessage(
+        messagesDao: database.messagesDao,
+        ctx: ctx,
+      );
+    } else if (messageType == MessageType.pin.value ||
+        messageType == MessageType.unpin.value) {
+      await pinned.handlePinUnpin(
+        unpin: messageType == MessageType.unpin.value,
+        messagesDao: database.messagesDao,
+        ctx: ctx,
+      );
+    } else {
+      typing.handleTyping(
+        start: messageType == MessageType.typing_start.value,
+        conversationId: senderContactId,
+      );
+    }
+    ackPersisted();
+    return;
+  }
+
   // Delivery is at-least-once: a message that arrived but wasn't acknowledged
   // before the app died comes back on the next connect. `messageId` is the
   // primary key and `insertMessage` is a plain insert, so replaying one we
@@ -167,6 +248,51 @@ Future<void> _receiveQueuedMessageTask(
   }
 
   if (messageType != MessageType.message.value) {
+    // Control envelopes (type 10/11) are ephemeral: we never persist a
+    // `Messages` row for them. The server still holds its copy until acked,
+    // so ACK unconditionally once we've applied the receipt to our side.
+    if (messageType == MessageType.received.value) {
+      final ctx = IncomingContext(
+        senderContactId: senderContactId,
+        conversationId: senderContactId,
+        messageId: messageId,
+        logicalId: logicalId,
+        messageOrder: 0,
+        senderSequence: 0,
+        rawMessage: rawMessage,
+        serverId: serverId,
+      );
+      final env = ControlEnvelope.decode(rawMessage);
+      await receipts.handleReceivedReceipt(
+        env: env,
+        ctx: ctx,
+        messagesDao: database.messagesDao,
+      );
+      ackPersisted();
+      return;
+    }
+
+    if (messageType == MessageType.read.value) {
+      final ctx = IncomingContext(
+        senderContactId: senderContactId,
+        conversationId: senderContactId,
+        messageId: messageId,
+        logicalId: logicalId,
+        messageOrder: 0,
+        senderSequence: 0,
+        rawMessage: rawMessage,
+        serverId: serverId,
+      );
+      final env = ControlEnvelope.decode(rawMessage);
+      await receipts.handleReadReceipt(
+        env: env,
+        ctx: ctx,
+        messagesDao: database.messagesDao,
+      );
+      ackPersisted();
+      return;
+    }
+
     throw StateError(
       'Receive handler for message type $messageType is not wired yet.',
     );

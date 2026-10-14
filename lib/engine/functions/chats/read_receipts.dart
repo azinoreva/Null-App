@@ -5,10 +5,7 @@
 // locally-persisted sent-message rows to status 2 (delivered) / 3 (read)
 // and stamps `receivedAt` / `readAt`.
 
-import 'package:drift/drift.dart';
-
 import '../../crypto/chat/null_crypto.dart';
-import '../../database/app_database.dart';
 import '../../database/queries/contacts_queries.dart';
 import '../../database/queries/identity_queries.dart';
 import '../../database/queries/messages_queries.dart';
@@ -101,17 +98,20 @@ Future<void> _applyStatus(
   final ids = (payload['message_ids'] as List<dynamic>? ?? const [])
       .map((e) => e.toString())
       .toList();
+  if (ids.isEmpty) return;
   final at = payload['at'] as int? ?? DateTime.now().millisecondsSinceEpoch;
 
   for (final id in ids) {
     final row = await messagesDao.getMessageById(id);
     if (row == null) continue;
+    if (row.status >= status) continue;
 
-    await messagesDao.updateMessageStatus(id, status);
-    if (stampReadAt) {
-      await (messagesDao.update(messagesDao.db.messages)
-            ..where((t) => t.messageId.equals(id)))
-          .write(MessagesCompanion(readAt: Value(at)));
+    if (status == 2) {
+      await messagesDao.markMessageAsDelivered(id);
+    } else if (status == 3) {
+      await messagesDao.markMessageAsRead(id, readAt: stampReadAt ? at : row.readAt);
+    } else {
+      await messagesDao.updateMessageStatus(id, status);
     }
   }
 }

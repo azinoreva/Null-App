@@ -151,7 +151,6 @@ extension MessageTypeProtocol on MessageType {
       case MessageType.message:
       case MessageType.media:
       case MessageType.edit:
-      case MessageType.delete:
       case MessageType.thread_reply:
       case MessageType.link_preview:
       case MessageType.location:
@@ -159,8 +158,6 @@ extension MessageTypeProtocol on MessageType {
       case MessageType.sticker:
       case MessageType.polls:
       case MessageType.poll_vote:
-      case MessageType.pin:
-      case MessageType.unpin:
       case MessageType.reaction_add:
       case MessageType.reaction_remove:
       case MessageType.annotation:
@@ -177,6 +174,9 @@ extension MessageTypeProtocol on MessageType {
       case MessageType.read:
       case MessageType.received:
       case MessageType.poll_close:
+      case MessageType.pin:
+      case MessageType.unpin:
+      case MessageType.delete:
       case MessageType.typing_start:
       case MessageType.typing_stop:
       case MessageType.room_rename:

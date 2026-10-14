@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../engine/network/updates/updates.dart';
 import '../state/providers.dart';
 import '../widgets/app_theme.dart';
 import '../widgets/display/updates_card.dart';
@@ -64,6 +65,30 @@ class _UpdatesScreenState extends ConsumerState<UpdatesScreen> {
   }
 
   Future<void> _refresh() => ref.read(updatesFeedProvider.notifier).refresh();
+
+  Future<void> _recordReaction(
+    PostData post, {
+    required bool liked,
+    required bool disliked,
+  }) async {
+    final selectedLiked = liked;
+    final selectedDisliked = disliked && !liked;
+    await ref.read(updatesFeedProvider.notifier).saveReaction(
+      post,
+      liked: selectedLiked,
+      disliked: selectedDisliked,
+    );
+    if (post.serverId.isEmpty || (!selectedLiked && !selectedDisliked)) return;
+    try {
+      await UpdatesActionsService(serverId: post.serverId).markUpdateRead(
+        updateId: post.updateId,
+        like: selectedLiked,
+        dislike: selectedDisliked,
+      );
+    } catch (_) {
+      // A peer server can be offline while the rest of the feed remains usable.
+    }
+  }
 
   void _openTab(NavigationTab tab) {
     if (tab == NavigationTab.updates) return;
@@ -196,6 +221,7 @@ class _UpdatesScreenState extends ConsumerState<UpdatesScreen> {
                               return Padding(
                                 padding: const EdgeInsets.only(bottom: 16.0),
                                 child: UpdateComponent(
+                                  key: ValueKey(post.updateId),
                                   avatarUrl: post.avatarUrl,
                                   nickname: post.nickname,
                                   timeText: post.timeText,
@@ -203,8 +229,13 @@ class _UpdatesScreenState extends ConsumerState<UpdatesScreen> {
                                   mediaUrl: post.mediaUrl,
                                   isLiked: post.isLiked,
                                   isDisliked: post.isDisliked,
-                                  isShared: post.isShared,
-                                  isSubscribed: post.isSubscribed,
+                                  isReposted: post.isReposted,
+                                  onReactionChanged: (liked, disliked) =>
+                                      _recordReaction(
+                                        post,
+                                        liked: liked,
+                                        disliked: disliked,
+                                      ),
                                 ),
                               );
                             }

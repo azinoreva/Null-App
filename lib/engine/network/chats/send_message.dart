@@ -34,9 +34,27 @@ class SendMessageResponse {
   SendMessageResponse({required this.messageSent});
 
   factory SendMessageResponse.fromJson(Map<String, dynamic> json) {
-    return SendMessageResponse(
-      messageSent: json['message_sent'] as int,
-    );
+    return SendMessageResponse(messageSent: _parseTimestamp(json['message_sent']));
+  }
+
+  /// The server reports acceptance as a Unix timestamp (seconds), but the
+  /// exact shape varies: a bare int, a numeric string, or an object (the same
+  /// `{"message_sent": {...}}` envelope the WebSocket uses). A 200 must never
+  /// throw just because the body didn't match, or the durable send task would
+  /// treat an accepted message as failed and retry it endlessly.
+  static int _parseTimestamp(dynamic raw) {
+    if (raw is int) return raw;
+    if (raw is num) return raw.toInt();
+    if (raw is String) return int.tryParse(raw) ?? 0;
+    if (raw is Map) {
+      for (final key in const ['timestamp', 'message_sent', 'messageSent', 'at']) {
+        final value = raw[key];
+        if (value is int) return value;
+        if (value is num) return value.toInt();
+        if (value is String) return int.tryParse(value) ?? 0;
+      }
+    }
+    return 0;
   }
 
   Map<String, dynamic> toJson() {
@@ -106,7 +124,11 @@ class SendMessageService {
     );
 
     return SendMessageResponse.fromJson(
-      response.data as Map<String, dynamic>,
+      response.data is Map<String, dynamic>
+          ? response.data as Map<String, dynamic>
+          : response.data is Map
+          ? Map<String, dynamic>.from(response.data as Map)
+          : const <String, dynamic>{},
     );
   }
 }

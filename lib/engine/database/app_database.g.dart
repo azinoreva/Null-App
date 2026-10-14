@@ -2858,6 +2858,17 @@ class $MessagesTable extends Messages with TableInfo<$MessagesTable, Message> {
     type: DriftSqlType.int,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _pinnedMeta = const VerificationMeta('pinned');
+  @override
+  late final GeneratedColumn<int> pinned = GeneratedColumn<int>(
+    'pinned',
+    aliasedName,
+    false,
+    check: () => pinned.isIn([0, 1]),
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
   @override
   List<GeneratedColumn> get $columns => [
     messageId,
@@ -2880,6 +2891,7 @@ class $MessagesTable extends Messages with TableInfo<$MessagesTable, Message> {
     protocolVersion,
     receivedAt,
     readAt,
+    pinned,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -3062,6 +3074,12 @@ class $MessagesTable extends Messages with TableInfo<$MessagesTable, Message> {
         readAt.isAcceptableOrUnknown(data['read_at']!, _readAtMeta),
       );
     }
+    if (data.containsKey('pinned')) {
+      context.handle(
+        _pinnedMeta,
+        pinned.isAcceptableOrUnknown(data['pinned']!, _pinnedMeta),
+      );
+    }
     return context;
   }
 
@@ -3151,6 +3169,10 @@ class $MessagesTable extends Messages with TableInfo<$MessagesTable, Message> {
         DriftSqlType.int,
         data['${effectivePrefix}read_at'],
       ),
+      pinned: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}pinned'],
+      )!,
     );
   }
 
@@ -3181,6 +3203,7 @@ class Message extends DataClass implements Insertable<Message> {
   final int protocolVersion;
   final int? receivedAt;
   final int? readAt;
+  final int pinned;
   const Message({
     required this.messageId,
     required this.logicalMessageId,
@@ -3202,6 +3225,7 @@ class Message extends DataClass implements Insertable<Message> {
     required this.protocolVersion,
     this.receivedAt,
     this.readAt,
+    required this.pinned,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -3234,6 +3258,7 @@ class Message extends DataClass implements Insertable<Message> {
     if (!nullToAbsent || readAt != null) {
       map['read_at'] = Variable<int>(readAt);
     }
+    map['pinned'] = Variable<int>(pinned);
     return map;
   }
 
@@ -3267,6 +3292,7 @@ class Message extends DataClass implements Insertable<Message> {
       readAt: readAt == null && nullToAbsent
           ? const Value.absent()
           : Value(readAt),
+      pinned: Value(pinned),
     );
   }
 
@@ -3296,6 +3322,7 @@ class Message extends DataClass implements Insertable<Message> {
       protocolVersion: serializer.fromJson<int>(json['protocolVersion']),
       receivedAt: serializer.fromJson<int?>(json['receivedAt']),
       readAt: serializer.fromJson<int?>(json['readAt']),
+      pinned: serializer.fromJson<int>(json['pinned']),
     );
   }
   @override
@@ -3322,6 +3349,7 @@ class Message extends DataClass implements Insertable<Message> {
       'protocolVersion': serializer.toJson<int>(protocolVersion),
       'receivedAt': serializer.toJson<int?>(receivedAt),
       'readAt': serializer.toJson<int?>(readAt),
+      'pinned': serializer.toJson<int>(pinned),
     };
   }
 
@@ -3346,6 +3374,7 @@ class Message extends DataClass implements Insertable<Message> {
     int? protocolVersion,
     Value<int?> receivedAt = const Value.absent(),
     Value<int?> readAt = const Value.absent(),
+    int? pinned,
   }) => Message(
     messageId: messageId ?? this.messageId,
     logicalMessageId: logicalMessageId ?? this.logicalMessageId,
@@ -3369,6 +3398,7 @@ class Message extends DataClass implements Insertable<Message> {
     protocolVersion: protocolVersion ?? this.protocolVersion,
     receivedAt: receivedAt.present ? receivedAt.value : this.receivedAt,
     readAt: readAt.present ? readAt.value : this.readAt,
+    pinned: pinned ?? this.pinned,
   );
   Message copyWithCompanion(MessagesCompanion data) {
     return Message(
@@ -3414,6 +3444,7 @@ class Message extends DataClass implements Insertable<Message> {
           ? data.receivedAt.value
           : this.receivedAt,
       readAt: data.readAt.present ? data.readAt.value : this.readAt,
+      pinned: data.pinned.present ? data.pinned.value : this.pinned,
     );
   }
 
@@ -3439,13 +3470,14 @@ class Message extends DataClass implements Insertable<Message> {
           ..write('edited: $edited, ')
           ..write('protocolVersion: $protocolVersion, ')
           ..write('receivedAt: $receivedAt, ')
-          ..write('readAt: $readAt')
+          ..write('readAt: $readAt, ')
+          ..write('pinned: $pinned')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode => Object.hash(
+  int get hashCode => Object.hashAll([
     messageId,
     logicalMessageId,
     conversationId,
@@ -3466,7 +3498,8 @@ class Message extends DataClass implements Insertable<Message> {
     protocolVersion,
     receivedAt,
     readAt,
-  );
+    pinned,
+  ]);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -3490,7 +3523,8 @@ class Message extends DataClass implements Insertable<Message> {
           other.edited == this.edited &&
           other.protocolVersion == this.protocolVersion &&
           other.receivedAt == this.receivedAt &&
-          other.readAt == this.readAt);
+          other.readAt == this.readAt &&
+          other.pinned == this.pinned);
 }
 
 class MessagesCompanion extends UpdateCompanion<Message> {
@@ -3514,6 +3548,7 @@ class MessagesCompanion extends UpdateCompanion<Message> {
   final Value<int> protocolVersion;
   final Value<int?> receivedAt;
   final Value<int?> readAt;
+  final Value<int> pinned;
   final Value<int> rowid;
   const MessagesCompanion({
     this.messageId = const Value.absent(),
@@ -3536,6 +3571,7 @@ class MessagesCompanion extends UpdateCompanion<Message> {
     this.protocolVersion = const Value.absent(),
     this.receivedAt = const Value.absent(),
     this.readAt = const Value.absent(),
+    this.pinned = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   MessagesCompanion.insert({
@@ -3559,6 +3595,7 @@ class MessagesCompanion extends UpdateCompanion<Message> {
     this.protocolVersion = const Value.absent(),
     this.receivedAt = const Value.absent(),
     this.readAt = const Value.absent(),
+    this.pinned = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : messageId = Value(messageId),
        logicalMessageId = Value(logicalMessageId),
@@ -3595,6 +3632,7 @@ class MessagesCompanion extends UpdateCompanion<Message> {
     Expression<int>? protocolVersion,
     Expression<int>? receivedAt,
     Expression<int>? readAt,
+    Expression<int>? pinned,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -3618,6 +3656,7 @@ class MessagesCompanion extends UpdateCompanion<Message> {
       if (protocolVersion != null) 'protocol_version': protocolVersion,
       if (receivedAt != null) 'received_at': receivedAt,
       if (readAt != null) 'read_at': readAt,
+      if (pinned != null) 'pinned': pinned,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -3643,6 +3682,7 @@ class MessagesCompanion extends UpdateCompanion<Message> {
     Value<int>? protocolVersion,
     Value<int?>? receivedAt,
     Value<int?>? readAt,
+    Value<int>? pinned,
     Value<int>? rowid,
   }) {
     return MessagesCompanion(
@@ -3666,6 +3706,7 @@ class MessagesCompanion extends UpdateCompanion<Message> {
       protocolVersion: protocolVersion ?? this.protocolVersion,
       receivedAt: receivedAt ?? this.receivedAt,
       readAt: readAt ?? this.readAt,
+      pinned: pinned ?? this.pinned,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -3733,6 +3774,9 @@ class MessagesCompanion extends UpdateCompanion<Message> {
     if (readAt.present) {
       map['read_at'] = Variable<int>(readAt.value);
     }
+    if (pinned.present) {
+      map['pinned'] = Variable<int>(pinned.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -3762,6 +3806,7 @@ class MessagesCompanion extends UpdateCompanion<Message> {
           ..write('protocolVersion: $protocolVersion, ')
           ..write('receivedAt: $receivedAt, ')
           ..write('readAt: $readAt, ')
+          ..write('pinned: $pinned, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -13172,6 +13217,7 @@ typedef $$MessagesTableCreateCompanionBuilder = MessagesCompanion Function({
   Value<int> protocolVersion,
   Value<int?> receivedAt,
   Value<int?> readAt,
+  Value<int> pinned,
   Value<int> rowid,
 });
 typedef $$MessagesTableUpdateCompanionBuilder = MessagesCompanion Function({
@@ -13195,6 +13241,7 @@ typedef $$MessagesTableUpdateCompanionBuilder = MessagesCompanion Function({
   Value<int> protocolVersion,
   Value<int?> receivedAt,
   Value<int?> readAt,
+  Value<int> pinned,
   Value<int> rowid,
 });
 
@@ -13322,6 +13369,11 @@ class $$MessagesTableFilterComposer
 
   ColumnFilters<int> get readAt => $composableBuilder(
     column: $table.readAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get pinned => $composableBuilder(
+    column: $table.pinned,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -13453,6 +13505,11 @@ class $$MessagesTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<int> get pinned => $composableBuilder(
+    column: $table.pinned,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   $$ConversationsTableOrderingComposer get conversationId {
     final $$ConversationsTableOrderingComposer composer = $composerBuilder(
       composer: this,
@@ -13563,6 +13620,9 @@ class $$MessagesTableAnnotationComposer
   GeneratedColumn<int> get readAt =>
       $composableBuilder(column: $table.readAt, builder: (column) => column);
 
+  GeneratedColumn<int> get pinned =>
+      $composableBuilder(column: $table.pinned, builder: (column) => column);
+
   $$ConversationsTableAnnotationComposer get conversationId {
     final $$ConversationsTableAnnotationComposer composer = $composerBuilder(
       composer: this,
@@ -13635,6 +13695,7 @@ class $$MessagesTableTableManager
                 Value<int> protocolVersion = const Value.absent(),
                 Value<int?> receivedAt = const Value.absent(),
                 Value<int?> readAt = const Value.absent(),
+                Value<int> pinned = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => MessagesCompanion(
                 messageId: messageId,
@@ -13657,6 +13718,7 @@ class $$MessagesTableTableManager
                 protocolVersion: protocolVersion,
                 receivedAt: receivedAt,
                 readAt: readAt,
+                pinned: pinned,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -13681,6 +13743,7 @@ class $$MessagesTableTableManager
                 Value<int> protocolVersion = const Value.absent(),
                 Value<int?> receivedAt = const Value.absent(),
                 Value<int?> readAt = const Value.absent(),
+                Value<int> pinned = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => MessagesCompanion.insert(
                 messageId: messageId,
@@ -13703,6 +13766,7 @@ class $$MessagesTableTableManager
                 protocolVersion: protocolVersion,
                 receivedAt: receivedAt,
                 readAt: readAt,
+                pinned: pinned,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0

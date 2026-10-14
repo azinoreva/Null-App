@@ -26,6 +26,10 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   /// active ones.
   bool _showArchived = false;
 
+  /// The conversation shown in the desktop/tablet right pane. Null shows the
+  /// "No chat selected" placeholder.
+  SyncStateData? _selectedConversation;
+
   @override
   Widget build(BuildContext context) {
     final themeExtension =
@@ -79,9 +83,24 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                   ),
                   child: _buildChatListPanel(context, themeExtension, isDesktop: true),
                 ),
-                // Right Panel - Workspace/Placeholder
+                // Right Panel - Selected chat or Workspace/Placeholder
                 Expanded(
-                  child: _buildDesktopPlaceholder(context, themeExtension),
+                  child: _selectedConversation == null
+                      ? _buildDesktopPlaceholder(context, themeExtension)
+                      : Chatting(
+                          key: ValueKey(
+                            _selectedConversation!.conversationId,
+                          ),
+                          conversationId:
+                              _selectedConversation!.conversationId,
+                          displayName: _selectedConversation!.displayName,
+                          avatarUrl: _selectedConversation!.avatar ?? '',
+                          status: _selectedConversation!.status,
+                          conversationType:
+                              _selectedConversation!.conversationType,
+                          onBack: () =>
+                              setState(() => _selectedConversation = null),
+                        ),
                 ),
               ],
             );
@@ -247,7 +266,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         ],
 
         // Chat List
-        Expanded(child: _buildConversationList(themeExtension)),
+        Expanded(
+          child: _buildConversationList(themeExtension, isDesktop: isDesktop),
+        ),
 
         // Desktop Bottom "Mark all read" Action
         if (isDesktop) ...[
@@ -339,7 +360,10 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     );
   }
 
-  Widget _buildConversationList(AppColorScheme themeExtension) {
+  Widget _buildConversationList(
+    AppColorScheme themeExtension, {
+    required bool isDesktop,
+  }) {
     final syncStates = ref.watch(syncStatesProvider);
 
     return syncStates.when(
@@ -374,6 +398,10 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
             for (final row in visible) ...[
               GestureDetector(
                 onTap: () {
+                  if (isDesktop) {
+                    setState(() => _selectedConversation = row);
+                    return;
+                  }
                   Navigator.of(context).push(
                     MaterialPageRoute(
                       builder: (_) => Chatting(
@@ -521,5 +549,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
 
     if (confirmed != true || !mounted) return;
     await ref.read(syncStatesProvider.notifier).delete(row.conversationId);
+    if (_selectedConversation?.conversationId == row.conversationId) {
+      setState(() => _selectedConversation = null);
+    }
   }
 }

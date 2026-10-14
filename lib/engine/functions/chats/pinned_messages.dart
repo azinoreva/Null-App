@@ -1,119 +1,32 @@
 // module name: pinned_messages
 //
-// MessageType.pin (15) / MessageType.unpin (16) — pin / unpin message
-// events. Encrypted + persisted (the event itself is part of history) while
-// the conversation's pinned flag is applied via `sync_state.pinned`.
+// MessageType.pin (15) / MessageType.unpin (16) — per-message pinning in a
+// conversation. Control carrier: plaintext, ephemeral, never persisted, and
+// never advances the ratchet.
+//
+// The event addresses a single target message by the id it was sent with
+// (the wire `messageId`); the receiver flips that row's `pinned` flag. This
+// is the in-chat pinned banner, distinct from the conversation-list pin
+// which lives on `sync_state.pinned` and is purely local.
 
-import '../../crypto/chat/null_crypto.dart';
-import '../../database/queries/contacts_queries.dart';
-import '../../database/queries/identity_queries.dart';
 import '../../database/queries/messages_queries.dart';
-import '../../database/queries/sync_state_queries.dart';
-import '../../network/chats/send_message.dart';
-import 'message_sender.dart';
 import 'message_types.dart';
 import 'wire_protocol.dart';
 
-/// Builds a pin / unpin payload. [messageIds] are the sender-side logical
-/// message ids being pinned.
-Map<String, dynamic> buildPinnedPayload({
-  required List<String> messageIds,
+/// Applies a received pin / unpin to the target message row.
+Future<IncomingMessageResult> handlePinUnpin({
   required bool unpin,
-  String? pinnedBy,
-  int? at,
-}) {
-  return {
-    'message_ids': messageIds,
-    'action': unpin ? 'unpin' : 'pin',
-    'pinned_by': pinnedBy,
-    'at': at ?? DateTime.now().millisecondsSinceEpoch,
-  };
-}
-
-/// Sends a pin (or unpin when [unpin] is true) for a list of message ids.
-Future<SendMessageResponse> sendPinnedMessages(
-  NullCrypto crypto,
-  ContactsDao contactsDao,
-  IdentityDao identityDao,
-  MessagesDao messagesDao, {
-  required String conversationId,
-  required String serverId,
-  required List<String> messageIds,
-  bool unpin = false,
-  String? pinnedBy,
-  int? at,
-  String? messageId,
-  String? logicalId,
-}) {
-  return sendTypedMessage(
-    crypto,
-    contactsDao,
-    identityDao,
-    messagesDao,
-    conversationId: conversationId,
-    messageType: unpin ? MessageType.unpin : MessageType.pin,
-    payload: buildPinnedPayload(
-      messageIds: messageIds,
-      unpin: unpin,
-      pinnedBy: pinnedBy,
-      at: at,
-    ),
-    serverId: serverId,
-    messageId: messageId,
-    logicalId: logicalId,
-  );
-}
-
-/// Stores a received pin event and flips the conversation pinned flag on.
-Future<IncomingMessageResult> handlePin({
-  required Map<String, dynamic> payload,
-  required IncomingContext ctx,
   required MessagesDao messagesDao,
-  required SyncStateDao syncStateDao,
+  required IncomingContext ctx,
 }) async {
-  await storeDecryptedContent(
-    messagesDao,
-    conversationId: ctx.conversationId,
-    senderId: ctx.senderContactId,
-    ctx: ctx,
-    type: MessageType.pin,
-    payload: payload,
-    rawMessage: ctx.rawMessage,
-  );
-  if (await syncStateDao.getSyncStateById(ctx.conversationId) != null) {
-    await syncStateDao.setPinned(ctx.conversationId, pinned: 1);
+  final target = await messagesDao.findMessageByIdOrLogicalId(ctx.messageId);
+  if (target != null) {
+    await messagesDao.setMessagePinned(target.messageId, unpin ? 0 : 1);
   }
   return IncomingMessageResult(
-    type: MessageType.pin,
+    type: unpin ? MessageType.unpin : MessageType.pin,
     handled: true,
     messageId: ctx.messageId,
-    detail: payload,
-  );
-}
-
-/// Stores a received unpin event and flips the conversation pinned flag off.
-Future<IncomingMessageResult> handleUnpin({
-  required Map<String, dynamic> payload,
-  required IncomingContext ctx,
-  required MessagesDao messagesDao,
-  required SyncStateDao syncStateDao,
-}) async {
-  await storeDecryptedContent(
-    messagesDao,
-    conversationId: ctx.conversationId,
-    senderId: ctx.senderContactId,
-    ctx: ctx,
-    type: MessageType.unpin,
-    payload: payload,
-    rawMessage: ctx.rawMessage,
-  );
-  if (await syncStateDao.getSyncStateById(ctx.conversationId) != null) {
-    await syncStateDao.setPinned(ctx.conversationId, pinned: 0);
-  }
-  return IncomingMessageResult(
-    type: MessageType.unpin,
-    handled: true,
-    messageId: ctx.messageId,
-    detail: payload,
+    detail: {'message_id': target?.messageId ?? ctx.messageId, 'unpin': unpin},
   );
 }

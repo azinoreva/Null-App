@@ -160,6 +160,11 @@ Future<void> _sendTypedMessageTask(
   }
   final payload = jsonDecode(payloadJson) as Map<String, dynamic>;
 
+  // An edit (17) is an encrypted *replacement* of an existing message: the
+  // wire `messageId` is the target row's id, the body is the new raw text
+  // (not JSON), and the row is upserted instead of inserted.
+  final isEdit = type == MessageType.edit;
+
   await sendTypedMessage(
     crypto,
     database.contactsDao,
@@ -173,6 +178,8 @@ Future<void> _sendTypedMessageTask(
     messageId: messageId,
     logicalId: logicalId,
     replyTo: replyTo,
+    replaceExisting: isEdit,
+    plaintextText: isEdit ? payload['text'] as String? : null,
   );
 }
 
@@ -199,6 +206,8 @@ Future<SendMessageResponse> sendTypedMessage(
   String? logicalId,
   String? replyTo,
   int status = 0,
+  bool replaceExisting = false,
+  String? plaintextText,
 }) async {
   final identity = await identityDao.getCurrentIdentityOrNull();
   if (identity == null) {
@@ -218,7 +227,9 @@ Future<SendMessageResponse> sendTypedMessage(
     ),
   ];
 
-  final existing = messageId == null
+  // A replace (edit) deliberately re-encrypts instead of re-posting the
+  // stored ciphertext, so it never takes the "resend existing" path.
+  final existing = (replaceExisting || messageId == null)
       ? null
       : await messagesDao.getMessageById(messageId);
   if (existing != null) {
@@ -230,7 +241,7 @@ Future<SendMessageResponse> sendTypedMessage(
       'mac': base64UrlEncode(existing.mac),
       'sender_sequence': existing.senderSequence,
     });
-return _post(
+    final response = await _post(
       service,
       recipients,
       existing.messageId,
@@ -243,6 +254,8 @@ return _post(
       'none',
       targetServerId: targetServerId,
     );
+    await messagesDao.markMessageSent(existing.messageId);
+    return response;
   }
 
   final outgoingMessageId = messageId ?? _uuid.v4();
@@ -254,7 +267,7 @@ return _post(
       ) +
       1;
   final now = DateTime.now().millisecondsSinceEpoch;
-  final plaintextJson = jsonEncode(payload);
+  final plaintextJson = plaintextText ?? jsonEncode(payload);
 
   final String wireMessage;
   int messageOrder;
@@ -288,31 +301,40 @@ return _post(
   }
 
   if (messageType.isEncrypted) {
-    await messagesDao.insertMessage(
-      MessagesCompanion.insert(
-        messageId: outgoingMessageId,
-        logicalMessageId: outgoingLogicalId,
-        conversationId: conversationId,
-        senderId: identity.identityId,
-        senderSequence: senderSequence,
-        messageOrder: messageOrder,
-        chainIndex: messageOrder,
-        timestamp: now,
-        ciphertext: ciphertext,
-        nonce: nonce,
-        mac: mac,
-        decryptedMessage: Value(decryptedText),
-        messageType: messageType.value,
-        replyTo: Value(replyTo),
-        edited: const Value(0),
-        status: status,
-        keyVersion: 1,
-        protocolVersion: Value(kProtocolVersion),
-      ),
+    // An edit replaces the existing row in place (same message_id), keeping
+    // its original display order and marking it edited; everything else is a
+    // brand-new row appended to the conversation.
+    final prior = replaceExisting && messageId != null
+        ? await messagesDao.getMessageById(messageId)
+        : null;
+    final companion = MessagesCompanion.insert(
+      messageId: outgoingMessageId,
+      logicalMessageId: outgoingLogicalId,
+      conversationId: conversationId,
+      senderId: identity.identityId,
+      senderSequence: senderSequence,
+      messageOrder: prior?.messageOrder ?? messageOrder,
+      chainIndex: messageOrder,
+      timestamp: prior?.timestamp ?? now,
+      ciphertext: ciphertext,
+      nonce: nonce,
+      mac: mac,
+      decryptedMessage: Value(decryptedText),
+      messageType: prior?.messageType ?? messageType.value,
+      replyTo: Value(replyTo ?? prior?.replyTo),
+      edited: Value(replaceExisting ? 1 : 0),
+      status: prior?.status ?? status,
+      keyVersion: 1,
+      protocolVersion: Value(kProtocolVersion),
     );
+    if (replaceExisting && prior != null) {
+      await messagesDao.upsertMessage(companion);
+    } else {
+      await messagesDao.insertMessage(companion);
+    }
   }
 
-  return _post(
+  final response = await _post(
     service,
     recipients,
     outgoingMessageId,
@@ -325,6 +347,13 @@ return _post(
     'none',
     targetServerId: targetServerId,
   );
+
+  // Only encrypted types have a persisted row to advance; control envelopes
+  // are never stored. Moves the row out of the "sending" state once accepted.
+  if (messageType.isEncrypted) {
+    await messagesDao.markMessageSent(outgoingMessageId);
+  }
+  return response;
 }
 
 Future<SendMessageResponse> _post(

@@ -67,13 +67,31 @@ Future<Map<String, dynamic>> decryptEncryptedWirePayload(
   required String conversationId,
   required String rawMessage,
 }) async {
+  final plaintext = await decryptEncryptedWirePlaintext(
+    crypto,
+    conversationId: conversationId,
+    rawMessage: rawMessage,
+  );
+  return jsonDecode(plaintext) as Map<String, dynamic>;
+}
+
+/// Decrypts a raw `message` field produced by [buildEncryptedWirePayload]
+/// and returns the recovered plaintext *verbatim* (no JSON parsing). Used by
+/// content types whose body is the raw user text rather than a JSON object —
+/// notably `edit` (17), which replaces a message's text. Advances the
+/// ratchet exactly like [decryptEncryptedWirePayload].
+Future<String> decryptEncryptedWirePlaintext(
+  NullCrypto crypto, {
+  required String conversationId,
+  required String rawMessage,
+}) async {
   final decoded = jsonDecode(rawMessage) as Map<String, dynamic>;
   final wireVersion = decoded['v'] as int? ?? kProtocolVersion;
   if (wireVersion != kProtocolVersion) {
     throw StateError('Unsupported encrypted wire version $wireVersion.');
   }
 
-  final plaintext = await crypto.decryptMessage(
+  return crypto.decryptMessage(
     conversationId: conversationId,
     chainIndex: decoded['chain_index'] as int,
     ciphertext: base64DecodeTolerant(decoded['ciphertext'] as String),
@@ -81,8 +99,6 @@ Future<Map<String, dynamic>> decryptEncryptedWirePayload(
     mac: base64DecodeTolerant(decoded['mac'] as String),
     aad: messageAad(conversationId),
   );
-
-  return jsonDecode(plaintext) as Map<String, dynamic>;
 }
 
 /// Plaintext envelope for ephemeral / control message types. Signed
@@ -218,6 +234,22 @@ Future<Map<String, dynamic>> decryptContentPayload(
 }) async {
   await ensureRatchetReady(crypto, sessionsDao, conversationId);
   return decryptEncryptedWirePayload(
+    crypto,
+    conversationId: conversationId,
+    rawMessage: rawMessage,
+  );
+}
+
+/// Like [decryptContentPayload] but returns the recovered plaintext verbatim.
+/// Used for content types with a raw-text body (e.g. `edit`).
+Future<String> decryptContentPlaintext(
+  NullCrypto crypto,
+  SessionsDao sessionsDao, {
+  required String conversationId,
+  required String rawMessage,
+}) async {
+  await ensureRatchetReady(crypto, sessionsDao, conversationId);
+  return decryptEncryptedWirePlaintext(
     crypto,
     conversationId: conversationId,
     rawMessage: rawMessage,
