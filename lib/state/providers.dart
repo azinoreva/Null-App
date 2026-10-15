@@ -9,9 +9,11 @@ import '../engine/database/app_database.dart';
 import '../engine/engine.dart';
 import '../engine/task_queue.dart';
 import '../engine/functions/settings/settings.dart';
+import '../engine/functions/chats/typing_indicator.dart';
 import '../engine/network/api_client.dart';
 import '../engine/network/auth_failure_handler.dart';
 import '../engine/network/updates/check_updates.dart';
+import '../engine/network/updates/comments.dart';
 import '../engine/network/updates/updates_cache.dart';
 import '../engine/network/people/pick_contact.dart';
 import '../engine/network/people/pending_contacts_cache.dart';
@@ -379,6 +381,26 @@ final conversationMessagesProvider =
           .watchMessagesForConversation(conversationId);
     });
 
+/// Which conversations currently show a live "typing…" indicator.
+///
+/// Backed by [TypingIndicators], the in-memory map the receive handler updates
+/// for typing (24/25) events. Ephemeral by design — never persisted.
+final typingConversationsProvider =
+    NotifierProvider<TypingConversationsNotifier, Set<String>>(
+      TypingConversationsNotifier.new,
+    );
+
+class TypingConversationsNotifier extends Notifier<Set<String>> {
+  @override
+  Set<String> build() {
+    final subscription = TypingIndicators.instance.stream.listen((next) {
+      state = next;
+    });
+    ref.onDispose(() => subscription.cancel());
+    return TypingIndicators.instance.active;
+  }
+}
+
 /// The rendered message list for a conversation.
 ///
 /// Built from the `messages` table, using `sync_state.lastMessageId` to anchor
@@ -627,6 +649,7 @@ class ChatMessagesNotifier extends AsyncNotifier<List<ChatMessageItem>> {
       items.add(
         ChatMessageItem(
           id: m.messageId,
+          logicalId: m.logicalMessageId,
           isMe: isMe,
           chatType: isGroup ? ChatType.group : ChatType.individual,
           sender: sender,
@@ -634,6 +657,7 @@ class ChatMessagesNotifier extends AsyncNotifier<List<ChatMessageItem>> {
           mediaType: MessageMediaType.text,
           timestamp: formatChatTime(m.timestamp),
           isEdited: m.edited == 1,
+          pinned: m.pinned == 1,
           deliveryStatus: isMe ? _deliveryStatusFor(m.status) : null,
         ),
       );
@@ -860,8 +884,35 @@ class UpdatesFeedNotifier extends AsyncNotifier<UpdatesFeedState> {
       }
     }
 
-    if (updates.isNotEmpty) unawaited(_cache.save(updates));
+    if (updates.isNotEmpty) {
+      await _cache.save(updates);
+      unawaited(_prefetchComments(updates));
+    }
     return updates;
+  }
+
+  /// Fetches comments while the feed is being updated and caches them with
+  /// their post. This runs in the background so it does not delay feed paint.
+  Future<void> _prefetchComments(List<Update> updates) async {
+    await Future.wait(
+      updates.map((update) async {
+        try {
+          if (!ApiClient.isRegistered(update.serverId)) {
+            await ApiClient.registerServer(
+              serverId: update.serverId,
+              onAuthFailure: serverAuthFailureCallbackFor(update.serverId),
+            );
+          }
+          final response = await CommentsService(
+            serverId: update.serverId,
+          ).checkComments(updateId: update.updateId).timeout(_fetchTimeout);
+          await _cache.saveComments(update.updateId, response.comments);
+        } catch (_) {
+          // Comment prefetch is best-effort; the post remains usable and the
+          // modal can fetch comments on demand if this request fails.
+        }
+      }),
+    );
   }
 
   bool get _hasMoreServers => _hasMoreByServer.values.any((hasMore) => hasMore);
@@ -897,7 +948,6 @@ class UpdatesFeedNotifier extends AsyncNotifier<UpdatesFeedState> {
         return;
       }
 
-      unawaited(_cache.save(updates));
       state = AsyncData(
         UpdatesFeedState(
           posts: [...current.posts, ...updates.map(_toPostData)],

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:drift/drift.dart' show Value;
@@ -7,6 +8,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 
 import '../engine/database/app_database.dart';
+import '../engine/functions/chats/message_types.dart';
 import '../engine/functions/servers/serverfxn.dart' as server_database;
 import '../engine/network/servers/servers.dart' as server_directory;
 import '../state/providers.dart';
@@ -44,6 +46,11 @@ class _ChattingState extends ConsumerState<Chatting> {
   static const _uuid = Uuid();
   final ScrollController _scrollController = ScrollController();
   int _lastItemCount = 0;
+
+  /// When we last told the peer we started typing, so a burst of keystrokes
+  /// only emits one `typing_start` per [_typingRefresh].
+  DateTime? _lastTypingStart;
+  static const Duration _typingRefresh = Duration(seconds: 3);
 
   bool get _isGroup => widget.conversationType == 1;
 
@@ -107,18 +114,19 @@ class _ChattingState extends ConsumerState<Chatting> {
       conversationSyncStateProvider(widget.conversationId),
     );
     final draft = syncState.value?.draft ?? '';
+    final peerTyping = ref
+        .watch(typingConversationsProvider)
+        .contains(widget.conversationId);
 
     return Scaffold(
       backgroundColor: colorScheme.surface,
       body: Column(
         children: [
-          _buildHeader(context, colorScheme),
+          _buildHeader(context, colorScheme, peerTyping: peerTyping),
           Expanded(child: _buildMessages(context, colorScheme, messagesAsync)),
           ChatInput(
             initialText: draft,
-            onTextChanged: (text) => ref
-                .read(syncStateDaoProvider)
-                .updateDraft(widget.conversationId, text),
+            onTextChanged: _onInputChanged,
             groupMembers: const [],
             onSendMessage: (text, mediaType, {mediaUrl}) {
               unawaited(_queueMessage(text));
@@ -127,6 +135,13 @@ class _ChattingState extends ConsumerState<Chatting> {
         ],
       ),
     );
+  }
+
+  void _onInputChanged(String text) {
+    unawaited(
+      ref.read(syncStateDaoProvider).updateDraft(widget.conversationId, text),
+    );
+    _handleTyping(text);
   }
 
   Future<void> _queueMessage(String text) async {
@@ -243,7 +258,239 @@ class _ChattingState extends ConsumerState<Chatting> {
     }
   }
 
-  Widget _buildHeader(BuildContext context, ColorScheme colorScheme) {
+  /// Resolves the conversation's primary (transport) server, recreating its
+  /// local row from the server list if a legacy install only stored it there.
+  Future<String> _resolvePrimaryServerId() async {
+    final conversation = await ref
+        .read(conversationsDaoProvider)
+        .getConversationById(widget.conversationId);
+    if (conversation == null || conversation.servers.isEmpty) {
+      throw StateError('This conversation has no servers.');
+    }
+
+    final database = ref.read(appDatabaseProvider);
+    final primaryServerId = await ServerListService.primaryServerIdFor(
+      conversation.servers,
+    );
+    if (await database.serversDao.getServerById(primaryServerId) == null) {
+      final config = await ServerListService.lookup(primaryServerId);
+      if (config != null) {
+        await server_database.createServer(
+          database.serversDao,
+          server: server_directory.ServerInfo.fromJson(config.toJson()),
+        );
+      }
+    }
+    if (await database.serversDao.getServerById(primaryServerId) == null) {
+      throw StateError(
+        'The server is not available locally. Reconnect it before sending.',
+      );
+    }
+    return primaryServerId;
+  }
+
+  /// Queues a generic typed message (edit 17 / delete 18 / pin 15 / unpin 16 /
+  /// typing 24-25) through the durable task queue. [messageId] is the target
+  /// message's id for the event types, and a fresh id for typing.
+  Future<void> _queueTyped({
+    required int messageType,
+    required Map<String, dynamic> payload,
+    required String messageId,
+    String? logicalId,
+  }) async {
+    try {
+      final primaryServerId = await _resolvePrimaryServerId();
+      if (!mounted) return;
+      await ref
+          .read(taskQueueProvider)
+          .queueTask(
+            functionName: 'sendTypedMessage',
+            args: [
+              widget.conversationId,
+              messageType,
+              jsonEncode(payload),
+              primaryServerId,
+              messageId,
+              logicalId ?? _uuid.v4(),
+            ],
+            serverId: primaryServerId,
+          );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not queue message: $error')),
+      );
+    }
+  }
+
+  void _handleTyping(String text) {
+    if (text.trim().isEmpty) {
+      _lastTypingStart = null;
+      unawaited(_sendTyping(start: false));
+      return;
+    }
+    final now = DateTime.now();
+    final last = _lastTypingStart;
+    if (last != null && now.difference(last) < _typingRefresh) return;
+    _lastTypingStart = now;
+    unawaited(_sendTyping(start: true));
+  }
+
+  /// Best-effort typing hint; failures are ignored (transient UI feedback).
+  Future<void> _sendTyping({required bool start}) async {
+    try {
+      final primaryServerId = await _resolvePrimaryServerId();
+      if (!mounted) return;
+      await ref
+          .read(taskQueueProvider)
+          .queueTask(
+            functionName: 'sendTypedMessage',
+            args: [
+              widget.conversationId,
+              start
+                  ? MessageType.typing_start.value
+                  : MessageType.typing_stop.value,
+              jsonEncode({'kind': start ? 'typing_start' : 'typing_stop'}),
+              primaryServerId,
+              _uuid.v4(),
+              _uuid.v4(),
+            ],
+            serverId: primaryServerId,
+          );
+    } catch (_) {
+      // Typing indicators are best-effort.
+    }
+  }
+
+  void _showMessageActions(ChatMessageItem item) {
+    showModalBottomSheet<void>(
+      context: context,
+      builder: (sheetContext) => SafeArea(
+        child: Wrap(
+          children: [
+            ListTile(
+              leading: const Icon(Icons.edit_outlined),
+              title: const Text('Edit'),
+              onTap: () {
+                Navigator.pop(sheetContext);
+                unawaited(_editMessage(item));
+              },
+            ),
+            ListTile(
+              leading: Icon(item.pinned ? Icons.push_pin_outlined : Icons.push_pin),
+              title: Text(item.pinned ? 'Unpin' : 'Pin'),
+              onTap: () {
+                Navigator.pop(sheetContext);
+                unawaited(_togglePin(item, pin: !item.pinned));
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.delete_outline, color: Colors.red),
+              title: const Text('Delete', style: TextStyle(color: Colors.red)),
+              onTap: () {
+                Navigator.pop(sheetContext);
+                unawaited(_confirmDelete(item));
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _editMessage(ChatMessageItem item) async {
+    final controller = TextEditingController(text: item.content);
+    final newText = await showDialog<String>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Edit message'),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          maxLines: null,
+          decoration: const InputDecoration(hintText: 'Message'),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, controller.text),
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+    controller.dispose();
+
+    final trimmed = newText?.trim();
+    if (trimmed == null || trimmed.isEmpty || trimmed == item.content) return;
+    if (!mounted) return;
+
+    await ref.read(messagesDaoProvider).markMessageEdited(item.id, trimmed);
+    await _queueTyped(
+      messageType: MessageType.edit.value,
+      payload: {'kind': 'edit', 'text': trimmed},
+      messageId: item.id,
+    );
+  }
+
+  Future<void> _confirmDelete(ChatMessageItem item) async {
+    // Deleting a message you sent propagates to the peer; deleting the
+    // peer's message is local-only (it never touches the ratchet).
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Delete message'),
+        content: Text(
+          item.isMe
+              ? 'Delete this message for everyone?'
+              : 'Delete this message from your device?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: Colors.red),
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    if (!mounted) return;
+
+    await ref.read(messagesDaoProvider).deleteMessage(item.id);
+
+    if (!item.isMe) return;
+
+    await _queueTyped(
+      messageType: MessageType.delete.value,
+      payload: const {'kind': 'delete'},
+      messageId: item.id,
+      logicalId: item.logicalId,
+    );
+  }
+
+  Future<void> _togglePin(ChatMessageItem item, {required bool pin}) async {
+    await ref.read(messagesDaoProvider).setMessagePinned(item.id, pin ? 1 : 0);
+    await _queueTyped(
+      messageType: pin ? MessageType.pin.value : MessageType.unpin.value,
+      payload: {'kind': pin ? 'pin' : 'unpin'},
+      messageId: item.id,
+      logicalId: item.logicalId,
+    );
+  }
+
+  Widget _buildHeader(
+    BuildContext context,
+    ColorScheme colorScheme, {
+    required bool peerTyping,
+  }) {
     final initials = widget.displayName.isNotEmpty
         ? widget.displayName
               .trim()
@@ -320,12 +567,20 @@ class _ChattingState extends ConsumerState<Chatting> {
                 const SizedBox(height: 2),
                 Row(
                   children: [
-                    Icon(Icons.circle, color: _statusColor(), size: 6),
+                    Icon(
+                      Icons.circle,
+                      color: peerTyping
+                          ? const Color(0xFF2EB82E)
+                          : _statusColor(),
+                      size: 6,
+                    ),
                     const SizedBox(width: 4),
                     Text(
-                      _statusLabel(),
+                      peerTyping ? 'typing…' : _statusLabel(),
                       style: TextStyle(
-                        color: _statusColor(),
+                        color: peerTyping
+                            ? const Color(0xFF2EB82E)
+                            : _statusColor(),
                         fontSize: 11,
                         fontWeight: FontWeight.w600,
                         letterSpacing: 0.5,
@@ -381,8 +636,13 @@ class _ChattingState extends ConsumerState<Chatting> {
           controller: _scrollController,
           padding: const EdgeInsets.symmetric(vertical: 12),
           itemCount: items.length,
-          itemBuilder: (context, index) =>
-              ChatBubbleComponent(message: items[index]),
+          itemBuilder: (context, index) {
+            final item = items[index];
+            return ChatBubbleComponent(
+              message: item,
+              onLongPress: () => _showMessageActions(item),
+            );
+          },
         );
       },
     );

@@ -207,6 +207,18 @@ class MessagesDao extends DatabaseAccessor<AppDatabase>
         .write(MessagesCompanion(pinned: Value(pinned)));
   }
 
+  // Marks a message as edited (locally, optimistically) and updates its
+  // plaintext. The send task re-encrypts and upserts the authoritative row.
+  Future<void> markMessageEdited(String messageId, String decryptedMessage) async {
+    await (update(db.messages)..where((t) => t.messageId.equals(messageId)))
+        .write(
+          MessagesCompanion(
+            decryptedMessage: Value(decryptedMessage),
+            edited: const Value(1),
+          ),
+        );
+  }
+
   // Get the latest message in a conversation (ordered by message_order desc).
   Future<Message?> getLatestMessage(String conversationId) =>
       (select(db.messages)

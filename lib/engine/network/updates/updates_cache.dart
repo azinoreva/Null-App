@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:hive_flutter/hive_flutter.dart';
 
 import 'check_updates.dart';
+import 'comments.dart';
 
 /// Local, on-device cache for the updates feed.
 ///
@@ -21,6 +22,7 @@ class UpdatesCacheService {
   static const String boxName = 'updates_cache';
   static const String _savedAtKey = '_saved_at';
   static const String _updateKey = 'update';
+  static const String _commentsKey = 'comments';
   static const String _offsetPrefix = '_offset:';
   static const String _hasMorePrefix = '_has_more:';
   static const String _reactionPrefix = '_reaction:';
@@ -68,12 +70,40 @@ class UpdatesCacheService {
     final now = DateTime.now().millisecondsSinceEpoch;
     final entries = <String, String>{};
     for (final update in updates) {
+      final existing = _readEnvelope(box.get(update.updateId));
       entries[update.updateId] = jsonEncode({
         _savedAtKey: now,
         _updateKey: update.toJson(),
+        if (existing?[_commentsKey] is List)
+          _commentsKey: existing![_commentsKey],
       });
     }
     await box.putAll(entries);
+  }
+
+  /// Stores comments in the same Hive entry as their post, under its update ID.
+  Future<void> saveComments(String updateId, List<Comment> comments) async {
+    final box = _requireBox;
+    final envelope = _readEnvelope(box.get(updateId));
+    if (envelope == null) return;
+    envelope[_commentsKey] = comments.map((comment) => comment.toJson()).toList();
+    await box.put(updateId, jsonEncode(envelope));
+  }
+
+  /// Returns null when comments have not been cached; an empty list means the
+  /// post was checked and currently has no comments.
+  List<Comment>? loadComments(String updateId) {
+    final envelope = _readEnvelope(_requireBox.get(updateId));
+    final rawComments = envelope?[_commentsKey];
+    if (rawComments is! List) return null;
+    try {
+      return rawComments
+          .whereType<Map>()
+          .map((comment) => Comment.fromJson(Map<String, dynamic>.from(comment)))
+          .toList(growable: false);
+    } catch (_) {
+      return null;
+    }
   }
 
   /// Persists the user's reaction locally, keyed by its source server and
@@ -202,13 +232,22 @@ class UpdatesCacheService {
 
   /// Returns `(savedAtMillis, Update)`, or `null` for malformed entries.
   (int, Update)? _decode(String? raw) {
-    if (raw == null) return null;
     try {
-      final map = jsonDecode(raw) as Map<String, dynamic>;
+      final map = _readEnvelope(raw);
+      if (map == null) return null;
       final savedAt = map[_savedAtKey];
       final updateJson = map[_updateKey];
       if (savedAt is! int || updateJson is! Map) return null;
       return (savedAt, Update.fromJson(Map<String, dynamic>.from(updateJson)));
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Map<String, dynamic>? _readEnvelope(String? raw) {
+    if (raw == null) return null;
+    try {
+      return Map<String, dynamic>.from(jsonDecode(raw) as Map);
     } catch (_) {
       return null;
     }

@@ -3,6 +3,8 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../engine/network/api_client.dart';
+import '../engine/network/auth_failure_handler.dart';
 import '../engine/network/updates/updates.dart';
 import '../state/providers.dart';
 import '../widgets/app_theme.dart';
@@ -80,6 +82,7 @@ class _UpdatesScreenState extends ConsumerState<UpdatesScreen> {
     );
     if (post.serverId.isEmpty || (!selectedLiked && !selectedDisliked)) return;
     try {
+      await _ensureServerRegistered(post.serverId);
       await UpdatesActionsService(serverId: post.serverId).markUpdateRead(
         updateId: post.updateId,
         like: selectedLiked,
@@ -88,6 +91,14 @@ class _UpdatesScreenState extends ConsumerState<UpdatesScreen> {
     } catch (_) {
       // A peer server can be offline while the rest of the feed remains usable.
     }
+  }
+
+  Future<void> _ensureServerRegistered(String serverId) async {
+    if (ApiClient.isRegistered(serverId)) return;
+    await ApiClient.registerServer(
+      serverId: serverId,
+      onAuthFailure: serverAuthFailureCallbackFor(serverId),
+    );
   }
 
   void _openTab(NavigationTab tab) {
@@ -222,6 +233,9 @@ class _UpdatesScreenState extends ConsumerState<UpdatesScreen> {
                                 padding: const EdgeInsets.only(bottom: 16.0),
                                 child: UpdateComponent(
                                   key: ValueKey(post.updateId),
+                                  updateId: post.updateId,
+                                  serverId: post.serverId,
+                                  ensureServerRegistered: _ensureServerRegistered,
                                   avatarUrl: post.avatarUrl,
                                   nickname: post.nickname,
                                   timeText: post.timeText,

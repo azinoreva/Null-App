@@ -49,6 +49,7 @@ class MessageReaction {
 
 class ChatMessageItem {
   final String id;
+  final String? logicalId;
   final bool isMe;
   final ChatType chatType;
   final SenderPresentation? sender;
@@ -58,11 +59,13 @@ class ChatMessageItem {
   final String? mediaUrl;
   final String timestamp;
   final bool isEdited;
+  final bool pinned;
   final DeliveryStatus? deliveryStatus;
   final List<MessageReaction>? reactions;
 
   const ChatMessageItem({
     required this.id,
+    this.logicalId,
     required this.isMe,
     required this.chatType,
     this.sender,
@@ -72,6 +75,7 @@ class ChatMessageItem {
     this.mediaUrl,
     required this.timestamp,
     this.isEdited = false,
+    this.pinned = false,
     this.deliveryStatus,
     this.reactions,
   });
@@ -87,6 +91,7 @@ class ChatBubbleComponent extends StatelessWidget {
   final Function(String emoji)? onReactionClick;
   final Function(String url)? onMediaClick;
   final Function(String url)? onLinkClick;
+  final VoidCallback? onLongPress;
 
   const ChatBubbleComponent({
     super.key,
@@ -95,6 +100,7 @@ class ChatBubbleComponent extends StatelessWidget {
     this.onReactionClick,
     this.onMediaClick,
     this.onLinkClick,
+    this.onLongPress,
   });
 
   @override
@@ -135,11 +141,33 @@ class ChatBubbleComponent extends StatelessWidget {
                     ),
                   ),
 
+                // Pinned marker
+                if (message.pinned)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 4.0, left: 4.0),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: const [
+                        Icon(Icons.push_pin, size: 12.0, color: Color(0xFF2EB82E)),
+                        SizedBox(width: 4.0),
+                        Text(
+                          'Pinned',
+                          style: TextStyle(
+                            fontSize: 10.0,
+                            color: Color(0xFF2EB82E),
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
                 // Main Chat Container
                 GestureDetector(
                   onDoubleTap: () {
                     if (onReplyClick != null) onReplyClick!(message.id);
                   },
+                  onLongPress: onLongPress,
                   child: Container(
                     padding: const EdgeInsets.all(12.0),
                     decoration: BoxDecoration(

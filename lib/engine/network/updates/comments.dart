@@ -11,7 +11,7 @@ class Comment {
   final String updateId;
   final String commentId;
   final String userId;
-  final String nickname;
+  final String? nickname;
   final String text;
   final String? replyTo;
   final String? atUser;
@@ -31,7 +31,7 @@ class Comment {
       updateId: json['update_id'] as String,
       commentId: json['comment_id'] as String,
       userId: json['user_id'] as String,
-      nickname: json['nickname'] as String,
+      nickname: json['nickname'] as String?,
       text: json['text'] as String,
       replyTo: json['reply_to'] as String?,
       atUser: json['at_user'] as String?,
