@@ -38,7 +38,7 @@ class Update {
   final String nickname;
   final UpdateMedia? media;
   final String text;
-  final String category;
+  final String? category;
   final String hashtag;
   final String updateId;
 
@@ -47,7 +47,7 @@ class Update {
     required this.nickname,
     this.media,
     required this.text,
-    required this.category,
+    this.category,
     required this.hashtag,
     required this.updateId,
   });
@@ -60,7 +60,7 @@ class Update {
           ? UpdateMedia.fromJson(json['media'] as Map<String, dynamic>)
           : null,
       text: json['text'] as String,
-      category: json['category'] as String,
+      category: json['category'] as String?,
       hashtag: json['hashtag'] as String,
       updateId: json['update_id'] as String,
     );

@@ -1,3 +1,4 @@
+import '../../network/updates/updates_categories.dart';
 
 /// Groups used to section the feed-control picker UI.
 enum CategoryGroup {
@@ -16,127 +17,90 @@ enum CategoryGroup {
   final String label;
 }
 
-/// All feed categories. `name` is the storage id (matches the Python values).
-enum Categories {
-  // News & Current Affairs
-  politics('Politics', CategoryGroup.news),
-  government('Government', CategoryGroup.news),
-  law('Law', CategoryGroup.news),
-  news('News', CategoryGroup.news),
-  world('World', CategoryGroup.news),
-  local('Local', CategoryGroup.news),
-  crime('Crime', CategoryGroup.news),
-  weather('Weather', CategoryGroup.news),
+/// A feed category. The available IDs come from the backend's
+/// `/api/sub-categories` response, cached in Hive by [UpdatesCategoriesService].
+/// IDs remain the stable values stored in SharedPreferences and sent to APIs.
+class Categories {
+  const Categories._(this.id, this.label, this.group, this.subcategories);
 
-  // Business & Economy
-  business('Business', CategoryGroup.business),
-  finance('Finance', CategoryGroup.business),
-  investing('Investing', CategoryGroup.business),
-  crypto('Crypto', CategoryGroup.business),
-  markets('Markets', CategoryGroup.business),
-  startups('Startups', CategoryGroup.business),
-  economy('Economy', CategoryGroup.business),
-  real_estate('Real Estate', CategoryGroup.business),
-  jobs('Jobs', CategoryGroup.business),
-  career('Career', CategoryGroup.business),
-
-  // Tech & Science
-  technology('Technology', CategoryGroup.tech),
-  gadgets('Gadgets', CategoryGroup.tech),
-  ai('AI', CategoryGroup.tech),
-  software('Software', CategoryGroup.tech),
-  cybersecurity('Cybersecurity', CategoryGroup.tech),
-  science('Science', CategoryGroup.tech),
-  space('Space', CategoryGroup.tech),
-  environment('Environment', CategoryGroup.tech),
-  climate('Climate', CategoryGroup.tech),
-
-  // Health & Lifestyle
-  health('Health', CategoryGroup.health),
-  medicine('Medicine', CategoryGroup.health),
-  nutrition('Nutrition', CategoryGroup.health),
-  fitness('Fitness', CategoryGroup.health),
-  wellness('Wellness', CategoryGroup.health),
-  mental_health('Mental Health', CategoryGroup.health),
-  parenting('Parenting', CategoryGroup.health),
-  relationships('Relationships', CategoryGroup.health),
-  lifestyle('Lifestyle', CategoryGroup.health),
-
-  // Education & Learning
-  education('Education', CategoryGroup.education),
-  academic('Academic', CategoryGroup.education),
-  learning('Learning', CategoryGroup.education),
-  books('Books', CategoryGroup.education),
-  languages('Languages', CategoryGroup.education),
-
-  // Entertainment & Culture
-  entertainment('Entertainment', CategoryGroup.entertainment),
-  movies('Movies', CategoryGroup.entertainment),
-  tv('TV', CategoryGroup.entertainment),
-  music('Music', CategoryGroup.entertainment),
-  art('Art', CategoryGroup.entertainment),
-  theater('Theater', CategoryGroup.entertainment),
-  celebrity('Celebrity', CategoryGroup.entertainment),
-  pop_culture('Pop Culture', CategoryGroup.entertainment),
-
-  // Sports
-  sports('Sports', CategoryGroup.sports),
-  football('Football', CategoryGroup.sports),
-  basketball('Basketball', CategoryGroup.sports),
-  soccer('Soccer', CategoryGroup.sports),
-  tennis('Tennis', CategoryGroup.sports),
-  motorsports('Motorsports', CategoryGroup.sports),
-  esports('Esports', CategoryGroup.sports),
-  gaming('Gaming', CategoryGroup.sports),
-
-  // Other Interests
-  travel('Travel', CategoryGroup.interests),
-  food('Food', CategoryGroup.interests),
-  cooking('Cooking', CategoryGroup.interests),
-  drinks('Drinks', CategoryGroup.interests),
-  fashion('Fashion', CategoryGroup.interests),
-  beauty('Beauty', CategoryGroup.interests),
-  home_garden('Home & Garden', CategoryGroup.interests),
-  diy('DIY', CategoryGroup.interests),
-  automotive('Automotive', CategoryGroup.interests),
-  pets('Pets', CategoryGroup.interests),
-  animals('Animals', CategoryGroup.interests),
-  hobbies('Hobbies', CategoryGroup.interests),
-  photography('Photography', CategoryGroup.interests),
-
-  // Society
-  religion('Religion', CategoryGroup.society),
-  spirituality('Spirituality', CategoryGroup.society),
-  social('Social', CategoryGroup.society),
-  community('Community', CategoryGroup.society),
-  activism('Activism', CategoryGroup.society),
-  history('History', CategoryGroup.society);
-
-  const Categories(this.label, this.group);
-
-  /// Human readable name, e.g. "Pop Culture".
+  final String id;
   final String label;
-
-  /// Section this category belongs to in the picker.
   final CategoryGroup group;
+  final List<String> subcategories;
 
-  /// Stable id used for persistence.
-  String get id => name;
+  /// Current backend categories in the order returned by the service.
+  static List<Categories> get values {
+    final entries = UpdatesCategoriesService.instance.categoryEntries;
+    return entries.entries
+        .map((entry) => Categories._(
+              entry.key,
+              _labelFor(entry.key),
+              _groupFor(entry.key),
+              entry.value,
+            ))
+        .toList(growable: false);
+  }
 
-  /// Parses a stored id. Returns `null` for unknown/removed categories.
   static Categories? fromId(String id) {
-    for (final c in Categories.values) {
-      if (c.name == id) return c;
-    }
-    return null;
+    final subcategories =
+        UpdatesCategoriesService.instance.categoryEntries[id];
+    if (subcategories == null) return null;
+    return Categories._(id, _labelFor(id), _groupFor(id), subcategories);
   }
 
-  /// All categories grouped for a sectioned list UI.
-  static Map<CategoryGroup, List<Categories>> get grouped {
-    final map = <CategoryGroup, List<Categories>>{};
-    for (final c in Categories.values) {
-      map.putIfAbsent(c.group, () => <Categories>[]).add(c);
+  static String _labelFor(String id) => id
+      .split(RegExp(r'[-_]'))
+      .where((part) => part.isNotEmpty)
+      .map((part) => '${part[0].toUpperCase()}${part.substring(1)}')
+      .join(' ');
+
+  // Keep familiar sections for current category IDs. New backend IDs appear
+  // automatically and use the general interests section until classified.
+  static CategoryGroup _groupFor(String id) {
+    const groups = <CategoryGroup, Set<String>>{
+      CategoryGroup.news: {
+        'politics', 'government', 'law', 'news', 'world', 'local', 'crime',
+        'weather', 'disaster',
+      },
+      CategoryGroup.business: {
+        'business', 'finance', 'investing', 'crypto', 'markets', 'startups',
+        'economy', 'real_estate', 'jobs', 'career',
+      },
+      CategoryGroup.tech: {
+        'technology', 'gadgets', 'ai', 'software', 'cybersecurity', 'science',
+        'space', 'environment', 'climate',
+      },
+      CategoryGroup.health: {
+        'health', 'medicine', 'nutrition', 'fitness', 'wellness',
+        'mental_health', 'parenting', 'relationships', 'lifestyle',
+      },
+      CategoryGroup.education: {'education', 'academic', 'learning', 'books', 'languages'},
+      CategoryGroup.entertainment: {
+        'entertainment', 'movies', 'tv', 'music', 'art', 'theater', 'celebrity',
+        'pop_culture',
+      },
+      CategoryGroup.sports: {
+        'sports', 'football', 'basketball', 'soccer', 'tennis', 'motorsports',
+        'esports', 'gaming',
+      },
+      CategoryGroup.interests: {
+        'travel', 'food', 'cooking', 'drinks', 'fashion', 'beauty',
+        'home_garden', 'diy', 'automotive', 'pets', 'animals', 'hobbies',
+        'photography',
+      },
+      CategoryGroup.society: {
+        'religion', 'spirituality', 'social', 'community', 'activism', 'history',
+      },
+    };
+    for (final entry in groups.entries) {
+      if (entry.value.contains(id)) return entry.key;
     }
-    return map;
+    return CategoryGroup.interests;
   }
+
+  @override
+  bool operator ==(Object other) => other is Categories && other.id == id;
+
+  @override
+  int get hashCode => id.hashCode;
 }

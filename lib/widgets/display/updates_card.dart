@@ -23,6 +23,10 @@ class UpdateComponent extends StatefulWidget {
   final void Function(bool liked, bool disliked)? onReactionChanged;
   final VoidCallback? onHidePost;
 
+  /// Called the first time this card mounts, so the underlying post can be
+  /// marked seen in the feed's seen cache.
+  final VoidCallback? onSeen;
+
   const UpdateComponent({
     super.key,
     required this.updateId,
@@ -38,6 +42,7 @@ class UpdateComponent extends StatefulWidget {
     this.isReposted = false,
     this.onReactionChanged,
     this.onHidePost,
+    this.onSeen,
   });
 
   @override
@@ -53,6 +58,11 @@ class _UpdateComponentState extends State<UpdateComponent> {
   void initState() {
     super.initState();
     _syncState();
+    // Mark as seen once it has been laid out; ListView only builds items
+    // close to the viewport, so mounting approximates being on screen.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) widget.onSeen?.call();
+    });
   }
 
   @override
@@ -555,7 +565,7 @@ class _UpdatePostDialogState extends State<UpdatePostDialog> {
     );
   }
 
-  Widget _comments(AppColorScheme theme) {
+  Widget _commentsSection(AppColorScheme theme) {
     final children = _childrenByParent();
     final ids = _comments.map((comment) => comment.commentId).toSet();
     final roots = _comments
@@ -796,7 +806,7 @@ class _UpdatePostDialogState extends State<UpdatePostDialog> {
         ),
         const SizedBox(height: 18),
         Divider(color: theme.border),
-        _comments(theme),
+        _commentsSection(theme),
       ],
     );
   }

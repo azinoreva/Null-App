@@ -35,7 +35,11 @@ class _UpdatesScreenState extends ConsumerState<UpdatesScreen> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      unawaited(ref.read(updatesFeedProvider.notifier).refresh());
+      final feed = ref.read(updatesFeedProvider.notifier);
+      // Opening the screen starts a new seen-session: posts already read on a
+      // previous visit are dropped before the refresh below lands.
+      feed.beginSession();
+      unawaited(feed.refresh());
     });
     _scrollController.addListener(_handleScroll);
   }
@@ -44,6 +48,8 @@ class _UpdatesScreenState extends ConsumerState<UpdatesScreen> {
   void dispose() {
     _scrollController.removeListener(_handleScroll);
     _scrollController.dispose();
+    // Push any buffered "seen" writes to disk before leaving the screen.
+    unawaited(ref.read(updatesFeedProvider.notifier).flushSeen());
     super.dispose();
   }
 
@@ -67,6 +73,10 @@ class _UpdatesScreenState extends ConsumerState<UpdatesScreen> {
   }
 
   Future<void> _refresh() => ref.read(updatesFeedProvider.notifier).refresh();
+
+  void _markSeen(PostData post) {
+    ref.read(updatesFeedProvider.notifier).markSeen(post);
+  }
 
   Future<void> _recordReaction(
     PostData post, {
@@ -250,6 +260,7 @@ class _UpdatesScreenState extends ConsumerState<UpdatesScreen> {
                                         liked: liked,
                                         disliked: disliked,
                                       ),
+                                  onSeen: () => _markSeen(post),
                                 ),
                               );
                             }

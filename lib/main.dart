@@ -18,6 +18,7 @@ import 'engine/network/main_server_client.dart';
 import 'engine/network/auth_failure_handler.dart';
 import 'engine/functions/servers/connect_serverfxn.dart';
 import 'engine/network/updates/updates_cache.dart';
+import 'engine/network/updates/updates_categories.dart';
 import 'engine/network/people/pending_contacts_cache.dart';
 import 'engine/network/server_connections.dart';
 import 'engine/network/presence_monitor.dart';
@@ -61,6 +62,7 @@ void main() async {
   await MainServerClient.init();
   await AppSettings.init();
   await UpdatesCacheService.instance.init();
+  await UpdatesCategoriesService.instance.init();
   await PendingContactsCacheService.instance.init();
   final database = await DatabaseInitializer.initialize();
   await const IdentityCrypto().ensureIdentityKey(database: database);

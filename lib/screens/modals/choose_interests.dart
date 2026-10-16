@@ -14,7 +14,7 @@ const int _kBatchSize = 5;
 ///
 /// Behavior:
 ///  - Categories load [ _kBatchSize] (5) at a time as the user scrolls,
-///    covering the full [Categories] enum.
+///    covering the categories returned by the backend.
 ///  - Tapping a row toggles it: selected rows stay in the list (highlighted
 ///    + checked) rather than disappearing, matching the mockup.
 ///  - Selecting a category bumps the remaining, not-yet-loaded categories
@@ -296,15 +296,18 @@ class _CategoryRow extends StatelessWidget {
   });
 
   IconData get _icon {
-    const overrides = <Categories, IconData>{
-      Categories.politics: Icons.public,
-      Categories.technology: Icons.memory,
-      Categories.music: Icons.music_note,
-      Categories.business: Icons.show_chart,
-      Categories.travel: Icons.flight,
-    };
-    final override = overrides[category];
-    if (override != null) return override;
+    switch (category.id) {
+      case 'politics':
+        return Icons.public;
+      case 'technology':
+        return Icons.memory;
+      case 'music':
+        return Icons.music_note;
+      case 'business':
+        return Icons.show_chart;
+      case 'travel':
+        return Icons.flight;
+    }
 
     switch (category.group) {
       case CategoryGroup.news:

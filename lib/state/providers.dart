@@ -15,6 +15,7 @@ import '../engine/network/auth_failure_handler.dart';
 import '../engine/network/updates/check_updates.dart';
 import '../engine/network/updates/comments.dart';
 import '../engine/network/updates/updates_cache.dart';
+import '../ai_algorithm/filters/filter.dart';
 import '../engine/network/people/pick_contact.dart';
 import '../engine/network/people/pending_contacts_cache.dart';
 import '../engine/database/queries/contacts_queries.dart';
@@ -32,6 +33,10 @@ import '../widgets/chats/chat_bubble_component.dart';
 class PostData {
   final String updateId;
   final String serverId;
+
+  /// Stable feed order (highest = newest). Assigned locally when an update is
+  /// first cached; the feed is sorted by it so pagination stays sequential.
+  final int order;
   final String avatarUrl;
   final String nickname;
   final String timeText;
@@ -44,6 +49,7 @@ class PostData {
   const PostData({
     required this.updateId,
     this.serverId = '',
+    this.order = 0,
     required this.avatarUrl,
     required this.nickname,
     required this.timeText,
@@ -57,6 +63,7 @@ class PostData {
   PostData copyWith({bool? isLiked, bool? isDisliked}) => PostData(
     updateId: updateId,
     serverId: serverId,
+    order: order,
     avatarUrl: avatarUrl,
     nickname: nickname,
     timeText: timeText,
@@ -740,6 +747,19 @@ class UpdatesFeedNotifier extends AsyncNotifier<UpdatesFeedState> {
   final Map<String, bool> _hasMoreByServer = {};
   final Set<String> _loadedUpdateIds = {};
 
+  /// Seen keys captured once when the notifier starts. Updates already seen in
+  /// a previous session are hidden; anything marked seen *this* session stays
+  /// on screen so the user can scroll back up to it.
+  Set<String> _sessionSeen = const {};
+
+  /// Seen keys already recorded this session, so a re-mounted card isn't
+  /// written to Hive twice.
+  final Set<String> _markedThisSession = {};
+
+  /// Batched, debounced seen writes so scrolling doesn't hammer Hive.
+  final Map<String, PostData> _pendingSeen = {};
+  Timer? _seenFlushTimer;
+
   /// The feed-control category ids the currently loaded feed was built from.
   /// Used to notice when the user changes their tags in Settings.
   List<String> _activeTags = const [];
@@ -752,23 +772,73 @@ class UpdatesFeedNotifier extends AsyncNotifier<UpdatesFeedState> {
     _activeTags = _currentTags();
     _settings!.addListener(_onSettingsChanged);
     ref.onDispose(() => _settings?.removeListener(_onSettingsChanged));
+    ref.onDispose(() {
+      _seenFlushTimer?.cancel();
+      unawaited(flushSeen());
+    });
 
     // Seed from the Hive cache so the feed renders immediately (and offline).
     // UpdatesScreen triggers a refresh whenever the route is entered.
     final cached = _cache.load();
+    final filteredCachedUpdates = await FeedFilter.instance.apply(
+      updates: cached.map((entry) => entry.update),
+      selectedCategories: AppSettings.instance.feedControlOrdered,
+    );
+    final allowedCachedKeys = filteredCachedUpdates
+        .map((update) => UpdatesCacheService.seenKeyFor(update.serverId, update.updateId))
+        .toSet();
+    final visibleCached = cached
+        .where((entry) => allowedCachedKeys.contains(
+              UpdatesCacheService.seenKeyFor(
+                entry.update.serverId,
+                entry.update.updateId,
+              ),
+            ))
+        .toList(growable: false);
+    _sessionSeen = _cache.loadSeenKeys();
     _loadedUpdateIds
       ..clear()
-      ..addAll(cached.map((update) => update.updateId));
-    if (cached.isEmpty) return const UpdatesFeedState(isRefreshing: true);
+      ..addAll(visibleCached.map((entry) => entry.update.updateId));
+    final posts = visibleCached
+        .where((entry) => !_isSessionSeen(entry.update))
+        .map(_toPostData)
+        .toList(growable: false);
+    if (visibleCached.isEmpty) return const UpdatesFeedState(isRefreshing: true);
     return UpdatesFeedState(
-      posts: cached.map(_toPostData).toList(),
+      posts: posts,
       isRefreshing: true,
       hasMore: true,
     );
   }
 
-  /// Category ids selected in Settings > Updates Preferences. An empty list
-  /// means "no tags" — the whole feed is requested.
+  bool _isSessionSeen(Update update) =>
+      _isSeen(update.serverId, update.updateId);
+
+  bool _isSeen(String serverId, String updateId) =>
+      _sessionSeen.contains(UpdatesCacheService.seenKeyFor(serverId, updateId));
+
+  /// Starts a new visit to the updates screen.
+  ///
+  /// This notifier is intentionally kept alive for the whole app, so [build]
+  /// only ever runs once — this is the session boundary instead. Anything seen
+  /// on an earlier visit is dropped from the visible list, while posts seen
+  /// during the current visit stay put until the next one.
+  void beginSession() {
+    // Keys still waiting to be flushed count too, so reopening immediately
+    // after leaving can't briefly resurrect an item that was just seen.
+    _sessionSeen = {..._cache.loadSeenKeys(), ..._pendingSeen.keys};
+    _markedThisSession.clear();
+    final current = state.value;
+    if (current == null) return;
+    final posts = current.posts
+        .where((post) => !_isSeen(post.serverId, post.updateId))
+        .toList(growable: false);
+    if (posts.length != current.posts.length) {
+      state = AsyncData(current.copyWith(posts: posts));
+    }
+  }
+
+  /// Category ids selected in Settings > Updates Preferences.
   List<String> _currentTags() => AppSettings.instance.feedControlOrdered
       .map((category) => category.id)
       .toList(growable: false);
@@ -776,7 +846,40 @@ class UpdatesFeedNotifier extends AsyncNotifier<UpdatesFeedState> {
   void _onSettingsChanged() {
     final tags = _currentTags();
     if (_listEquals(tags, _activeTags)) return;
-    unawaited(refresh());
+    unawaited(_refreshForCategoryChange());
+  }
+
+  Future<void> _refreshForCategoryChange() async {
+    final current = state.value;
+    if (current != null) {
+      final cached = _cache.load();
+      final allowed = await FeedFilter.instance.apply(
+        updates: cached.map((entry) => entry.update),
+        selectedCategories: AppSettings.instance.feedControlOrdered,
+      );
+      final allowedKeys = allowed
+          .map((update) => UpdatesCacheService.seenKeyFor(
+                update.serverId,
+                update.updateId,
+              ))
+          .toSet();
+      final latest = state.value;
+      if (latest != null) {
+        state = AsyncData(
+          latest.copyWith(
+            posts: latest.posts
+                .where((post) => allowedKeys.contains(
+                      UpdatesCacheService.seenKeyFor(
+                        post.serverId,
+                        post.updateId,
+                      ),
+                    ))
+                .toList(growable: false),
+          ),
+        );
+      }
+    }
+    await refresh();
   }
 
   bool _listEquals(List<String> a, List<String> b) {
@@ -827,7 +930,7 @@ class UpdatesFeedNotifier extends AsyncNotifier<UpdatesFeedState> {
     }.toList(growable: false);
   }
 
-  Future<List<Update>> _loadPage({required bool reset}) async {
+  Future<List<CachedUpdate>> _loadPage({required bool reset}) async {
     _activeTags = _currentTags();
     final serverIds = await _serverIds();
     if (reset) {
@@ -839,6 +942,7 @@ class UpdatesFeedNotifier extends AsyncNotifier<UpdatesFeedState> {
       _offsetByServer.addAll(_cache.loadOffsets());
       _hasMoreByServer.addAll(_cache.loadHasMore());
     }
+    if (_activeTags.isEmpty) return const [];
 
     final updates = <Update>[];
     for (final serverId in serverIds) {
@@ -884,11 +988,23 @@ class UpdatesFeedNotifier extends AsyncNotifier<UpdatesFeedState> {
       }
     }
 
-    if (updates.isNotEmpty) {
-      await _cache.save(updates);
-      unawaited(_prefetchComments(updates));
+    final filteredUpdates = await FeedFilter.instance.apply(
+      updates: updates,
+      selectedCategories: AppSettings.instance.feedControlOrdered,
+    );
+    if (filteredUpdates.isNotEmpty) {
+      final orders = await _cache.save(filteredUpdates);
+      unawaited(_prefetchComments(filteredUpdates));
+      return [
+        for (final update in filteredUpdates)
+          if (!_isSessionSeen(update))
+            CachedUpdate(
+              update: update,
+              order: orders[update.updateId] ?? 0,
+            ),
+      ];
     }
-    return updates;
+    return const [];
   }
 
   /// Fetches comments while the feed is being updated and caches them with
@@ -918,10 +1034,18 @@ class UpdatesFeedNotifier extends AsyncNotifier<UpdatesFeedState> {
   bool get _hasMoreServers => _hasMoreByServer.values.any((hasMore) => hasMore);
 
   Future<UpdatesFeedState> _loadFirstPage() async {
-    final updates = await _loadPage(reset: true);
+    var updates = await _loadPage(reset: true);
+    // If the first page was entirely seen already, keep pulling older pages
+    // until something unseen turns up (bounded so a fully-seen feed can't
+    // loop forever) so opening the screen never lands on an empty list.
+    var extraPages = 0;
+    while (updates.isEmpty && _hasMoreServers && extraPages < 3) {
+      extraPages++;
+      updates = await _loadPage(reset: false);
+    }
     return UpdatesFeedState(
-      posts: updates.map(_toPostData).toList(),
-      page: 1,
+      posts: _sortedPosts(updates.map(_toPostData)),
+      page: 1 + extraPages,
       hasMore: _hasMoreServers,
     );
   }
@@ -950,7 +1074,7 @@ class UpdatesFeedNotifier extends AsyncNotifier<UpdatesFeedState> {
 
       state = AsyncData(
         UpdatesFeedState(
-          posts: [...current.posts, ...updates.map(_toPostData)],
+          posts: _sortedPosts([...current.posts, ...updates.map(_toPostData)]),
           page: current.page + 1,
           hasMore: _hasMoreServers,
         ),
@@ -961,6 +1085,9 @@ class UpdatesFeedNotifier extends AsyncNotifier<UpdatesFeedState> {
       state = AsyncData(current.copyWith(isLoadingMore: false));
     }
   }
+
+  List<PostData> _sortedPosts(Iterable<PostData> posts) =>
+      posts.toList()..sort((a, b) => b.order.compareTo(a.order));
 
   /// Saves reaction state locally and updates the visible feed immediately.
   /// This state is restored from Hive; it is never fetched from the backend.
@@ -993,7 +1120,8 @@ class UpdatesFeedNotifier extends AsyncNotifier<UpdatesFeedState> {
     );
   }
 
-  PostData _toPostData(Update update) {
+  PostData _toPostData(CachedUpdate cached) {
+    final update = cached.update;
     final reaction = _cache.loadReaction(
       serverId: update.serverId,
       updateId: update.updateId,
@@ -1001,6 +1129,7 @@ class UpdatesFeedNotifier extends AsyncNotifier<UpdatesFeedState> {
     return PostData(
       updateId: update.updateId,
       serverId: update.serverId,
+      order: cached.order,
       avatarUrl:
           'https://api.dicebear.com/7.x/avataaars/png?seed='
           '${Uri.encodeComponent(update.nickname)}&size=128',
@@ -1011,6 +1140,39 @@ class UpdatesFeedNotifier extends AsyncNotifier<UpdatesFeedState> {
       isLiked: reaction.liked,
       isDisliked: reaction.disliked,
     );
+  }
+
+  /// Records [post] as seen. Writes are debounced and batched so a screen of
+  /// cards mounting (or scrolling) doesn't hit Hive once per item.
+  ///
+  /// Seen state is persisted but never mutates the on-screen list, so items
+  /// stay visible within the session and only disappear on the next open.
+  void markSeen(PostData post) {
+    if (post.serverId.isEmpty || post.updateId.isEmpty) return;
+    final key = UpdatesCacheService.seenKeyFor(post.serverId, post.updateId);
+    if (!_markedThisSession.add(key)) return;
+    _pendingSeen[key] = post;
+    _seenFlushTimer?.cancel();
+    _seenFlushTimer = Timer(const Duration(milliseconds: 400), () {
+      unawaited(flushSeen());
+    });
+  }
+
+  /// Forces any buffered seen writes to disk now (used before disposal).
+  Future<void> flushSeen() async {
+    _seenFlushTimer?.cancel();
+    _seenFlushTimer = null;
+    if (_pendingSeen.isEmpty) return;
+    final items = _pendingSeen.values.toList(growable: false);
+    _pendingSeen.clear();
+    try {
+      await _cache.markSeenBatch([
+        for (final post in items)
+          (serverId: post.serverId, updateId: post.updateId, order: post.order),
+      ]);
+    } catch (_) {
+      // Seen state is best-effort; a cache failure must never break the feed.
+    }
   }
 }
 
